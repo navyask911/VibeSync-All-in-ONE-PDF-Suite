@@ -23,7 +23,7 @@
         android:maxSdkVersion="32" />
 
     <application
-        android:name=".OmniPdfApp"
+        android:name=".VibeSyncApp"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
@@ -31,7 +31,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.OmniPDFStudio"
+        android:theme="@style/Theme.VibeSyncPDFStudio"
         tools:targetApi="35">
 
         <!-- Google AdMob Application ID (Official Production App ID) -->
@@ -44,7 +44,7 @@
             android:exported="true"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
             android:windowSoftInputMode="adjustResize"
-            android:theme="@style/Theme.OmniPDFStudio">
+            android:theme="@style/Theme.VibeSyncPDFStudio">
             
             <!-- Standard Launcher Intent -->
             <intent-filter>

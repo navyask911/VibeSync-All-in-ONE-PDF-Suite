@@ -1,0 +1,131 @@
+package com.vibesync.toolkit.pdf
+
+import android.app.Application
+import android.net.Uri
+import androidx.compose.ui.test.*
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.vibesync.toolkit.pdf.data.model.PageMetadata
+import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
+import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
+import io.mockk.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import org.junit.Before
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+
+@RunWith(AndroidJUnit4::class)
+class PdfViewerScreenTest {
+
+    @get:Rule
+    val composeTestRule = createComposeRule()
+
+    private lateinit var mockViewModel: PdfViewerViewModel
+    private val testUri = Uri.parse("content://com.vibesync.toolkit.pdf/sample.pdf")
+
+    @Before
+    fun setUp() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        mockViewModel = mockk(relaxed = true)
+    }
+
+    @Test
+    fun testRapidContinuousVerticalScrollAndZoomGestures() {
+        // Setup 30 mock pages to test continuous rapid vertical list scroll
+        val pages = (1..30).map { PageMetadata(pageIndex = it - 1, width = 595, height = 842, aspectRatio = 595f / 842f) }
+        val stateFlow = MutableStateFlow(
+            com.omnidoc.toolkit.pdf.presentation.viewer.ViewerUiState(
+                fileName = "Large_Catalog_2026.pdf",
+                pageCount = 30,
+                currentPageIndex = 0,
+                isLoading = false,
+                pagesMetadata = pages
+            )
+        )
+        every { mockViewModel.uiState } returns stateFlow
+        coEvery { mockViewModel.getPageBitmap(any(), any()) } returns null
+
+        composeTestRule.setContent {
+            PdfViewerScreen(
+                documentUri = testUri,
+                viewModel = mockViewModel,
+                onNavigateBack = {},
+                onNavigateToEditor = {}
+            )
+        }
+
+        // Verify document title and page count appear in top bar
+        composeTestRule.onNodeWithText("Large_Catalog_2026.pdf").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Page 1 of 30").assertIsDisplayed()
+
+        // Rapid continuous vertical scroll gestures to verify OOM-safe LazyColumn recycling
+        val listNode = composeTestRule.onNodeWithContentDescription("PDF Page 1", useUnmergedTree = true)
+        listNode.assertExists()
+
+        // Swipe up multiple times rapidly
+        composeTestRule.onRoot().performTouchInput {
+            swipeUp(durationMillis = 100)
+            swipeUp(durationMillis = 100)
+            swipeUp(durationMillis = 100)
+        }
+
+        // Verify editor action button remains responsive
+        composeTestRule.onNodeWithContentDescription("Edit & Sign").assertIsDisplayed().performClick()
+    }
+
+    @Test
+    fun testPasswordDialogSubmissionAndPasswordVisibilityToggle() {
+        val stateFlow = MutableStateFlow(
+            com.omnidoc.toolkit.pdf.presentation.viewer.ViewerUiState(
+                fileName = "Protected_Financial_Audit.pdf",
+                pageCount = 0,
+                isLoading = false,
+                isPasswordRequired = true,
+                errorMessage = "Document is encrypted. Enter password to view."
+            )
+        )
+        every { mockViewModel.uiState } returns stateFlow
+
+        composeTestRule.setContent {
+            PdfViewerScreen(
+                documentUri = testUri,
+                viewModel = mockViewModel,
+                onNavigateBack = {},
+                onNavigateToEditor = {}
+            )
+        }
+
+        // 1. Verify Password Dialog is displayed with accessibility metadata
+        composeTestRule.onNodeWithText("Password Protected PDF").assertIsDisplayed()
+        composeTestRule.onNodeWithText("This document is secured with encryption. Please enter the password to view pages.").assertIsDisplayed()
+
+        // 2. Find Password Input and enter text
+        val passwordField = composeTestRule.onNodeWithText("Password")
+        passwordField.assertIsDisplayed()
+        passwordField.performTextInput("SecretVault2026!")
+
+        // 3. Test Password Visibility Toggle ("Show password" <-> "Hide password")
+        val toggleButton = composeTestRule.onNodeWithContentDescription("Show password")
+        toggleButton.assertIsDisplayed()
+
+        // Click to toggle visibility on
+        toggleButton.performClick()
+
+        // Verify accessibility description changes to "Hide password"
+        composeTestRule.onNodeWithContentDescription("Hide password").assertIsDisplayed()
+
+        // Click to toggle visibility back off
+        composeTestRule.onNodeWithContentDescription("Hide password").performClick()
+        composeTestRule.onNodeWithContentDescription("Show password").assertIsDisplayed()
+
+        // 4. Submit password via "Unlock" button
+        val unlockButton = composeTestRule.onNodeWithText("Unlock")
+        unlockButton.assertIsDisplayed()
+        unlockButton.performClick()
+
+        // Verify viewModel received password submission
+        verify(exactly = 1) { mockViewModel.submitPassword("SecretVault2026!") }
+    }
+}

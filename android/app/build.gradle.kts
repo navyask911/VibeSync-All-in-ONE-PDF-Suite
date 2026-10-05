@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    namespace = "com.omnidoc.toolkit.pdf"
+    namespace = "com.vibesync.toolkit.pdf"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.omnidoc.toolkit.pdf"
+        applicationId = "com.vibesync.toolkit.pdf"
         minSdk = 24
         targetSdk = 35
         versionCode = 1

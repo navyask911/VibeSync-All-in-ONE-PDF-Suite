@@ -46,7 +46,7 @@
 The codebase adheres strictly to **Clean Architecture & MVVM** with unidirectional data flow (UDF):
 
 ```
-android/app/src/main/java/com/omnidoc/toolkit/pdf/
+android/app/src/main/java/com/vibesync/toolkit/pdf/
 ├── core/
 │   ├── designsystem/     # VibeSync Crimson & Ruby design tokens, typography, surfaces
 │   ├── security/         # MasterKey AES-256-GCM cryptographic vault
@@ -62,7 +62,7 @@ android/app/src/main/java/com/omnidoc/toolkit/pdf/
 │   ├── tools/            # Split, Merge, Encrypt, Convert Tool Screens
 │   └── viewer/           # Continuous LazyColumn PdfViewerScreen, PdfViewerViewModel
 ├── MainActivity.kt       # Single-activity Jetpack Compose navigation host
-└── OmniPdfApp.kt         # Application entry point & PDFBox font cache initialization
+└── VibeSyncApp.kt        # Application entry point & PDFBox font cache initialization
 ```
 
 ---
