@@ -9,6 +9,7 @@ coverage/
 
 # Gradle & Android
 .gradle/
+**/build/
 build/
 */build/
 app/build/
@@ -18,8 +19,9 @@ android/.gradle/
 .idea/
 local.properties
 .cxx/
+captures/
 
-# Keystores & Signing Secrets
+# Keystores & Signing Secrets (Never commit credentials)
 *.jks
 *.keystore
 keystore_base64.txt

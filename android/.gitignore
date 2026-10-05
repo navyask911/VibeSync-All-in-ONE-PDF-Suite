@@ -1,6 +1,7 @@
 # Android Studio and Gradle exclusions
 .gradle/
 build/
+**/build/
 app/build/
 *.iml
 .idea/
@@ -8,7 +9,7 @@ local.properties
 .cxx/
 captures/
 
-# Keystores & Signing
+# Keystores & Signing Secrets (Never commit credentials)
 *.jks
 *.keystore
 release.keystore
@@ -17,3 +18,4 @@ debug.keystore
 # Build Outputs
 *.apk
 *.aab
+*.ap_
