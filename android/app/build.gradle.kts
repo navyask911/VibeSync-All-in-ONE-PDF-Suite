@@ -23,7 +23,7 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystoreFile = file("release-upload.jks")
+            val keystoreFile = rootProject.file("app/release-upload.jks")
             if (keystoreFile.exists() && keystoreFile.length() > 0) {
                 storeFile = keystoreFile
                 storePassword = System.getenv("RELEASE_STORE_PASSWORD") ?: ""
@@ -37,7 +37,7 @@ android {
         release {
             isMinifyEnabled = false
             isShrinkResources = false
-            val keystoreFile = file("release-upload.jks")
+            val keystoreFile = rootProject.file("app/release-upload.jks")
             if (keystoreFile.exists() && keystoreFile.length() > 0) {
                 signingConfig = signingConfigs.getByName("release")
             } else {
