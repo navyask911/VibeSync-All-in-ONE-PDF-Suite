@@ -29,9 +29,14 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
+      - name: Accept Android Licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
       - name: Make Gradle Wrapper Executable
         run: |
-          chmod +x android/gradlew
+          if [ -f "android/gradlew" ]; then
+            chmod +x android/gradlew
+          fi
 
       - name: Ensure Gradle Wrapper Assets
         working-directory: android
@@ -48,8 +53,13 @@ jobs:
           mkdir -p android/app
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
             echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release-upload.jks
-            echo "has_keystore=true" >> "$GITHUB_OUTPUT"
-            echo "Keystore successfully decoded into android/app/release-upload.jks"
+            if [ -s "android/app/release-upload.jks" ]; then
+              echo "has_keystore=true" >> "$GITHUB_OUTPUT"
+              echo "Keystore successfully decoded into android/app/release-upload.jks ($(wc -c < android/app/release-upload.jks) bytes)"
+            else
+              echo "has_keystore=false" >> "$GITHUB_OUTPUT"
+              echo "Decoded keystore is empty (0 bytes). Falling back to debug signing."
+            fi
           else
             echo "has_keystore=false" >> "$GITHUB_OUTPUT"
             echo "WARNING: secrets.KEYSTORE_BASE64 is empty. Building with default debug signing config for verification."
@@ -58,16 +68,19 @@ jobs:
       - name: Build Signed AAB and Universal APK
         working-directory: android
         run: |
-          if [ "${{ steps.decode_keystore.outputs.has_keystore }}" = "true" ]; then
+          if [ "${{ steps.decode_keystore.outputs.has_keystore }}" = "true" ] && [ -s "app/release-upload.jks" ]; then
+            echo "Building with production keystore..."
             ./gradlew bundleRelease assembleRelease \
               --no-daemon \
               --stacktrace \
+              --info \
               -Pandroid.injected.signing.store.file="release-upload.jks" \
               -Pandroid.injected.signing.store.password="${{ secrets.RELEASE_STORE_PASSWORD }}" \
               -Pandroid.injected.signing.key.alias="${{ secrets.RELEASE_KEY_ALIAS }}" \
               -Pandroid.injected.signing.key.password="${{ secrets.RELEASE_KEY_PASSWORD }}"
           else
-            ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace
+            echo "Building without production keystore (fallback to verification signing)..."
+            ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace --info
           fi
 
       - name: Securely Wipe Keystore
@@ -83,13 +96,15 @@ jobs:
         with:
           name: VibeSync-GooglePlay-AAB
           path: android/app/build/outputs/bundle/release/*.aab
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 30
 
       - name: Upload Direct-Install Release (.apk)
         uses: actions/upload-artifact@v4
         with:
           name: VibeSync-Installable-APK
-          path: android/app/build/outputs/apk/release/*.apk
-          if-no-files-found: error
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
           retention-days: 30

@@ -6,18 +6,30 @@ plugins {
 
 android {
     namespace = "com.omnidoc.toolkit.pdf"
-    compileSdk = 36
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.omnidoc.toolkit.pdf"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
             useSupportLibrary = true
+        }
+    }
+
+    signingConfigs {
+        create("release") {
+            val keystoreFile = rootProject.file("app/release-upload.jks")
+            if (keystoreFile.exists() && keystoreFile.length() > 0) {
+                storeFile = keystoreFile
+                storePassword = project.findProperty("android.injected.signing.store.password") as? String ?: System.getenv("RELEASE_STORE_PASSWORD") ?: ""
+                keyAlias = project.findProperty("android.injected.signing.key.alias") as? String ?: System.getenv("RELEASE_KEY_ALIAS") ?: ""
+                keyPassword = project.findProperty("android.injected.signing.key.password") as? String ?: System.getenv("RELEASE_KEY_PASSWORD") ?: ""
+            }
         }
     }
 
@@ -29,7 +41,12 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug") // Replace with production release keystore in CI/CD
+            val releaseKeystore = rootProject.file("app/release-upload.jks")
+            if (releaseKeystore.exists() && releaseKeystore.length() > 0) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
+            }
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -40,6 +57,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlin {
+        jvmToolchain(17)
     }
 
     kotlinOptions {
