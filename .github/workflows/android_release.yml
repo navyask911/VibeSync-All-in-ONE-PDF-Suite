@@ -45,7 +45,8 @@ jobs:
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
-          gradle :app:assembleRelease :app:bundleRelease --no-daemon --info --stacktrace -x test -x lint
+          chmod +x gradlew
+          ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace -x test -x lint
 
       - name: Secure Clean Keystore
         if: always()
