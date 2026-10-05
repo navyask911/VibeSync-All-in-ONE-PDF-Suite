@@ -78,6 +78,10 @@ android {
     }
 }
 
+kotlin {
+    jvmToolchain(17)
+}
+
 dependencies {
     // Platform Architecture & Core Android
     implementation("androidx.core:core-ktx:1.15.0")
