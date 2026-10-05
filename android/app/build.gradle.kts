@@ -38,10 +38,10 @@ android {
             isMinifyEnabled = false
             isShrinkResources = false
             val keystoreFile = rootProject.file("app/release-upload.jks")
-            if (keystoreFile.exists() && keystoreFile.length() > 0) {
-                signingConfig = signingConfigs.getByName("release")
+            signingConfig = if (keystoreFile.exists() && keystoreFile.length() > 0) {
+                signingConfigs.getByName("release")
             } else {
-                signingConfig = signingConfigs.getByName("debug")
+                signingConfigs.getByName("debug")
             }
         }
         debug {
