@@ -463,7 +463,7 @@ fun DashboardScreen(
             onDismissRequest = { showPrivacyDialog = false },
             icon = {
                 Icon(
-                    imageVector = Icons.Default.Shield,
+                    imageVector = Icons.Default.Security,
                     contentDescription = null,
                     tint = Color(0xFF10B981),
                     modifier = Modifier.size(36.dp)

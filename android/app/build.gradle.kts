@@ -21,32 +21,11 @@ android {
         }
     }
 
-    signingConfigs {
-        create("release") {
-            val keystoreFile = file("release-upload.jks")
-            if (keystoreFile.exists() && keystoreFile.length() > 0) {
-                storeFile = keystoreFile
-                storePassword = project.findProperty("android.injected.signing.store.password") as? String ?: System.getenv("RELEASE_STORE_PASSWORD") ?: ""
-                keyAlias = project.findProperty("android.injected.signing.key.alias") as? String ?: System.getenv("RELEASE_KEY_ALIAS") ?: ""
-                keyPassword = project.findProperty("android.injected.signing.key.password") as? String ?: System.getenv("RELEASE_KEY_PASSWORD") ?: ""
-            }
-        }
-    }
-
     buildTypes {
         release {
-            isMinifyEnabled = false // Temporarily disable minification to ensure compilation passes first
+            isMinifyEnabled = false
             isShrinkResources = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
-            val keystoreFile = file("release-upload.jks")
-            if (keystoreFile.exists() && keystoreFile.length() > 0) {
-                signingConfig = signingConfigs.getByName("release")
-            } else {
-                signingConfig = signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("debug")
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -57,10 +36,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-
-    kotlin {
-        jvmToolchain(17)
     }
 
     kotlinOptions {
@@ -97,7 +72,7 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
-    implementation("androidx.compose.material3:material3:1.3.1")
+    implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.navigation:navigation-compose:2.8.3")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
