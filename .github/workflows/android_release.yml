@@ -45,6 +45,7 @@ jobs:
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
+          gradle wrapper --gradle-version 8.7
           chmod +x gradlew
           ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --stacktrace -x test -x lint
 

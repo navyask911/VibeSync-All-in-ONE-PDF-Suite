@@ -8,6 +8,8 @@ app/build/
 local.properties
 .cxx/
 captures/
+!gradle/wrapper/gradle-wrapper.jar
+!**/gradle/wrapper/gradle-wrapper.jar
 
 # Keystores & Signing Secrets (Never commit credentials)
 *.jks
