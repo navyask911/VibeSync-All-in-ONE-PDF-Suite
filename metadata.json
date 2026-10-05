@@ -1,6 +1,8 @@
 {
-  "name": "OmniPDF Studio",
+  "name": "VibeSync All in ONE PDF Suite",
   "description": "Production-ready clean-room native Android PDF Suite & Toolkit built with Jetpack Compose, ML Kit Document Scanner, and PdfBox-Android.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

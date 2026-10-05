@@ -31,12 +31,16 @@ jobs:
 
       - name: Make Gradle Wrapper Executable
         run: |
-          if [ -f "android/gradlew" ]; then
-            chmod +x android/gradlew
+          chmod +x android/gradlew
+
+      - name: Ensure Gradle Wrapper Assets
+        working-directory: android
+        run: |
+          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+            echo "Bootstrapping Gradle wrapper..."
+            gradle wrapper --gradle-version 8.7 || true
           fi
-          if [ -f "gradlew" ]; then
-            chmod +x gradlew
-          fi
+          chmod +x gradlew
 
       - name: Decode Release Keystore
         id: decode_keystore
