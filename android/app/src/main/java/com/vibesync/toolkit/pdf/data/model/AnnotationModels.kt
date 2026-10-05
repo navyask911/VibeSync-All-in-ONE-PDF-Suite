@@ -1,6 +1,7 @@
 package com.vibesync.toolkit.pdf.data.model
 
 import android.graphics.Bitmap
+import android.graphics.PointF
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import java.io.Serializable
@@ -14,7 +15,9 @@ enum class ToolMode {
     ERASER
 }
 
-data class Point2D(val x: Float, val y: Float) : Serializable
+data class Point2D(val x: Float, val y: Float) : Serializable {
+    constructor(pointF: PointF) : this(pointF.x, pointF.y)
+}
 
 data class VectorStroke(
     val id: String = java.util.UUID.randomUUID().toString(),
@@ -23,7 +26,24 @@ data class VectorStroke(
     val strokeWidth: Float,
     val isHighlighter: Boolean = false,
     val alpha: Float = if (isHighlighter) 0.35f else 1.0f
-) : Serializable
+) : Serializable {
+    constructor(
+        points: List<PointF>,
+        colorArgb: Int,
+        strokeWidth: Float,
+        isHighlighter: Boolean = false,
+        id: String = java.util.UUID.randomUUID().toString()
+    ) : this(
+        id = id,
+        points = points.map { Point2D(it.x, it.y) },
+        colorArgb = colorArgb,
+        strokeWidth = strokeWidth,
+        isHighlighter = isHighlighter,
+        alpha = if (isHighlighter) 0.35f else 1.0f
+    )
+}
+
+typealias DrawingStroke = VectorStroke
 
 data class TextAnnotation(
     val id: String = java.util.UUID.randomUUID().toString(),
@@ -44,7 +64,7 @@ data class SignatureAnnotation(
 )
 
 data class PageAnnotations(
-    val pageIndex: Int,
+    val pageIndex: Int = 0,
     val strokes: List<VectorStroke> = emptyList(),
     val textAnnotations: List<TextAnnotation> = emptyList(),
     val signatures: List<SignatureAnnotation> = emptyList()

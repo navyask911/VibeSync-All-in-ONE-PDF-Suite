@@ -82,6 +82,16 @@ kotlin {
     jvmToolchain(17)
 }
 
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    kotlinOptions {
+        allWarningsAsErrors = false
+        freeCompilerArgs += listOf(
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=kotlinx.coroutines.ExperimentalCoroutinesApi"
+        )
+    }
+}
+
 dependencies {
     // Platform Architecture & Core Android
     implementation("androidx.core:core-ktx:1.15.0")
