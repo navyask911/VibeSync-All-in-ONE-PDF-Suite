@@ -32,7 +32,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.OmniPDFStudio"
-        tools:targetApi="36">
+        tools:targetApi="35">
 
         <!-- Google AdMob Application ID (Official Production App ID) -->
         <meta-data
