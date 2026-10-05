@@ -1,0 +1,32 @@
+# Node & Web
+node_modules/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Gradle & Android
+.gradle/
+build/
+*/build/
+app/build/
+android/app/build/
+android/.gradle/
+*.iml
+.idea/
+local.properties
+.cxx/
+
+# Keystores & Signing Secrets
+*.jks
+*.keystore
+keystore_base64.txt
+release.keystore
+debug.keystore
+
+# Build Outputs & Bundles
+*.apk
+*.aab
+*.ap_

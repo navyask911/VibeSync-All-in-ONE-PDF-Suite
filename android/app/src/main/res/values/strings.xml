@@ -1,0 +1,15 @@
+<resources>
+    <string name="app_name">VibeSync All in ONE PDF Suite</string>
+    <string name="title_dashboard">VibeSync PDF Hub</string>
+    <string name="title_viewer">VibeSync Viewer</string>
+    <string name="title_editor">Annotation &amp; Signature</string>
+    <string name="title_scanner">ML Kit Document Scanner</string>
+    <string name="title_split">Split Document</string>
+    <string name="title_merge">Merge Documents</string>
+    <string name="title_encrypt">Encrypt &amp; Protect</string>
+    <string name="title_convert">Images to PDF</string>
+    
+    <!-- Google AdMob Configuration -->
+    <string name="admob_app_id">ca-app-pub-4783826505860771~4377815936</string>
+    <string name="admob_banner_unit_id">ca-app-pub-4783826505860771/3755922842</string>
+</resources>

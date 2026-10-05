@@ -1,0 +1,410 @@
+package com.omnidoc.toolkit.pdf.presentation.tools
+
+import android.app.Activity
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.omnidoc.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
+import com.omnidoc.toolkit.pdf.core.util.UriUtils
+import com.omnidoc.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
+import com.omnidoc.toolkit.pdf.presentation.monetization.AdMobManager
+import kotlinx.coroutines.launch
+import java.io.File
+
+// ==========================================
+// 1. SPLIT PDF SCREEN
+// ==========================================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SplitScreen(
+    onNavigateBack: () -> Unit,
+    onSuccess: (List<File>) -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val engine = remember { PdfBoxToolkitEngine(context) }
+
+    var selectedUri by remember { mutableStateOf<Uri?>(null) }
+    var intervalsInput by remember { mutableStateOf("1-2, 3") }
+    var isProcessing by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val pickPdfLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? -> selectedUri = uri }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Split Document", fontWeight = FontWeight.SemiBold) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("Select PDF to Split", fontWeight = FontWeight.Bold)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    if (selectedUri != null) {
+                        Text("Selected: ${UriUtils.getFileName(context, selectedUri!!)}", fontSize = 13.sp)
+                    } else {
+                        Button(
+                            onClick = { pickPdfLauncher.launch(arrayOf("application/pdf")) },
+                            colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
+                        ) {
+                            Text("Choose PDF Document")
+                        }
+                    }
+                }
+            }
+
+            OutlinedTextField(
+                value = intervalsInput,
+                onValueChange = { intervalsInput = it },
+                label = { Text("Page Intervals (e.g. 1-2, 3, 4-5)") },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            errorMessage?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Button(
+                onClick = {
+                    val uri = selectedUri ?: return@Button
+                    isProcessing = true
+                    errorMessage = null
+                    coroutineScope.launch {
+                        // Parse interval string
+                        val ranges = intervalsInput.split(",").mapNotNull { part ->
+                            val clean = part.trim()
+                            if (clean.contains("-")) {
+                                val split = clean.split("-")
+                                val start = split[0].toIntOrNull() ?: 1
+                                val end = split[1].toIntOrNull() ?: start
+                                IntRange(start, end)
+                            } else {
+                                clean.toIntOrNull()?.let { IntRange(it, it) }
+                            }
+                        }
+
+                        val result = engine.splitPdf(uri, ranges)
+                        isProcessing = false
+                        result.fold(
+                            onSuccess = { files ->
+                                (context as? Activity)?.let { act ->
+                                    AdMobManager.showInterstitial(act) { onSuccess(files) }
+                                } ?: onSuccess(files)
+                            },
+                            onFailure = { errorMessage = it.localizedMessage }
+                        )
+                    }
+                },
+                enabled = selectedUri != null && !isProcessing,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
+            ) {
+                if (isProcessing) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text("Split and Save Files")
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// 2. MERGE PDFS SCREEN (Reorderable List)
+// ==========================================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MergeScreen(
+    onNavigateBack: () -> Unit,
+    onSuccess: (File) -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val engine = remember { PdfBoxToolkitEngine(context) }
+
+    val selectedUris = remember { mutableStateListOf<Uri>() }
+    var isMerging by remember { mutableStateOf(false) }
+
+    val pickMultiplePdfsLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<Uri> ->
+        selectedUris.addAll(uris)
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Merge Documents", fontWeight = FontWeight.SemiBold) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp)
+        ) {
+            Button(
+                onClick = { pickMultiplePdfsLauncher.launch(arrayOf("application/pdf")) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
+            ) {
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Add PDF Files to Merge")
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Text("Document Assembly Order:", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Spacer(modifier = Modifier.height(8.dp))
+
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                itemsIndexed(selectedUris) { index, uri ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("${index + 1}.", fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp))
+                            Text(
+                                UriUtils.getFileName(context, uri),
+                                modifier = Modifier.weight(1f),
+                                maxLines = 1,
+                                fontSize = 13.sp
+                            )
+                            // Up Arrow
+                            IconButton(
+                                onClick = {
+                                    if (index > 0) {
+                                        val temp = selectedUris[index]
+                                        selectedUris[index] = selectedUris[index - 1]
+                                        selectedUris[index - 1] = temp
+                                    }
+                                },
+                                enabled = index > 0
+                            ) {
+                                Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Move Up")
+                            }
+                            // Down Arrow
+                            IconButton(
+                                onClick = {
+                                    if (index < selectedUris.size - 1) {
+                                        val temp = selectedUris[index]
+                                        selectedUris[index] = selectedUris[index + 1]
+                                        selectedUris[index + 1] = temp
+                                    }
+                                },
+                                enabled = index < selectedUris.size - 1
+                            ) {
+                                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Move Down")
+                            }
+                            // Delete
+                            IconButton(onClick = { selectedUris.removeAt(index) }) {
+                                Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.Red)
+                            }
+                        }
+                    }
+                }
+            }
+
+            Button(
+                onClick = {
+                    if (selectedUris.size >= 2) {
+                        isMerging = true
+                        coroutineScope.launch {
+                            val output = UriUtils.createExportCacheFile(context, "merged_output")
+                            val result = engine.mergePdfs(selectedUris, output)
+                            isMerging = false
+                            result.onSuccess { mergedFile ->
+                                (context as? Activity)?.let { act ->
+                                    AdMobManager.showInterstitial(act) { onSuccess(mergedFile) }
+                                } ?: onSuccess(mergedFile)
+                            }
+                        }
+                    }
+                },
+                enabled = selectedUris.size >= 2 && !isMerging,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
+            ) {
+                if (isMerging) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text("Merge (${selectedUris.size}) Documents")
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// 3. ENCRYPT & PROTECT SCREEN
+// ==========================================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EncryptScreen(
+    onNavigateBack: () -> Unit,
+    onSuccess: (File) -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val engine = remember { PdfBoxToolkitEngine(context) }
+
+    var selectedUri by remember { mutableStateOf<Uri?>(null) }
+    var password by rememberSaveable { mutableStateOf("") }
+    var passwordVisible by rememberSaveable { mutableStateOf(false) }
+    var allowPrinting by remember { mutableStateOf(true) }
+    var allowCopying by remember { mutableStateOf(false) }
+    var isEncrypting by remember { mutableStateOf(false) }
+
+    val pickPdfLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? -> selectedUri = uri }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Encrypt & Protect", fontWeight = FontWeight.SemiBold) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Button(
+                onClick = { pickPdfLauncher.launch(arrayOf("application/pdf")) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
+            ) {
+                Text(if (selectedUri != null) "Change PDF (${UriUtils.getFileName(context, selectedUri!!)})" else "Select PDF to Protect")
+            }
+
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it },
+                label = { Text("Document Password") },
+                singleLine = true,
+                visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                trailingIcon = {
+                    val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
+                    val description = if (passwordVisible) "Hide password" else "Show password"
+                    IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                        Icon(imageVector = image, contentDescription = description)
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = allowPrinting, onCheckedChange = { allowPrinting = it })
+                Text("Allow Printing Document", fontSize = 14.sp)
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Checkbox(checked = allowCopying, onCheckedChange = { allowCopying = it })
+                Text("Allow Content Copying / Extraction", fontSize = 14.sp)
+            }
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            Button(
+                onClick = {
+                    val uri = selectedUri ?: return@Button
+                    isEncrypting = true
+                    coroutineScope.launch {
+                        val output = UriUtils.createExportCacheFile(context, "encrypted_protected")
+                        val result = engine.encryptPdf(
+                            sourceUri = uri,
+                            userPassword = password,
+                            ownerPassword = password + "_admin",
+                            allowPrinting = allowPrinting,
+                            allowCopying = allowCopying,
+                            outputFile = output
+                        )
+                        isEncrypting = false
+                        result.onSuccess {
+                            (context as? Activity)?.let { act ->
+                                AdMobManager.showInterstitial(act) { onSuccess(it) }
+                            } ?: onSuccess(it)
+                        }
+                    }
+                },
+                enabled = selectedUri != null && password.isNotBlank() && !isEncrypting,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
+            ) {
+                if (isEncrypting) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text("Apply AES-128/256 Encryption")
+                }
+            }
+        }
+    }
+}

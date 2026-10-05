@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    
+    <!-- Base Crimson Red Gradient -->
+    <path
+        android:pathData="M0,0h108v108h-108z"
+        android:fillColor="#D32F2F" />
+
+    <!-- Deep Ruby Folded Shadow Corner -->
+    <path
+        android:pathData="M0,0 L108,0 L108,108 Z"
+        android:fillColor="#C62828" />
+
+    <!-- Geometric Inverted Triangle Highlight from VibeSync Box Art -->
+    <path
+        android:pathData="M18,22 L90,22 L54,88 Z"
+        android:fillColor="#8E0000" />
+    
+    <!-- Subtle Inner Ruby Facet -->
+    <path
+        android:pathData="M26,26 L82,26 L54,78 Z"
+        android:fillColor="#B71C1C" />
+</vector>

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- White Top-Left PDF Suite Badge from Box Art -->
+    <path
+        android:pathData="M24,28 h42 v16 h-42 z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Red 'PDF' text simulation block inside badge -->
+    <path
+        android:pathData="M28,32 h16 v8 h-16 z"
+        android:fillColor="#D32F2F" />
+
+    <!-- Dark 'suite' text simulation block inside badge -->
+    <path
+        android:pathData="M48,34 h14 v4 h-14 z"
+        android:fillColor="#212121" />
+
+    <!-- Central Stylized VibeSync 'V' Monogram with Folded Geometric facets -->
+    <path
+        android:pathData="M34,48 L54,82 L74,48 L64,48 L54,68 L44,48 Z"
+        android:fillColor="#FFFFFF" />
+
+    <!-- Bottom Professional Ribbon Bar from Box Art -->
+    <path
+        android:pathData="M30,86 h48 v5 h-48 z"
+        android:fillColor="#FFFFFF" />
+</vector>

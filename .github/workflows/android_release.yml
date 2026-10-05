@@ -1,0 +1,91 @@
+name: Build & Sign Android Release (AAB & APK)
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-release:
+    name: Build & Sign Release Bundle & APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Make Gradle Wrapper Executable
+        run: |
+          if [ -f "android/gradlew" ]; then
+            chmod +x android/gradlew
+          fi
+          if [ -f "gradlew" ]; then
+            chmod +x gradlew
+          fi
+
+      - name: Decode Release Keystore
+        id: decode_keystore
+        run: |
+          mkdir -p android/app
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release-upload.jks
+            echo "has_keystore=true" >> "$GITHUB_OUTPUT"
+            echo "Keystore successfully decoded into android/app/release-upload.jks"
+          else
+            echo "has_keystore=false" >> "$GITHUB_OUTPUT"
+            echo "WARNING: secrets.KEYSTORE_BASE64 is empty. Building with default debug signing config for verification."
+          fi
+
+      - name: Build Signed AAB and Universal APK
+        working-directory: android
+        run: |
+          if [ "${{ steps.decode_keystore.outputs.has_keystore }}" = "true" ]; then
+            ./gradlew bundleRelease assembleRelease \
+              --no-daemon \
+              --stacktrace \
+              -Pandroid.injected.signing.store.file="release-upload.jks" \
+              -Pandroid.injected.signing.store.password="${{ secrets.RELEASE_STORE_PASSWORD }}" \
+              -Pandroid.injected.signing.key.alias="${{ secrets.RELEASE_KEY_ALIAS }}" \
+              -Pandroid.injected.signing.key.password="${{ secrets.RELEASE_KEY_PASSWORD }}"
+          else
+            ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace
+          fi
+
+      - name: Securely Wipe Keystore
+        if: always()
+        run: |
+          if [ -f "android/app/release-upload.jks" ]; then
+            shred -u android/app/release-upload.jks || rm -f android/app/release-upload.jks
+            echo "Keystore securely shredded from runner disk."
+          fi
+
+      - name: Upload Google Play Store Bundle (.aab)
+        uses: actions/upload-artifact@v4
+        with:
+          name: VibeSync-GooglePlay-AAB
+          path: android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Direct-Install Release (.apk)
+        uses: actions/upload-artifact@v4
+        with:
+          name: VibeSync-Installable-APK
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
+          retention-days: 30

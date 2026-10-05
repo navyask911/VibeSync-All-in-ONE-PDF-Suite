@@ -1,0 +1,6 @@
+{
+  "name": "OmniPDF Studio",
+  "description": "Production-ready clean-room native Android PDF Suite & Toolkit built with Jetpack Compose, ML Kit Document Scanner, and PdfBox-Android.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

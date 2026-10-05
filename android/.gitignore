@@ -1,0 +1,19 @@
+# Android Studio and Gradle exclusions
+.gradle/
+build/
+app/build/
+*.iml
+.idea/
+local.properties
+.cxx/
+captures/
+
+# Keystores & Signing
+*.jks
+*.keystore
+release.keystore
+debug.keystore
+
+# Build Outputs
+*.apk
+*.aab

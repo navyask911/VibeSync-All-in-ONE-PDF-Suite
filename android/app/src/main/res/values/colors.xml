@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- VibeSync Brand Palette: Crimson Red, Deep Ruby & Clean White -->
+    <color name="vibesync_crimson_primary">#D32F2F</color>
+    <color name="vibesync_crimson_dark">#C62828</color>
+    <color name="vibesync_ruby_deep">#8E0000</color>
+    <color name="vibesync_ruby_accent">#B71C1C</color>
+    <color name="vibesync_white">#FFFFFF</color>
+    <color name="surface_dark">#120808</color>
+    <color name="surface_light">#FFFBFB</color>
+</resources>
