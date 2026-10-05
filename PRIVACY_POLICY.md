@@ -3,7 +3,7 @@
 **Effective Date:** October 5, 2026  
 **Last Updated:** October 5, 2026  
 **Application Name:** VibeSync All in ONE PDF Suite  
-**Developer Contact:** support@vibesync.app  
+**Developer Contact:** vibesyncrotechnologies@gmail.com  
 
 ---
 
