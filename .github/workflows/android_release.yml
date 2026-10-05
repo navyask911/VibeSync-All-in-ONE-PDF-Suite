@@ -27,24 +27,19 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-          cache: gradle
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.7
 
       - name: Accept Android Licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Make Gradle Wrapper Executable
-        run: |
-          if [ -f "android/gradlew" ]; then
-            chmod +x android/gradlew
-          fi
-
-      - name: Ensure Gradle Wrapper Assets
+      - name: Generate Gradle Wrapper
         working-directory: android
         run: |
-          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
-            echo "Bootstrapping Gradle wrapper..."
-            gradle wrapper --gradle-version 8.7 || true
-          fi
+          gradle wrapper --gradle-version 8.7
           chmod +x gradlew
 
       - name: Decode Release Keystore
@@ -70,7 +65,7 @@ jobs:
         run: |
           if [ "${{ steps.decode_keystore.outputs.has_keystore }}" = "true" ] && [ -s "app/release-upload.jks" ]; then
             echo "Building with production keystore..."
-            ./gradlew bundleRelease assembleRelease \
+            gradle bundleRelease assembleRelease \
               --no-daemon \
               --stacktrace \
               --info \
@@ -80,7 +75,7 @@ jobs:
               -Pandroid.injected.signing.key.password="${{ secrets.RELEASE_KEY_PASSWORD }}"
           else
             echo "Building without production keystore (fallback to verification signing)..."
-            ./gradlew bundleRelease assembleRelease --no-daemon --stacktrace --info
+            gradle bundleRelease assembleRelease --no-daemon --stacktrace --info
           fi
 
       - name: Securely Wipe Keystore
