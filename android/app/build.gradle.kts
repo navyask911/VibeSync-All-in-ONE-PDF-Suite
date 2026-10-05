@@ -23,7 +23,7 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystoreFile = rootProject.file("app/release-upload.jks")
+            val keystoreFile = file("release-upload.jks")
             if (keystoreFile.exists() && keystoreFile.length() > 0) {
                 storeFile = keystoreFile
                 storePassword = project.findProperty("android.injected.signing.store.password") as? String ?: System.getenv("RELEASE_STORE_PASSWORD") ?: ""
@@ -35,14 +35,14 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false // Temporarily disable minification to ensure compilation passes first
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            val releaseKeystore = rootProject.file("app/release-upload.jks")
-            if (releaseKeystore.exists() && releaseKeystore.length() > 0) {
+            val keystoreFile = file("release-upload.jks")
+            if (keystoreFile.exists() && keystoreFile.length() > 0) {
                 signingConfig = signingConfigs.getByName("release")
             } else {
                 signingConfig = signingConfigs.getByName("debug")

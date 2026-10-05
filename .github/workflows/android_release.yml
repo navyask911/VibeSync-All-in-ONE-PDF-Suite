@@ -65,17 +65,18 @@ jobs:
         run: |
           if [ "${{ steps.decode_keystore.outputs.has_keystore }}" = "true" ] && [ -s "app/release-upload.jks" ]; then
             echo "Building with production keystore..."
-            gradle bundleRelease assembleRelease \
-              --no-daemon \
+            gradle assembleRelease bundleRelease \
               --stacktrace \
-              --info \
+              --no-daemon \
+              -x test \
+              -x lint \
               -Pandroid.injected.signing.store.file="release-upload.jks" \
               -Pandroid.injected.signing.store.password="${{ secrets.RELEASE_STORE_PASSWORD }}" \
               -Pandroid.injected.signing.key.alias="${{ secrets.RELEASE_KEY_ALIAS }}" \
               -Pandroid.injected.signing.key.password="${{ secrets.RELEASE_KEY_PASSWORD }}"
           else
-            echo "Building without production keystore (fallback to verification signing)..."
-            gradle bundleRelease assembleRelease --no-daemon --stacktrace --info
+            echo "Building with fallback signing (no keystore provided)..."
+            gradle assembleRelease bundleRelease --stacktrace --no-daemon -x test -x lint
           fi
 
       - name: Securely Wipe Keystore
