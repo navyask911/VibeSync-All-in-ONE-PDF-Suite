@@ -2,105 +2,65 @@ name: Build & Sign Android Release (AAB & APK)
 
 on:
   push:
-    branches:
-      - main
-      - master
-    tags:
-      - 'v*'
+    branches: [ main, master ]
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  build-release:
+  build:
     name: Build & Sign Release Bundle & APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repository
+      - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
           distribution: 'temurin'
+          java-version: '17'
 
-      - name: Setup Gradle
+      - name: Setup Gradle (Bypass Broken GitHub Cache)
         uses: gradle/actions/setup-gradle@v3
         with:
           gradle-version: 8.7
+          cache-disabled: true
 
-      - name: Accept Android Licenses
+      - name: Accept Android SDK Licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
 
-      - name: Generate Gradle Wrapper
+      - name: Setup Signing Keystore
         working-directory: android
         run: |
-          gradle wrapper --gradle-version 8.7
-          chmod +x gradlew
-
-      - name: Decode Release Keystore
-        id: decode_keystore
-        run: |
-          mkdir -p android/app
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/release-upload.jks
-            if [ -s "android/app/release-upload.jks" ]; then
-              echo "has_keystore=true" >> "$GITHUB_OUTPUT"
-              echo "Keystore successfully decoded into android/app/release-upload.jks ($(wc -c < android/app/release-upload.jks) bytes)"
-            else
-              echo "has_keystore=false" >> "$GITHUB_OUTPUT"
-              echo "Decoded keystore is empty (0 bytes). Falling back to debug signing."
-            fi
-          else
-            echo "has_keystore=false" >> "$GITHUB_OUTPUT"
-            echo "WARNING: secrets.KEYSTORE_BASE64 is empty. Building with default debug signing config for verification."
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/release-upload.jks
           fi
 
-      - name: Build Signed AAB and Universal APK
+      - name: Compile Universal APK
         working-directory: android
         run: |
-          if [ "${{ steps.decode_keystore.outputs.has_keystore }}" = "true" ] && [ -s "app/release-upload.jks" ]; then
-            echo "Building with production keystore..."
-            gradle assembleRelease bundleRelease \
-              --stacktrace \
-              --no-daemon \
-              -x test \
-              -x lint \
-              -Pandroid.injected.signing.store.file="release-upload.jks" \
-              -Pandroid.injected.signing.store.password="${{ secrets.RELEASE_STORE_PASSWORD }}" \
-              -Pandroid.injected.signing.key.alias="${{ secrets.RELEASE_KEY_ALIAS }}" \
-              -Pandroid.injected.signing.key.password="${{ secrets.RELEASE_KEY_PASSWORD }}"
-          else
-            echo "Building with fallback signing (no keystore provided)..."
-            gradle assembleRelease bundleRelease --stacktrace --no-daemon -x test -x lint
-          fi
+          gradle :app:assembleRelease --no-daemon --stacktrace -x test -x lint
 
-      - name: Securely Wipe Keystore
-        if: always()
+      - name: Compile Release AAB
+        working-directory: android
         run: |
-          if [ -f "android/app/release-upload.jks" ]; then
-            shred -u android/app/release-upload.jks || rm -f android/app/release-upload.jks
-            echo "Keystore securely shredded from runner disk."
-          fi
+          gradle :app:bundleRelease --no-daemon --stacktrace -x test -x lint
 
-      - name: Upload Google Play Store Bundle (.aab)
+      - name: Secure Clean Keystore
+        if: always()
+        working-directory: android
+        run: rm -f app/release-upload.jks
+
+      - name: Upload Signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: VibeSync-Installable-APK
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn
+
+      - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
         with:
           name: VibeSync-GooglePlay-AAB
           path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: warn
-          retention-days: 30
-
-      - name: Upload Direct-Install Release (.apk)
-        uses: actions/upload-artifact@v4
-        with:
-          name: VibeSync-Installable-APK
-          path: |
-            android/app/build/outputs/apk/release/*.apk
-            android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: warn
-          retention-days: 30
