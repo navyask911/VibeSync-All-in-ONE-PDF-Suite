@@ -32,8 +32,10 @@ jobs:
       - name: Setup Signing Keystore
         working-directory: android
         run: |
+          mkdir -p app
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > app/release-upload.jks
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 --decode > app/release-upload.jks
+            ls -lh app/release-upload.jks
           fi
 
       - name: Build Signed AAB and APK
