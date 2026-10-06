@@ -74,7 +74,7 @@ class PdfBoxToolkitEngineTest {
         )
 
         val result = engine.splitPdf(sourceUri, intervals)
-        assertTrue(result.isSuccess, "Splitting should succeed even with boundary ranges")
+        assertTrue("Splitting should succeed even with boundary ranges", result.isSuccess)
 
         val generatedFiles = result.getOrThrow()
         assertEquals("Should produce 3 valid partition documents", 3, generatedFiles.size)
@@ -125,7 +125,7 @@ class PdfBoxToolkitEngineTest {
         val uris = listOf(Uri.fromFile(file1), Uri.fromFile(file2), Uri.fromFile(file3))
 
         val mergeResult = engine.mergePdfs(uris, outputFile)
-        assertTrue(mergeResult.isSuccess, "Merge should complete successfully")
+        assertTrue("Merge should complete successfully", mergeResult.isSuccess)
 
         PDDocument.load(outputFile).use { mergedDoc ->
             assertEquals("Merged doc must contain 3 pages", 3, mergedDoc.numberOfPages)
@@ -152,19 +152,19 @@ class PdfBoxToolkitEngineTest {
             outputFile = encryptedOutput
         )
 
-        assertTrue(encryptResult.isSuccess, "Encryption should succeed")
-        assertTrue(encryptedOutput.exists(), "Encrypted file must exist")
+        assertTrue("Encryption should succeed", encryptResult.isSuccess)
+        assertTrue("Encrypted file must exist", encryptedOutput.exists())
 
         // 1. Attempt opening without password -> Must be flagged as encrypted
         PDDocument.load(encryptedOutput).use { lockedDoc ->
-            assertTrue(lockedDoc.isEncrypted, "Document must report isEncrypted == true")
+            assertTrue("Document must report isEncrypted == true", lockedDoc.isEncrypted)
         }
 
         // 2. Open with User password and verify permissions
         PDDocument.load(encryptedOutput, userPass).use { userDoc ->
             val permissions: AccessPermission = userDoc.currentAccessPermission
-            assertFalse(permissions.canPrint(), "Printing must be explicitly restricted")
-            assertTrue(permissions.canExtractContent(), "Content copying/extraction must be allowed")
+            assertFalse("Printing must be explicitly restricted", permissions.canPrint())
+            assertTrue("Content copying/extraction must be allowed", permissions.canExtractContent())
         }
 
         // 3. Test Decryption back to clean document
@@ -174,10 +174,10 @@ class PdfBoxToolkitEngineTest {
             password = userPass,
             outputFile = decryptedOutput
         )
-        assertTrue(decryptResult.isSuccess, "Decryption with valid password should succeed")
+        assertTrue("Decryption with valid password should succeed", decryptResult.isSuccess)
 
         PDDocument.load(decryptedOutput).use { unencryptedDoc ->
-            assertFalse(unencryptedDoc.isEncrypted, "Decrypted document must have security removed")
+            assertFalse("Decrypted document must have security removed", unencryptedDoc.isEncrypted)
         }
     }
 
@@ -213,15 +213,15 @@ class PdfBoxToolkitEngineTest {
             outputFile = flattenedOutput
         )
 
-        assertTrue(flattenResult.isSuccess, "Flattening vector annotations onto PDF should succeed")
-        assertTrue(flattenedOutput.exists(), "Flattened file should exist")
+        assertTrue("Flattening vector annotations onto PDF should succeed", flattenResult.isSuccess)
+        assertTrue("Flattened file should exist", flattenedOutput.exists())
 
         // Mathematical verification of coordinate mapping
         val expectedStartPdfX = 540f * scaleFactor
         val expectedStartPdfY = a4HeightPt - (960f * scaleFactor)
 
-        assertEquals(297.6378f, expectedStartPdfX, 0.1f, "Horizontal mapping must match 72 DPI ratio")
-        assertTrue(expectedStartPdfY > 0, "Vertical inverted Cartesian PDF coordinate must be positive")
+        assertEquals("Horizontal mapping must match 72 DPI ratio", 297.6378f, expectedStartPdfX, 0.1f)
+        assertTrue("Vertical inverted Cartesian PDF coordinate must be positive", expectedStartPdfY > 0)
 
         PDDocument.load(flattenedOutput).use { doc ->
             assertEquals(1, doc.numberOfPages)
@@ -247,8 +247,8 @@ class PdfBoxToolkitEngineTest {
             outputFile = outputFile
         )
 
-        assertTrue(result.isSuccess, "Image to PDF conversion should succeed")
-        assertTrue(outputFile.exists(), "Converted PDF must exist")
+        assertTrue("Image to PDF conversion should succeed", result.isSuccess)
+        assertTrue("Converted PDF must exist", outputFile.exists())
 
         PDDocument.load(outputFile).use { document ->
             assertEquals(1, document.numberOfPages)
@@ -277,7 +277,7 @@ class PdfBoxToolkitEngineTest {
 
         val result = engine.extractEmbeddedImages(Uri.fromFile(sourceFile))
 
-        assertTrue(result.isSuccess, "Embedded image extraction should succeed")
+        assertTrue("Embedded image extraction should succeed", result.isSuccess)
         val extracted = result.getOrThrow()
         assertEquals(1, extracted.size)
         assertTrue(extracted.single().exists())
@@ -295,7 +295,7 @@ class PdfBoxToolkitEngineTest {
             outputFile = outputFile
         )
 
-        assertTrue(result.isSuccess, "Watermarking should succeed")
+        assertTrue("Watermarking should succeed", result.isSuccess)
         PDDocument.load(outputFile).use { document ->
             assertEquals(2, document.numberOfPages)
         }
