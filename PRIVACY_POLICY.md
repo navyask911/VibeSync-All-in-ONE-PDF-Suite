@@ -93,5 +93,5 @@ We may periodically update our Privacy Policy to reflect application updates or 
 If you have questions, feedback, or concerns regarding your privacy or data safety while using VibeSync All in ONE PDF Suite, please contact:
 
 **Developer Support Team**  
-Email: [vibesyncrotechnologies@gmail.com)  
-Website: [https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite)
+Email: [vibesyncrotechnologies@gmail.com](mailto:vibesyncrotechnologies@gmail.com)  
+Website: [https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite](https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite)
