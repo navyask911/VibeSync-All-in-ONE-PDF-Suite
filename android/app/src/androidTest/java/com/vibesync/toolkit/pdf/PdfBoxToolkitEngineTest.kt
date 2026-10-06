@@ -5,6 +5,8 @@ import android.graphics.Color
 import android.graphics.PointF
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.test.core.app.ApplicationProvider
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.vibesync.toolkit.pdf.data.model.DrawingStroke
 import com.vibesync.toolkit.pdf.data.model.PageAnnotations
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
@@ -18,6 +20,13 @@ import com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy
 import kotlinx.coroutines.test.runTest
 import java.io.File
 import java.io.FileOutputStream
+import org.junit.After
+import org.junit.Before
+import org.junit.Test
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class PdfBoxToolkitEngineTest {
