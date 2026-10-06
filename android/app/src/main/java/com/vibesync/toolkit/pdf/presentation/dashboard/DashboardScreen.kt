@@ -531,7 +531,10 @@ fun DashboardScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://vibesync.app/privacy"))
+                        val intent = Intent(
+                            Intent.ACTION_VIEW,
+                            Uri.parse("https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite/blob/main/PRIVACY_POLICY.md")
+                        )
                         try {
                             context.startActivity(intent)
                         } catch (e: Exception) {
