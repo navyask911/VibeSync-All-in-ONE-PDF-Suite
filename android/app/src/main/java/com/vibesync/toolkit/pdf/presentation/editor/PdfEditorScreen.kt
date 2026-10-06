@@ -246,11 +246,11 @@ fun PdfEditorScreen(
                 Text(
                     text = "VibeSync All in ONE PDF Suite",
                     modifier = Modifier
-                        .align(Alignment.Center)
-                        .graphicsLayer(rotationZ = -24f),
-                    color = Color(0xFF8E0000).copy(alpha = 0.18f),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Bold
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                    color = Color(0xFF8E0000).copy(alpha = 0.55f),
+                    fontSize = 8.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
 
                 // Interactive Vector Canvas Overlay
