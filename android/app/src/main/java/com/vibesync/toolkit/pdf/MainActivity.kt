@@ -167,7 +167,7 @@ class MainActivity : ComponentActivity() {
                                 viewModel = editorViewModel,
                                 onNavigateBack = { navController.popBackStack() },
                                 onExportComplete = { savedFile ->
-                                    Toast.makeText(this@MainActivity, "Saved to ${savedFile.name}", Toast.LENGTH_LONG).show()
+                                    shareFiles(listOf(savedFile), "application/pdf")
                                     navController.popBackStack()
                                 }
                             )
@@ -178,7 +178,7 @@ class MainActivity : ComponentActivity() {
                             SplitScreen(
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { files ->
-                                    Toast.makeText(this@MainActivity, "Split into ${files.size} documents", Toast.LENGTH_LONG).show()
+                                    shareFiles(files, "application/pdf")
                                     navController.popBackStack()
                                 }
                             )
@@ -189,7 +189,7 @@ class MainActivity : ComponentActivity() {
                             MergeScreen(
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { mergedFile ->
-                                    Toast.makeText(this@MainActivity, "Merged into ${mergedFile.name}", Toast.LENGTH_LONG).show()
+                                    shareFiles(listOf(mergedFile), "application/pdf")
                                     navController.popBackStack()
                                 }
                             )
@@ -200,7 +200,7 @@ class MainActivity : ComponentActivity() {
                             EncryptScreen(
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { encryptedFile ->
-                                    Toast.makeText(this@MainActivity, "Document encrypted & locked", Toast.LENGTH_LONG).show()
+                                    shareFiles(listOf(encryptedFile), "application/pdf")
                                     navController.popBackStack()
                                 }
                             )
@@ -210,7 +210,7 @@ class MainActivity : ComponentActivity() {
                             ConvertImagesScreen(
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { outputFile ->
-                                    Toast.makeText(this@MainActivity, "PDF created: " + outputFile.name, Toast.LENGTH_LONG).show()
+                                    shareFiles(listOf(outputFile), "application/pdf")
                                     navController.popBackStack()
                                 }
                             )
@@ -220,7 +220,7 @@ class MainActivity : ComponentActivity() {
                             ExtractImagesScreen(
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { files ->
-                                    Toast.makeText(this@MainActivity, "Extracted " + files.size + " images", Toast.LENGTH_LONG).show()
+                                    shareFiles(files, "image/png")
                                     navController.popBackStack()
                                 }
                             )
@@ -231,6 +231,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun shareFiles(files: List<File>, mimeType: String) {
+        val validFiles = files.filter { it.exists() && it.length() > 0L }
+        if (validFiles.isEmpty()) {
+            Toast.makeText(this, "No output files were created", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        val uris = validFiles.map { UriUtils.getShareableUri(this, it) }
+        val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+            type = mimeType
+            putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            clipData = ClipData.newUri(contentResolver, "VibeSync output", uris.first())
+        }
+        startActivity(Intent.createChooser(shareIntent, "Share VibeSync output"))
+    }
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
