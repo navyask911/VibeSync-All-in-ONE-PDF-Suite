@@ -41,7 +41,8 @@ fun PdfViewerScreen(
     documentUri: Uri,
     viewModel: PdfViewerViewModel,
     onNavigateBack: () -> Unit,
-    onNavigateToEditor: (Uri) -> Unit
+    onNavigateToEditor: (Uri) -> Unit,
+    onShareDocument: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
@@ -95,6 +96,9 @@ fun PdfViewerScreen(
                         }
                     }
                     // Jump to Editor / Signer
+                    IconButton(onClick = onShareDocument) {
+                        Icon(Icons.Default.Share, contentDescription = "Share PDF", tint = VibeSyncCrimsonPrimary)
+                    }
                     IconButton(onClick = { onNavigateToEditor(documentUri) }) {
                         Icon(Icons.Default.Draw, contentDescription = "Edit & Sign", tint = VibeSyncCrimsonPrimary)
                     }
@@ -302,12 +306,14 @@ fun PdfPageItem(
                 contentScale = ContentScale.Fit
             )
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(bottom = 2.dp),
                 contentAlignment = Alignment.BottomCenter
             ) {
                 Text(
                     text = "VibeSync All in ONE PDF Suite",
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
                     color = Color(0xFF8E0000).copy(alpha = 0.55f),
                     fontSize = 8.sp,
                     fontWeight = FontWeight.SemiBold
