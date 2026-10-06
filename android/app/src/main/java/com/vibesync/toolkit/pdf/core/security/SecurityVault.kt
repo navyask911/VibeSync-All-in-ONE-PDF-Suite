@@ -88,7 +88,7 @@ class SecurityVault(context: Context) {
     }
 
     companion object {
-        private const val SECURE_PREFS_FILE = "omnidoc_encrypted_vault"
+        private const val SECURE_PREFS_FILE = "vibesync_encrypted_vault"
         private const val KEY_SIGNATURE_PREFIX = "vault_sig"
     }
 }
