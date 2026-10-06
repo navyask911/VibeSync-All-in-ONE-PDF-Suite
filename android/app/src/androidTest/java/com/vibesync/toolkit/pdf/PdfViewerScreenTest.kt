@@ -36,7 +36,7 @@ class PdfViewerScreenTest {
         // Setup 30 mock pages to test continuous rapid vertical list scroll
         val pages = (1..30).map { PageMetadata(pageIndex = it - 1, width = 595, height = 842, aspectRatio = 595f / 842f) }
         val stateFlow = MutableStateFlow(
-            com.omnidoc.toolkit.pdf.presentation.viewer.ViewerUiState(
+            com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(
                 fileName = "Large_Catalog_2026.pdf",
                 pageCount = 30,
                 currentPageIndex = 0,
