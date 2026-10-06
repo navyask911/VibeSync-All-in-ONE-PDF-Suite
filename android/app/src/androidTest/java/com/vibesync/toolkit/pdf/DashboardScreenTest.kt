@@ -1,6 +1,7 @@
 package com.vibesync.toolkit.pdf
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -43,9 +44,11 @@ class DashboardScreenTest {
             }
         }
 
+        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("tool_convert"))
         composeTestRule.onNodeWithText("Images to PDF").assertIsDisplayed()
         composeTestRule.onNodeWithText("Extract Images").assertIsDisplayed()
         composeTestRule.onNodeWithTag("tool_convert").performClick()
+        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("tool_extract"))
         composeTestRule.onNodeWithTag("tool_extract").performClick()
         composeTestRule.onNodeWithTag("tool_scanner").performClick()
 
