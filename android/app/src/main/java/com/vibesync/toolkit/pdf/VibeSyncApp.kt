@@ -15,10 +15,12 @@ class VibeSyncApp : Application() {
         // 1. Initialize TomRoush/PdfBox-Android resource loader and crypto provider.
         try {
             PDFBoxResourceLoader.init(applicationContext)
-            if (Security.getProvider("BC") == null) {
-                Security.addProvider(BouncyCastleProvider())
+            val bcProvider = Security.getProvider("BC")
+            if (bcProvider == null || bcProvider.javaClass.name != BouncyCastleProvider::class.java.name) {
+                Security.removeProvider("BC")
+                Security.insertProviderAt(BouncyCastleProvider(), 1)
             }
-            Log.i(TAG, "PDFBoxResourceLoader and Bouncy Castle initialized successfully.")
+            Log.i(TAG, "PDFBoxResourceLoader and compatible Bouncy Castle provider initialized successfully.")
         } catch (e: Exception) {
             Log.e(TAG, "Failed to initialize PDFBox resources/security provider", e)
         }
