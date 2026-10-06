@@ -19,6 +19,15 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+      - name: Verify VibeSync-only package references
+        run: |
+          matches="$(git grep -niE 'com\.omnidoc|omnidoctoolkit|omnidoc' -- . ':!.git' || true)"
+          if [ -n "$matches" ]; then
+            echo "Forbidden OmniDoc references found:"
+            echo "$matches"
+            exit 1
+          fi
+
       - name: Set up JDK 17
         uses: actions/setup-java@v6
         with:
