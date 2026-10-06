@@ -270,7 +270,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 // pdfbox-android 2.0.27.0: AES-256 (revision 6).
                 val policy = StandardProtectionPolicy(ownerPassword, userPassword, permissions)
                 policy.encryptionKeyLength = 256
-                policy.preferAES = true
+                policy.setPreferAES(true)
                 policy.permissions = permissions
 
                 document.protect(policy)
