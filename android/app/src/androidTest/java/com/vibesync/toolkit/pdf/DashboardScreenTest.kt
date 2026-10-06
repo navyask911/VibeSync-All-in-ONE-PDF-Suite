@@ -55,7 +55,7 @@ class DashboardScreenTest {
         assertEquals(listOf("convert", "extract"), routes)
         assertTrue(scannerLaunched)
 
-        composeTestRule.onNodeWithText("Privacy & Terms").performClick()
+        composeTestRule.onNodeWithContentDescription("Privacy & Terms").performClick()
         composeTestRule.onNodeWithText("Privacy & Data Safety Guarantee").assertIsDisplayed()
     }
 }
