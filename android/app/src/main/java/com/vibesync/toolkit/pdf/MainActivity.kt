@@ -3,10 +3,12 @@ package com.vibesync.toolkit.pdf
 import android.Manifest
 import android.content.ClipData
 import android.content.Intent
+import android.util.Base64
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.widget.EditText
 import android.widget.Toast
 import java.io.File
 import androidx.activity.ComponentActivity
@@ -15,6 +17,7 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -43,9 +46,9 @@ import com.vibesync.toolkit.pdf.presentation.tools.MergeScreen
 import com.vibesync.toolkit.pdf.presentation.tools.SplitScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
-import java.net.URLDecoder
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import java.net.URLEncoder
+import kotlinx.coroutines.launch
 import java.nio.charset.StandardCharsets
 
 class MainActivity : ComponentActivity() {
@@ -107,7 +110,7 @@ class MainActivity : ComponentActivity() {
                     // Automatically forward ACTION_VIEW, ACTION_SEND, and scanner results to Viewer.
                     LaunchedEffect(pendingPdfUri) {
                         pendingPdfUri?.let { uri ->
-                            val encoded = URLEncoder.encode(uri.toString(), StandardCharsets.UTF_8.toString())
+                            val encoded = encodeUriRoute(uri)
                             navController.navigate("viewer/$encoded") {
                                 launchSingleTop = true
                             }
@@ -121,7 +124,7 @@ class MainActivity : ComponentActivity() {
                             DashboardScreen(
                                 viewModel = dashboardViewModel,
                                 onNavigateToViewer = { uri ->
-                                    val encoded = URLEncoder.encode(uri.toString(), StandardCharsets.UTF_8.toString())
+                                    val encoded = encodeUriRoute(uri)
                                     navController.navigate("viewer/$encoded")
                                 },
                                 onNavigateToTool = { route ->
@@ -144,14 +147,14 @@ class MainActivity : ComponentActivity() {
                             arguments = listOf(navArgument("encodedUri") { type = NavType.StringType })
                         ) { backStackEntry ->
                             val encodedUri = backStackEntry.arguments?.getString("encodedUri") ?: ""
-                            val decodedUri = Uri.parse(URLDecoder.decode(encodedUri, StandardCharsets.UTF_8.toString()))
+                            val decodedUri = Uri.parse(decodeUriRoute(encodedUri))
 
                             PdfViewerScreen(
                                 documentUri = decodedUri,
                                 viewModel = viewerViewModel,
                                 onNavigateBack = { navController.popBackStack() },
                                 onNavigateToEditor = { uri ->
-                                    val enc = URLEncoder.encode(uri.toString(), StandardCharsets.UTF_8.toString())
+                                    val enc = encodeUriRoute(uri)
                                     navController.navigate("editor/$enc")
                                 }
                             )
@@ -163,14 +166,14 @@ class MainActivity : ComponentActivity() {
                             arguments = listOf(navArgument("encodedUri") { type = NavType.StringType })
                         ) { backStackEntry ->
                             val encodedUri = backStackEntry.arguments?.getString("encodedUri") ?: ""
-                            val decodedUri = Uri.parse(URLDecoder.decode(encodedUri, StandardCharsets.UTF_8.toString()))
+                            val decodedUri = Uri.parse(decodeUriRoute(encodedUri))
 
                             PdfEditorScreen(
                                 documentUri = decodedUri,
                                 viewModel = editorViewModel,
                                 onNavigateBack = { navController.popBackStack() },
                                 onExportComplete = { savedFile ->
-                                    shareFiles(listOf(savedFile), "application/pdf")
+                                    shareFiles(listOf(savedFile), "application/pdf", "VibeSync_Edit_Signed")
                                     navController.popBackStack()
                                 }
                             )
@@ -181,7 +184,7 @@ class MainActivity : ComponentActivity() {
                             SplitScreen(
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { files ->
-                                    shareFiles(files, "application/pdf")
+                                    shareFiles(files, "application/pdf", "VibeSync_Split_Document")
                                     navController.popBackStack()
                                 }
                             )
@@ -192,7 +195,7 @@ class MainActivity : ComponentActivity() {
                             MergeScreen(
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { mergedFile ->
-                                    shareFiles(listOf(mergedFile), "application/pdf")
+                                    shareFiles(listOf(mergedFile), "application/pdf", "VibeSync_Merged_Document")
                                     navController.popBackStack()
                                 }
                             )
@@ -203,7 +206,7 @@ class MainActivity : ComponentActivity() {
                             EncryptScreen(
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { encryptedFile ->
-                                    shareFiles(listOf(encryptedFile), "application/pdf")
+                                    shareFiles(listOf(encryptedFile), "application/pdf", "VibeSync_Protected_Document")
                                     navController.popBackStack()
                                 }
                             )
@@ -213,7 +216,7 @@ class MainActivity : ComponentActivity() {
                             ConvertImagesScreen(
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { outputFile ->
-                                    shareFiles(listOf(outputFile), "application/pdf")
+                                    shareFiles(listOf(outputFile), "application/pdf", "VibeSync_Images_To_PDF")
                                     navController.popBackStack()
                                 }
                             )
@@ -223,7 +226,7 @@ class MainActivity : ComponentActivity() {
                             ExtractImagesScreen(
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { files ->
-                                    shareFiles(files, "image/png")
+                                    shareFiles(files, "image/png", "VibeSync_Extracted_Images")
                                     navController.popBackStack()
                                 }
                             )
@@ -234,22 +237,108 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun shareFiles(files: List<File>, mimeType: String) {
+    private fun shareFiles(files: List<File>, mimeType: String, defaultBaseName: String) {
         val validFiles = files.filter { it.exists() && it.length() > 0L }
         if (validFiles.isEmpty()) {
             Toast.makeText(this, "No output files were created", Toast.LENGTH_LONG).show()
             return
         }
 
-        val uris = validFiles.map { UriUtils.getShareableUri(this, it) }
-        val shareIntent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-            type = mimeType
-            putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            clipData = ClipData.newUri(contentResolver, "VibeSync output", uris.first())
+        val extension = if (mimeType == "image/png") ".png" else ".pdf"
+        val defaultName = defaultBaseName.removeSuffix(".pdf").removeSuffix(".png")
+        val input = EditText(this).apply {
+            setText(defaultName)
+            selectAll()
+            hint = "File name"
+            singleLine = true
+        }
+
+        android.app.AlertDialog.Builder(this)
+            .setTitle("Name your output file")
+            .setMessage("VibeSync watermark will be included. Extension is added automatically.")
+            .setView(input)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Continue") { _, _ ->
+                val requested = sanitizeOutputBaseName(input.text?.toString().orEmpty(), defaultName)
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val renamedFiles = renameOutputFiles(validFiles, requested, extension)
+                    launch(Dispatchers.Main) {
+                        if (renamedFiles.isEmpty()) {
+                            Toast.makeText(this@MainActivity, "Could not rename output files", Toast.LENGTH_LONG).show()
+                            return@launch
+                        }
+                        shareRenamedFiles(renamedFiles, mimeType)
+                    }
+                }
+            }
+            .show()
+    }
+
+    private fun shareRenamedFiles(files: List<File>, mimeType: String) {
+        val uris = files.map { UriUtils.getShareableUri(this, it) }
+        val shareIntent = if (uris.size == 1) {
+            Intent(Intent.ACTION_SEND).apply {
+                type = mimeType
+                putExtra(Intent.EXTRA_STREAM, uris.first())
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                clipData = ClipData.newUri(contentResolver, "VibeSync output", uris.first())
+            }
+        } else {
+            Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                type = mimeType
+                putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                clipData = ClipData.newUri(contentResolver, "VibeSync output", uris.first())
+            }
         }
         startActivity(Intent.createChooser(shareIntent, "Share VibeSync output"))
     }
+
+    private fun renameOutputFiles(files: List<File>, baseName: String, extension: String): List<File> {
+        return files.mapIndexedNotNull { index, source ->
+            val targetName = if (files.size == 1) {
+                baseName + extension
+            } else {
+                baseName + "_" + (index + 1) + extension
+            }
+            val target = File(source.parentFile ?: cacheDir, targetName)
+            if (source.absolutePath == target.absolutePath) {
+                source
+            } else if (source.renameTo(target)) {
+                target
+            } else {
+                try {
+                    source.copyTo(target, overwrite = true)
+                    source.delete()
+                    target
+                } catch (_: Exception) {
+                    null
+                }
+            }
+        }
+    }
+
+    private fun sanitizeOutputBaseName(raw: String, fallback: String): String {
+        val cleaned = raw.trim()
+            .replace(Regex("[\\\\/:*?\"<>|]"), "_")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .removeSuffix(".pdf")
+            .removeSuffix(".png")
+        return cleaned.ifBlank { fallback }.take(80)
+    }
+
+    private fun encodeUriRoute(uri: Uri): String =
+        Base64.encodeToString(
+            uri.toString().toByteArray(StandardCharsets.UTF_8),
+            Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING
+        )
+
+    private fun decodeUriRoute(encoded: String): Uri {
+        val bytes = Base64.decode(encoded, Base64.URL_SAFE or Base64.NO_WRAP)
+        return Uri.parse(String(bytes, StandardCharsets.UTF_8))
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
