@@ -101,9 +101,24 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 merger.addSource(tempFile)
             }
 
+            // Record each source page rotation before PDFMergerUtility normalizes page dictionaries.
+            val sourceRotations = buildList {
+                tempFiles.forEach { tempFile ->
+                    PDDocument.load(tempFile).use { sourceDocument ->
+                        for (pageIndex in 0 until sourceDocument.numberOfPages) {
+                            add(sourceDocument.getPage(pageIndex).rotation)
+                        }
+                    }
+                }
+            }
+
             // Execute merge using main memory with temp-file overflow support
             merger.mergeDocuments(MemoryUsageSetting.setupTempFileOnly())
             PDDocument.load(outputFile).use { mergedDocument ->
+                // Restore the original rotation for every page after the merge.
+                sourceRotations.take(mergedDocument.numberOfPages).forEachIndexed { pageIndex, rotation ->
+                    mergedDocument.getPage(pageIndex).rotation = rotation
+                }
                 applyVibeSyncWatermark(mergedDocument)
                 mergedDocument.save(outputFile)
             }
