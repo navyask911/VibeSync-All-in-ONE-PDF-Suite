@@ -68,8 +68,8 @@ jobs:
           emulator-boot-timeout: 600
           emulator-options: -no-snapshot -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
+          working-directory: ./android
           script: |
-            cd android
             gradle wrapper --gradle-version 8.7 --distribution-type bin
             chmod +x gradlew
             ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace
