@@ -4,6 +4,7 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vibesync.toolkit.pdf.core.security.SecurityVault
@@ -45,9 +46,10 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private var activeDocumentUri: Uri? = null
     private val pageAnnotationsMap = mutableMapOf<Int, PageAnnotations>()
 
-    // Undo / Redo Stacks per page
-    private val undoStack = mutableListOf<VectorStroke>()
-    private val redoStack = mutableListOf<VectorStroke>()
+    // Undo / Redo history stores complete page annotation snapshots so text,
+    // signatures, and vector strokes all participate consistently.
+    private val undoStack = mutableListOf<PageAnnotations>()
+    private val redoStack = mutableListOf<PageAnnotations>()
 
     fun initEditor(uri: Uri) {
         activeDocumentUri = uri
@@ -76,7 +78,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun addStroke(stroke: VectorStroke) {
-        undoStack.add(stroke)
+        undoStack.add(currentPageAnnotations())
         redoStack.clear()
         val updated = _uiState.value.currentStrokes + stroke
         _uiState.value = _uiState.value.copy(
@@ -93,8 +95,10 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             y = y,
             text = text,
             fontSizeSp = 16f,
-            colorArgb = _uiState.value.selectedColor.hashCode()
+            colorArgb = _uiState.value.selectedColor.toArgb()
         )
+        undoStack.add(currentPageAnnotations())
+        redoStack.clear()
         val updated = _uiState.value.currentTextAnnotations + annotation
         _uiState.value = _uiState.value.copy(currentTextAnnotations = updated)
         persistCurrentPageAnnotations()
@@ -103,6 +107,9 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     fun addSignature(bitmap: Bitmap, x: Float, y: Float) {
         // Automatically save to Encrypted Vault
         securityVault.saveDefaultSignature(bitmap)
+
+        undoStack.add(currentPageAnnotations())
+        redoStack.clear()
 
         val sig = SignatureAnnotation(
             x = x,
@@ -118,29 +125,19 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     fun undo() {
         if (undoStack.isNotEmpty()) {
-            val removed = undoStack.removeAt(undoStack.size - 1)
-            redoStack.add(removed)
-            val updated = undoStack.toList()
-            _uiState.value = _uiState.value.copy(
-                currentStrokes = updated,
-                canUndo = undoStack.isNotEmpty(),
-                canRedo = redoStack.isNotEmpty()
-            )
-            persistCurrentPageAnnotations()
+            redoStack.add(currentPageAnnotations())
+            val previous = undoStack.removeAt(undoStack.lastIndex)
+            applyAnnotations(previous)
+            updateHistoryFlags()
         }
     }
 
     fun redo() {
         if (redoStack.isNotEmpty()) {
-            val restored = redoStack.removeAt(redoStack.size - 1)
-            undoStack.add(restored)
-            val updated = undoStack.toList()
-            _uiState.value = _uiState.value.copy(
-                currentStrokes = updated,
-                canUndo = undoStack.isNotEmpty(),
-                canRedo = redoStack.isNotEmpty()
-            )
-            persistCurrentPageAnnotations()
+            undoStack.add(currentPageAnnotations())
+            val restored = redoStack.removeAt(redoStack.lastIndex)
+            applyAnnotations(restored)
+            updateHistoryFlags()
         }
     }
 
@@ -153,16 +150,10 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private fun loadPageAnnotations(pageIndex: Int) {
         val annotations = pageAnnotationsMap[pageIndex] ?: PageAnnotations(pageIndex)
         undoStack.clear()
-        undoStack.addAll(annotations.strokes)
         redoStack.clear()
 
-        _uiState.value = _uiState.value.copy(
-            currentStrokes = annotations.strokes,
-            currentTextAnnotations = annotations.textAnnotations,
-            currentSignatures = annotations.signatures,
-            canUndo = undoStack.isNotEmpty(),
-            canRedo = false
-        )
+        applyAnnotations(annotations)
+        updateHistoryFlags()
     }
 
     private fun persistCurrentPageAnnotations() {
@@ -174,6 +165,33 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             signatures = current.currentSignatures
         )
     }
+
+    private fun currentPageAnnotations(): PageAnnotations {
+        val current = _uiState.value
+        return PageAnnotations(
+            pageIndex = current.currentPageIndex,
+            strokes = current.currentStrokes,
+            textAnnotations = current.currentTextAnnotations,
+            signatures = current.currentSignatures
+        )
+    }
+
+    private fun applyAnnotations(annotations: PageAnnotations) {
+        _uiState.value = _uiState.value.copy(
+            currentStrokes = annotations.strokes,
+            currentTextAnnotations = annotations.textAnnotations,
+            currentSignatures = annotations.signatures
+        )
+        persistCurrentPageAnnotations()
+    }
+
+    private fun updateHistoryFlags() {
+        _uiState.value = _uiState.value.copy(
+            canUndo = undoStack.isNotEmpty(),
+            canRedo = redoStack.isNotEmpty()
+        )
+    }
+
 
     /**
      * Bakes all vector strokes, highlighters, and signatures onto the PDF stream
