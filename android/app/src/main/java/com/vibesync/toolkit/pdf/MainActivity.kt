@@ -147,7 +147,7 @@ class MainActivity : ComponentActivity() {
                             arguments = listOf(navArgument("encodedUri") { type = NavType.StringType })
                         ) { backStackEntry ->
                             val encodedUri = backStackEntry.arguments?.getString("encodedUri") ?: ""
-                            val decodedUri = Uri.parse(decodeUriRoute(encodedUri))
+                            val decodedUri = decodeUriRoute(encodedUri)
 
                             PdfViewerScreen(
                                 documentUri = decodedUri,
