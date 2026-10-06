@@ -1,6 +1,7 @@
 package com.vibesync.toolkit.pdf
 
 import android.app.Application
+import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -45,7 +46,8 @@ class PdfViewerScreenTest {
             )
         )
         every { mockViewModel.uiState } returns stateFlow
-        coEvery { mockViewModel.getPageBitmap(any(), any()) } returns null
+        coEvery { mockViewModel.getPageBitmap(any(), any()) } returns
+            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
 
         composeTestRule.setContent {
             PdfViewerScreen(
@@ -61,11 +63,11 @@ class PdfViewerScreenTest {
         composeTestRule.onNodeWithText("Page 1 of 30").assertIsDisplayed()
 
         // Rapid continuous vertical scroll gestures to verify OOM-safe LazyColumn recycling
-        val listNode = composeTestRule.onNodeWithContentDescription("PDF Page 1", useUnmergedTree = true)
-        listNode.assertExists()
+        val listNode = composeTestRule.onNodeWithTag("pdf_page_list")
+        listNode.assertIsDisplayed()
 
-        // Swipe up multiple times rapidly
-        composeTestRule.onRoot().performTouchInput {
+        // Swipe up multiple times rapidly on the actual LazyColumn.
+        listNode.performTouchInput {
             swipeUp(durationMillis = 100)
             swipeUp(durationMillis = 100)
             swipeUp(durationMillis = 100)
