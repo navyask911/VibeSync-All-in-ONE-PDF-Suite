@@ -1,9 +1,9 @@
 package com.vibesync.toolkit.pdf
 
-import android.graphics.Bitmap
+import android.app.Application
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import androidx.test.core.app.ApplicationProvider
+import io.mockk.mockk
 import com.vibesync.toolkit.pdf.data.model.VectorStroke
 import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
 import org.junit.Assert.assertEquals
@@ -17,7 +17,7 @@ class EditorViewModelTest {
 
     @Before
     fun setUp() {
-        val app = ApplicationProvider.getApplicationContext<android.app.Application>()
+        val app = mockk<Application>(relaxed = true)
         viewModel = EditorViewModel(app)
     }
 
