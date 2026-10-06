@@ -3,6 +3,7 @@ package com.vibesync.toolkit.pdf
 import android.content.Context
 import android.graphics.Color
 import android.graphics.PointF
+import android.graphics.Bitmap
 import android.net.Uri
 import com.vibesync.toolkit.pdf.data.model.DrawingStroke
 import com.vibesync.toolkit.pdf.data.model.PageAnnotations
@@ -10,10 +11,13 @@ import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
+import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
+import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
 import com.tom_roush.pdfbox.pdmodel.encryption.AccessPermission
 import com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy
 import kotlinx.coroutines.test.runTest
 import java.io.File
+import java.io.FileOutputStream
 
 @RunWith(AndroidJUnit4::class)
 class PdfBoxToolkitEngineTest {
@@ -217,4 +221,75 @@ class PdfBoxToolkitEngineTest {
             assertEquals(PDRectangle.A4.height, page.mediaBox.height, 0.01f)
         }
     }
+    @Test
+    fun testConvertImagesToPdfCreatesValidA4Document() = runTest {
+        val imageFile = File(tempFolder, "input_photo.png")
+        Bitmap.createBitmap(320, 200, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.rgb(30, 60, 90))
+            FileOutputStream(imageFile).use { output ->
+                compress(Bitmap.CompressFormat.PNG, 100, output)
+            }
+            recycle()
+        }
+
+        val outputFile = File(tempFolder, "images_to_pdf.pdf")
+        val result = engine.convertImagesToPdf(
+            imageUris = listOf(Uri.fromFile(imageFile)),
+            outputFile = outputFile
+        )
+
+        assertTrue(result.isSuccess, "Image to PDF conversion should succeed")
+        assertTrue(outputFile.exists(), "Converted PDF must exist")
+
+        PDDocument.load(outputFile).use { document ->
+            assertEquals(1, document.numberOfPages)
+            assertEquals(PDRectangle.A4.width, document.getPage(0).mediaBox.width, 0.01f)
+            assertEquals(PDRectangle.A4.height, document.getPage(0).mediaBox.height, 0.01f)
+        }
+    }
+
+    @Test
+    fun testExtractEmbeddedImagesProducesPngFiles() = runTest {
+        val sourceFile = File(tempFolder, "image_source.pdf")
+        val bitmap = Bitmap.createBitmap(120, 80, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.GREEN)
+        }
+
+        PDDocument().use { document ->
+            val page = PDPage(PDRectangle.A4)
+            document.addPage(page)
+            val image = LosslessFactory.createFromImage(document, bitmap)
+            PDPageContentStream(document, page).use { content ->
+                content.drawImage(image, 36f, 700f, 120f, 80f)
+            }
+            document.save(sourceFile)
+        }
+        bitmap.recycle()
+
+        val result = engine.extractEmbeddedImages(Uri.fromFile(sourceFile))
+
+        assertTrue(result.isSuccess, "Embedded image extraction should succeed")
+        val extracted = result.getOrThrow()
+        assertEquals(1, extracted.size)
+        assertTrue(extracted.single().exists())
+        assertTrue(extracted.single().length() > 0)
+    }
+
+    @Test
+    fun testWatermarkPdfProducesValidOutput() = runTest {
+        val sourceFile = createSamplePdf(2, "watermark_source.pdf")
+        val outputFile = File(tempFolder, "watermarked.pdf")
+
+        val result = engine.watermarkPdf(
+            sourceUri = Uri.fromFile(sourceFile),
+            watermarkText = "VibeSync TEST",
+            outputFile = outputFile
+        )
+
+        assertTrue(result.isSuccess, "Watermarking should succeed")
+        PDDocument.load(outputFile).use { document ->
+            assertEquals(2, document.numberOfPages)
+        }
+    }
+
 }
