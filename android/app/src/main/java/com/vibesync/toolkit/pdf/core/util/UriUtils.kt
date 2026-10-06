@@ -7,6 +7,7 @@ import android.os.ParcelFileDescriptor
 import android.provider.OpenableColumns
 import androidx.core.content.FileProvider
 import java.io.File
+import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.text.SimpleDateFormat
@@ -69,11 +70,17 @@ object UriUtils {
         val cacheDir = File(context.cacheDir, "pdf_cache").apply { if (!exists()) mkdirs() }
         val tempFile = File(cacheDir, "${prefix}_${System.currentTimeMillis()}.pdf")
         
-        context.contentResolver.openInputStream(uri)?.use { input ->
+        val inputStream: InputStream = when (uri.scheme?.lowercase(Locale.US)) {
+            "file" -> FileInputStream(requireNotNull(uri.path) { "File Uri has no path: $uri" })
+            else -> context.contentResolver.openInputStream(uri)
+                ?: throw IllegalArgumentException("Cannot open input stream for Uri: $uri")
+        }
+
+        inputStream.use { input ->
             FileOutputStream(tempFile).use { output ->
                 input.copyTo(output)
             }
-        } ?: throw IllegalArgumentException("Cannot open input stream for Uri: $uri")
+        }
 
         return tempFile
     }
