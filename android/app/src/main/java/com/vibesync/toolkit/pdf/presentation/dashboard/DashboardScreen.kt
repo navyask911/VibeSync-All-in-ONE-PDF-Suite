@@ -75,7 +75,7 @@ fun DashboardScreen(
             ToolItem("Merge Documents", "Drag-and-drop file combine", Icons.Default.MergeType, "merge", Color(0xFF8E0000)),
             ToolItem("Images to PDF", "Compile gallery photos to A4", Icons.Default.AddPhotoAlternate, "convert", Color(0xFFB71C1C)),
             ToolItem("Extract Images", "Dump embedded PNG/JPEGs", Icons.Default.Image, "extract", Color(0xFFE53935)),
-            ToolItem("Encrypt & Protect", "AES-256 standard encryption", Icons.Default.Lock, "encrypt", Color(0xFF5F0000))
+            ToolItem("Encrypt & Protect", "AES-128 standard encryption", Icons.Default.Lock, "encrypt", Color(0xFF5F0000))
         )
     }
 
