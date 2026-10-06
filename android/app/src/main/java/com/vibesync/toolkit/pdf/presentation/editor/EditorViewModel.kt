@@ -100,7 +100,11 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         undoStack.add(currentPageAnnotations())
         redoStack.clear()
         val updated = _uiState.value.currentTextAnnotations + annotation
-        _uiState.value = _uiState.value.copy(currentTextAnnotations = updated)
+        _uiState.value = _uiState.value.copy(
+            currentTextAnnotations = updated,
+            canUndo = undoStack.isNotEmpty(),
+            canRedo = redoStack.isNotEmpty()
+        )
         persistCurrentPageAnnotations()
     }
 
