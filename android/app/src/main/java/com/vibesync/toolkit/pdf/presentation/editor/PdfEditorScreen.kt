@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -33,6 +34,7 @@ import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncRubyDeep
 import com.vibesync.toolkit.pdf.data.model.ToolMode
 import com.vibesync.toolkit.pdf.presentation.monetization.AdMobManager
 import java.io.File
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -218,7 +220,7 @@ fun PdfEditorScreen(
                         color = Color(textItem.colorArgb),
                         fontSize = textItem.fontSizeSp.sp,
                         fontWeight = FontWeight.Medium,
-                        modifier = Modifier.offset(x = (textItem.x / 2.5f).dp, y = (textItem.y / 2.5f).dp)
+                        modifier = Modifier.offset { IntOffset(textItem.x.roundToInt(), textItem.y.roundToInt()) }
                     )
                 }
 
@@ -229,8 +231,8 @@ fun PdfEditorScreen(
                             bitmap = sigBmp.asImageBitmap(),
                             contentDescription = "Placed Signature",
                             modifier = Modifier
-                                .offset(x = (sig.x / 2.5f).dp, y = (sig.y / 2.5f).dp)
-                                .size(width = 120.dp, height = 60.dp)
+                                .offset { IntOffset(sig.x.roundToInt(), sig.y.roundToInt()) }
+                                .size(width = (sig.width / 2.5f).dp, height = (sig.height / 2.5f).dp)
                         )
                     }
                 }
