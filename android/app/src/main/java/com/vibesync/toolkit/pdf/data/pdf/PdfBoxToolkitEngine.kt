@@ -289,7 +289,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
                         // Position in center rotated at 45 degrees
                         val centerX = mediaBox.width / 4
                         val centerY = mediaBox.height / 2
-                        cs.setTextMatrix(0.707f, 0.707f, -0.707f, 0.707f, centerX, centerY)
+                        cs.setTextMatrix(0.707, 0.707, -0.707, 0.707, centerX.toDouble(), centerY.toDouble())
                         cs.showText(watermarkText)
                         cs.endText()
                     }
