@@ -191,3 +191,5 @@ When completing the **Data Safety form** in Google Play Console:
 - Built with **Jetpack Compose**, **Material 3**, and **Apache PDFBox-Android** (Apache License 2.0).
 - Google Play Services **ML Kit Document Scanner**.
 - **Privacy Policy:** See [PRIVACY_POLICY.md](PRIVACY_POLICY.md).
+- **Developer Support Team:** [vibesyncrotechnologies@gmail.com](mailto:vibesyncrotechnologies@gmail.com)
+- **Official Website / Repository:** [https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite](https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite)
