@@ -157,10 +157,9 @@ class PdfBoxToolkitEngine(private val context: Context) {
             val document = PDDocument()
 
             for (imageUri in imageUris) {
-                val inputStream: InputStream = context.contentResolver.openInputStream(imageUri)
-                    ?: continue
-                val bitmap = BitmapFactory.decodeStream(inputStream)
-                inputStream.close()
+                val sourceFile = UriUtils.copyUriToCacheFile(context, imageUri, "image_src_")
+                val bitmap = BitmapFactory.decodeFile(sourceFile.absolutePath)
+                sourceFile.delete()
 
                 if (bitmap != null) {
                     // Standard A4 dimensions in PDF Points (72 DPI)
