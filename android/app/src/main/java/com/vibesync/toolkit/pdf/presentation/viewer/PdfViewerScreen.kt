@@ -301,6 +301,15 @@ fun PdfPageItem(
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
             )
+            Text(
+                text = "VibeSync All in ONE PDF Suite",
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .graphicsLayer(rotationZ = -24f),
+                color = Color(0xFF8E0000).copy(alpha = 0.22f),
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
         } else {
             Box(
                 modifier = Modifier.fillMaxSize(),
