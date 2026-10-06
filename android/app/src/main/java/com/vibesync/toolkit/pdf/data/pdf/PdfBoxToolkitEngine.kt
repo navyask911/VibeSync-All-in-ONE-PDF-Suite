@@ -139,7 +139,11 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 }
             }
             sourceFile.delete()
-            Result.success(extractedFiles)
+            if (extractedFiles.isEmpty()) {
+                Result.failure(IllegalArgumentException("No embedded raster images were found in this PDF"))
+            } else {
+                Result.success(extractedFiles)
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to extract embedded images", e)
             Result.failure(e)
@@ -154,7 +158,12 @@ class PdfBoxToolkitEngine(private val context: Context) {
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
+            if (imageUris.isEmpty()) {
+                return@withContext Result.failure(IllegalArgumentException("Select at least one image"))
+            }
+
             val document = PDDocument()
+            var decodedImageCount = 0
 
             for (imageUri in imageUris) {
                 val sourceFile = UriUtils.copyUriToCacheFile(context, imageUri, "image_src_")
@@ -162,6 +171,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 sourceFile.delete()
 
                 if (bitmap != null) {
+                    decodedImageCount++
                     // Standard A4 dimensions in PDF Points (72 DPI)
                     val pageWidthPt = PDRectangle.A4.width
                     val pageHeightPt = PDRectangle.A4.height
@@ -191,6 +201,11 @@ class PdfBoxToolkitEngine(private val context: Context) {
                         contentStream.drawImage(pdImage, xOffset, yOffset, renderWidth, renderHeight)
                     }
                 }
+            }
+
+            if (decodedImageCount == 0) {
+                document.close()
+                return@withContext Result.failure(IllegalArgumentException("None of the selected images could be decoded"))
             }
 
             document.save(outputFile)
