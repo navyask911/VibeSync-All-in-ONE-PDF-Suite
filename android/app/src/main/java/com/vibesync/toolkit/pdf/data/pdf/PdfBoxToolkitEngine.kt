@@ -286,38 +286,17 @@ class PdfBoxToolkitEngine(private val context: Context) {
     }
 
     /**
-     * Overlays a subtle diagonal text watermark onto every page of the document.
+     * Adds the small VibeSync footer watermark to every PDF page.
      */
     suspend fun watermarkPdf(
         sourceUri: Uri,
-        watermarkText: String,
+        _watermarkText: String,
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "watermark_src_")
             PDDocument.load(sourceFile).use { document ->
-                val font = PDType1Font.HELVETICA_BOLD
-                val fontSize = 42f
-
-                for (page in document.pages) {
-                    val mediaBox = page.mediaBox
-                    PDPageContentStream(document, page, PDPageContentStream.AppendMode.APPEND, true, true).use { cs ->
-                        val graphicsState = PDExtendedGraphicsState().apply {
-                            nonStrokingAlphaConstant = 0.20f
-                        }
-                        cs.setGraphicsStateParameters(graphicsState)
-                        cs.setNonStrokingColor(128, 128, 128)
-
-                        cs.beginText()
-                        cs.setFont(font, fontSize)
-                        // Position in center rotated at 45 degrees
-                        val centerX = mediaBox.width / 4
-                        val centerY = mediaBox.height / 2
-                        cs.setTextMatrix(0.707, 0.707, -0.707, 0.707, centerX.toDouble(), centerY.toDouble())
-                        cs.showText(watermarkText)
-                        cs.endText()
-                    }
-                }
+                applyVibeSyncWatermark(document)
                 document.save(outputFile)
             }
             sourceFile.delete()
@@ -327,7 +306,6 @@ class PdfBoxToolkitEngine(private val context: Context) {
             Result.failure(e)
         }
     }
-
     /**
      * Flattens and bakes real-time vector annotations, highlighters, text boxes,
      * and digital signatures onto the original PDF stream mapped precisely at 72 DPI.
