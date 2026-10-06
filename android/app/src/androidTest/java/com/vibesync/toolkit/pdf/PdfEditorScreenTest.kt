@@ -15,6 +15,7 @@ import androidx.compose.ui.test.swipe
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.presentation.editor.EditorUiState
 import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
+import com.vibesync.toolkit.pdf.data.model.ToolMode
 import com.vibesync.toolkit.pdf.presentation.editor.PdfEditorScreen
 import io.mockk.coEvery
 import io.mockk.every
@@ -31,7 +32,7 @@ class PdfEditorScreenTest {
     @Test
     fun textToolOpensDialogAndPlacesText() {
         val viewModel = mockk<EditorViewModel>(relaxed = true)
-        every { viewModel.uiState } returns MutableStateFlow(EditorUiState())
+        every { viewModel.uiState } returns MutableStateFlow(EditorUiState(toolMode = ToolMode.TEXT))
         coEvery { viewModel.getPageBitmap(any()) } returns null
 
         composeTestRule.setContent {
