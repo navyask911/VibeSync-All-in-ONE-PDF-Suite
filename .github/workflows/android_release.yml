@@ -10,21 +10,25 @@ jobs:
     name: Build & Sign Release Bundle & APK
     runs-on: ubuntu-24.04
 
+    permissions:
+      contents: read
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v6
         with:
           distribution: 'temurin'
           java-version: '17'
 
       - name: Setup Gradle (Bypass Broken GitHub Cache)
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 8.7
           cache-disabled: true
+          validate-wrappers: false
 
       - name: Accept Android SDK Licenses
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
@@ -45,8 +49,10 @@ jobs:
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS || 'upload' }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
+          gradle --version
           gradle wrapper --gradle-version 8.7 --distribution-type bin
           chmod +x gradlew
+          ./gradlew --version
           ./gradlew :app:bundleRelease --no-daemon --stacktrace -x test -x lint
           ./gradlew :app:assembleRelease --no-daemon --stacktrace -x test -x lint
 
