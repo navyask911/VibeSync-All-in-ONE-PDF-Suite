@@ -127,6 +127,10 @@ class MainActivity : ComponentActivity() {
                                     val encoded = encodeUriRoute(uri)
                                     navController.navigate("viewer/$encoded")
                                 },
+                                onNavigateToEditor = { uri ->
+                                    val encoded = encodeUriRoute(uri)
+                                    navController.navigate("editor/$encoded")
+                                },
                                 onNavigateToTool = { route ->
                                     navController.navigate(route)
                                 },
