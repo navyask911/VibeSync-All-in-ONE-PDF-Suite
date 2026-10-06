@@ -18,6 +18,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavType
@@ -32,7 +33,9 @@ import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
 import com.vibesync.toolkit.pdf.presentation.editor.PdfEditorScreen
 import com.vibesync.toolkit.pdf.presentation.monetization.AdMobManager
 import com.vibesync.toolkit.pdf.presentation.scanner.DocumentScannerManager
+import com.vibesync.toolkit.pdf.presentation.tools.ConvertImagesScreen
 import com.vibesync.toolkit.pdf.presentation.tools.EncryptScreen
+import com.vibesync.toolkit.pdf.presentation.tools.ExtractImagesScreen
 import com.vibesync.toolkit.pdf.presentation.tools.MergeScreen
 import com.vibesync.toolkit.pdf.presentation.tools.SplitScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
