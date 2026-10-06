@@ -38,7 +38,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     private val rendererEngine = PdfRendererEngine(application)
     private val toolkitEngine = PdfBoxToolkitEngine(application)
-    private val securityVault = SecurityVault(application)
+    private val securityVault by lazy { SecurityVault(getApplication<Application>()) }
 
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
