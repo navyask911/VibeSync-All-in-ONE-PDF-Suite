@@ -39,6 +39,7 @@ class DashboardScreenTest {
                 DashboardScreen(
                     viewModel = viewModel,
                     onNavigateToViewer = {},
+                    onNavigateToEditor = {},
                     onNavigateToTool = { routes.add(it) },
                     onLaunchScanner = { scannerLaunched = true },
                     onRequestStoragePermission = {}
