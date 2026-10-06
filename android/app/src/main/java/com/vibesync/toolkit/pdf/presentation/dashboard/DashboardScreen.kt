@@ -228,8 +228,10 @@ fun DashboardScreen(
                                 .clickable {
                                     if (tool.route == "scanner") {
                                         onLaunchScanner()
-                                    } else if (tool.route.endsWith("_picker")) {
+                                    } else if (tool.route == "viewer_picker") {
                                         viewerPickerLauncher.launch(arrayOf("application/pdf"))
+                                    } else if (tool.route == "editor_picker") {
+                                        editorPickerLauncher.launch(arrayOf("application/pdf"))
                                     } else {
                                         onNavigateToTool(tool.route)
                                     }
