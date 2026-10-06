@@ -32,6 +32,8 @@ import androidx.compose.ui.input.pointer.detectDragGestures
 import androidx.compose.ui.input.pointer.detectTapGestures
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import com.vibesync.toolkit.pdf.data.model.Point2D
 import com.vibesync.toolkit.pdf.data.model.ToolMode
 import com.vibesync.toolkit.pdf.data.model.VectorStroke
