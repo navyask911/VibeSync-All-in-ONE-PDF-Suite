@@ -23,10 +23,12 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
         with:
+          gradle-version: 8.7
           cache-disabled: true
       - name: Run unit tests
         working-directory: android
         run: |
+          gradle wrapper --gradle-version 8.7 --distribution-type bin
           chmod +x gradlew
           ./gradlew testDebugUnitTest --no-daemon --stacktrace
 
