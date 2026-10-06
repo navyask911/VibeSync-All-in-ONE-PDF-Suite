@@ -182,10 +182,7 @@ fun PdfEditorScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color(0xFFCBD5E1))
-                .onGloballyPositioned { coordinates ->
-                    screenWidthPx = coordinates.size.width.toFloat()
-                },
+                .background(Color(0xFFCBD5E1)),
             contentAlignment = Alignment.Center
         ) {
             val pageBitmapState = produceState<Bitmap?>(initialValue = null, key1 = uiState.currentPageIndex) {
@@ -200,6 +197,9 @@ fun PdfEditorScreen(
                     .testTag("editor_pdf_page") // Standard A4 Aspect Ratio
                     .shadow(8.dp, RoundedCornerShape(4.dp))
                     .background(Color.White)
+                    .onGloballyPositioned { coordinates ->
+                        screenWidthPx = coordinates.size.width.toFloat()
+                    }
             ) {
                 val bitmap = pageBitmapState.value
                 if (bitmap != null && !bitmap.isRecycled) {
