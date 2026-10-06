@@ -77,21 +77,21 @@ class PdfBoxToolkitEngineTest {
         assertTrue(result.isSuccess, "Splitting should succeed even with boundary ranges")
 
         val generatedFiles = result.getOrThrow()
-        assertEquals(3, generatedFiles.size, "Should produce 3 valid partition documents")
+        assertEquals("Should produce 3 valid partition documents", 3, generatedFiles.size)
 
         // Validate partition 1 (pages 1..2)
         PDDocument.load(generatedFiles[0]).use { doc ->
-            assertEquals(2, doc.numberOfPages, "Part 1 should contain exactly 2 pages")
+            assertEquals("Part 1 should contain exactly 2 pages", 2, doc.numberOfPages)
         }
 
         // Validate partition 2 (single page 4)
         PDDocument.load(generatedFiles[1]).use { doc ->
-            assertEquals(1, doc.numberOfPages, "Part 2 should contain exactly 1 page")
+            assertEquals("Part 2 should contain exactly 1 page", 1, doc.numberOfPages)
         }
 
         // Validate partition 3 (clamped 5..6)
         PDDocument.load(generatedFiles[2]).use { doc ->
-            assertEquals(2, doc.numberOfPages, "Part 3 should be clamped to remaining 2 pages")
+            assertEquals("Part 3 should be clamped to remaining 2 pages", 2, doc.numberOfPages)
         }
     }
 
@@ -128,10 +128,10 @@ class PdfBoxToolkitEngineTest {
         assertTrue(mergeResult.isSuccess, "Merge should complete successfully")
 
         PDDocument.load(outputFile).use { mergedDoc ->
-            assertEquals(3, mergedDoc.numberOfPages, "Merged doc must contain 3 pages")
-            assertEquals(90, mergedDoc.getPage(0).rotation, "Page 1 must preserve 90° rotation")
-            assertEquals(180, mergedDoc.getPage(1).rotation, "Page 2 must preserve 180° rotation")
-            assertEquals(270, mergedDoc.getPage(2).rotation, "Page 3 must preserve 270° rotation")
+            assertEquals("Merged doc must contain 3 pages", 3, mergedDoc.numberOfPages)
+            assertEquals("Page 1 must preserve 90° rotation", 90, mergedDoc.getPage(0).rotation)
+            assertEquals("Page 2 must preserve 180° rotation", 180, mergedDoc.getPage(1).rotation)
+            assertEquals("Page 3 must preserve 270° rotation", 270, mergedDoc.getPage(2).rotation)
         }
     }
 
