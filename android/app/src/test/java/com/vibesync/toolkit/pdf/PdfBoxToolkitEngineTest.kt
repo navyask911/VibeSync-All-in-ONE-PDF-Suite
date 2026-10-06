@@ -1,6 +1,7 @@
 package com.vibesync.toolkit.pdf
 
 import android.content.Context
+import android.content.ContentResolver
 import android.graphics.Color
 import android.graphics.PointF
 import android.net.Uri
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.DisplayName
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.io.FileInputStream
 
 @DisplayName("PdfBoxToolkitEngine Unit Tests - Lifecycle & Edge Cases")
 class PdfBoxToolkitEngineTest {
@@ -30,12 +32,19 @@ class PdfBoxToolkitEngineTest {
     lateinit var tempFolder: File
 
     private lateinit var mockContext: Context
+    private lateinit var mockContentResolver: ContentResolver
     private lateinit var engine: PdfBoxToolkitEngine
 
     @BeforeEach
     fun setUp() {
         mockContext = mockk(relaxed = true)
+        mockContentResolver = mockk(relaxed = true)
         every { mockContext.cacheDir } returns tempFolder
+        every { mockContext.contentResolver } returns mockContentResolver
+        every { mockContentResolver.openInputStream(any()) } answers {
+            val uri = firstArg<Uri>()
+            FileInputStream(File(requireNotNull(uri.path)))
+        }
         engine = PdfBoxToolkitEngine(mockContext)
     }
 
