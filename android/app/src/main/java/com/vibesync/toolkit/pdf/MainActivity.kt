@@ -33,6 +33,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.core.util.UriUtils
+import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.presentation.dashboard.DashboardScreen
 import com.vibesync.toolkit.pdf.presentation.dashboard.DashboardViewModel
 import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
@@ -58,6 +59,7 @@ class MainActivity : ComponentActivity() {
     private val dashboardViewModel: DashboardViewModel by viewModels()
     private val viewerViewModel: PdfViewerViewModel by viewModels()
     private val editorViewModel: EditorViewModel by viewModels()
+    private val toolkitEngine by lazy { PdfBoxToolkitEngine(applicationContext) }
 
     private lateinit var scannerManager: DocumentScannerManager
     private lateinit var scannerLauncher: ActivityResultLauncher<IntentSenderRequest>
@@ -83,9 +85,21 @@ class MainActivity : ComponentActivity() {
             val scanResult = scannerManager.parseResult(result.resultCode, result.data)
             scanResult?.pdfUri?.let { scannedPdfUri ->
                 Toast.makeText(this, "Document scanned: ${scanResult.pageCount} pages", Toast.LENGTH_LONG).show()
-                // Forward the generated PDF into the same viewer navigation path used by
-                // picked/shared documents.
-                pendingPdfUriState.value = scannedPdfUri
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val watermarkedFile = UriUtils.createExportCacheFile(this@MainActivity, "VibeSync_Scanned_Document")
+                    val watermarkResult = toolkitEngine.watermarkPdf(
+                        sourceUri = scannedPdfUri,
+                        watermarkText = "VibeSync All in ONE PDF Suite",
+                        outputFile = watermarkedFile
+                    )
+                    launch(Dispatchers.Main) {
+                        watermarkResult.onSuccess {
+                            pendingPdfUriState.value = Uri.fromFile(watermarkedFile)
+                        }.onFailure {
+                            Toast.makeText(this@MainActivity, "Could not apply VibeSync watermark to scanned PDF", Toast.LENGTH_LONG).show()
+                        }
+                    }
+                }
             }
         }
 
@@ -160,6 +174,9 @@ class MainActivity : ComponentActivity() {
                                 onNavigateToEditor = { uri ->
                                     val enc = encodeUriRoute(uri)
                                     navController.navigate("editor/$enc")
+                                },
+                                onShareDocument = {
+                                    shareViewedDocument(decodedUri)
                                 }
                             )
                         }
@@ -241,6 +258,23 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun shareViewedDocument(sourceUri: Uri) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val output = UriUtils.createExportCacheFile(this@MainActivity, "VibeSync_Viewed_Document")
+            val result = toolkitEngine.watermarkPdf(
+                sourceUri = sourceUri,
+                watermarkText = "VibeSync All in ONE PDF Suite",
+                outputFile = output
+            )
+            launch(Dispatchers.Main) {
+                result.onSuccess {
+                    shareFiles(listOf(output), "application/pdf", "VibeSync_Viewed_Document")
+                }.onFailure { error ->
+                    Toast.makeText(this@MainActivity, error.localizedMessage ?: "Could not prepare the PDF for sharing", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
     private fun shareFiles(files: List<File>, mimeType: String, defaultBaseName: String) {
         val validFiles = files.filter { it.exists() && it.length() > 0L }
         if (validFiles.isEmpty()) {
