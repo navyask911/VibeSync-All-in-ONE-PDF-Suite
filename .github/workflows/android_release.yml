@@ -1,12 +1,70 @@
-- name: Build Signed AAB and APK
-      working-directory: android
-      env:
-        RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
-        RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS || 'upload' }}
-        RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
-      run: |
-        # Generate wrapper jar automatically if absent
-        gradle wrapper --gradle-version 8.7 --distribution-type bin
-        chmod +x gradlew
-        ./gradlew :app:bundleRelease --no-daemon --stacktrace -x test -x lint
-        ./gradlew :app:assembleRelease --no-daemon --stacktrace -x test -x lint
+name: Build & Sign Android Release (AAB & APK)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build & Sign Release Bundle & APK
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Gradle (Bypass Broken GitHub Cache)
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: 8.7
+          cache-disabled: true
+
+      - name: Accept Android SDK Licenses
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      - name: Setup Signing Keystore
+        working-directory: android
+        run: |
+          mkdir -p app
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | tr -d '\r\n ' | base64 --decode > app/release-upload.jks
+            ls -lh app/release-upload.jks
+          fi
+
+      - name: Build Signed AAB and APK
+        working-directory: android
+        env:
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS || 'upload' }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+        run: |
+          gradle wrapper --gradle-version 8.7 --distribution-type bin
+          chmod +x gradlew
+          ./gradlew :app:bundleRelease --no-daemon --stacktrace -x test -x lint
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace -x test -x lint
+
+      - name: Secure Clean Keystore
+        if: always()
+        working-directory: android
+        run: rm -f app/release-upload.jks
+
+      - name: Upload Signed APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: VibeSync-Installable-APK
+          path: android/app/build/outputs/apk/release/*.apk
+          if-no-files-found: warn
+
+      - name: Upload Signed AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: VibeSync-GooglePlay-AAB
+          path: android/app/build/outputs/bundle/release/*.aab
+          if-no-files-found: warn
