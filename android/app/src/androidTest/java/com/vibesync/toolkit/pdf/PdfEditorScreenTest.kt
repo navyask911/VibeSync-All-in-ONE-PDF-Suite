@@ -57,7 +57,7 @@ class PdfEditorScreenTest {
     fun signatureDialogOpensAndCanBeCancelled() {
         val viewModel = mockk<EditorViewModel>(relaxed = true)
         every { viewModel.uiState } returns MutableStateFlow(EditorUiState())
-        coEvery { viewModel.getPageBitmap(any()) } returns null
+        coEvery { viewModel.getPageBitmap(any(), any()) } returns null
 
         composeTestRule.setContent {
             VibeSyncPdfTheme {
