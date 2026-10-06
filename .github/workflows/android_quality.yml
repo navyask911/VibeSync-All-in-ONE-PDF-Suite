@@ -28,6 +28,13 @@ jobs:
             exit 1
           fi
 
+          bad_packages="$(git grep -nE '^package ' -- android/app/src | grep -vE 'package com\.vibesync(\.|$)' || true)"
+          if [ -n "$bad_packages" ]; then
+            echo "Non-VibeSync package declarations found:"
+            echo "$bad_packages"
+            exit 1
+          fi
+
       - name: Set up JDK 17
         uses: actions/setup-java@v6
         with:
