@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.ui.platform.testTag
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -49,13 +50,19 @@ fun PdfEditorScreen(
     var pendingTapOffset by remember { mutableStateOf(Offset.Zero) }
     var textInputState by remember { mutableStateOf("") }
     var screenWidthPx by remember { mutableFloatStateOf(1080f) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(documentUri) {
         viewModel.initEditor(documentUri)
         AdMobManager.preloadInterstitial(context)
     }
 
+    LaunchedEffect(uiState.errorMessage) {
+        uiState.errorMessage?.let { snackbarHostState.showSnackbar(it) }
+    }
+
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
@@ -189,7 +196,8 @@ fun PdfEditorScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
-                    .aspectRatio(595f / 842f) // Standard A4 Aspect Ratio
+                    .aspectRatio(595f / 842f)
+                    .testTag("editor_pdf_page") // Standard A4 Aspect Ratio
                     .shadow(8.dp, RoundedCornerShape(4.dp))
                     .background(Color.White)
             ) {
@@ -229,6 +237,7 @@ fun PdfEditorScreen(
 
                 // Interactive Vector Canvas Overlay
                 VectorCanvasOverlay(
+                    modifier = Modifier.testTag("editor_canvas_overlay"),
                     toolMode = uiState.toolMode,
                     strokeColor = uiState.selectedColor,
                     strokeWidth = uiState.strokeWidth,
@@ -302,6 +311,7 @@ private fun ToolIconButton(
             .clip(RoundedCornerShape(8.dp))
             .background(if (isSelected) VibeSyncCrimsonPrimary.copy(alpha = 0.12f) else Color.Transparent)
             .clickable { onClick() }
+            .testTag("editor_tool_$label")
             .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
         Icon(
