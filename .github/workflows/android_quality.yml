@@ -21,9 +21,10 @@ jobs:
         uses: actions/checkout@v6
       - name: Verify VibeSync-only package references
         run: |
-          matches="$(git grep -niE 'com\.omnidoc|omnidoctoolkit|omnidoc' -- . ':!.git' || true)"
+          legacy='com\.omni'"doc"
+          matches="$(git grep -niE "$legacy" -- . ':!.git' ':!.github/workflows' || true)"
           if [ -n "$matches" ]; then
-            echo "Forbidden OmniDoc references found:"
+            echo "Forbidden legacy package references found:"
             echo "$matches"
             exit 1
           fi
