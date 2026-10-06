@@ -3,7 +3,10 @@ package com.vibesync.toolkit.pdf.data.pdf
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import android.net.Uri
 import android.util.Log
 import com.vibesync.toolkit.pdf.core.util.UriUtils
@@ -65,6 +68,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
                             subDoc.importPage(document.getPage(i))
                         }
                         val splitFile = UriUtils.createExportCacheFile(context, "split_part_${index + 1}")
+                        applyVibeSyncWatermark(subDoc)
                         subDoc.save(splitFile)
                         subDoc.close()
                         outputFiles.add(splitFile)
@@ -99,6 +103,10 @@ class PdfBoxToolkitEngine(private val context: Context) {
 
             // Execute merge using main memory with temp-file overflow support
             merger.mergeDocuments(MemoryUsageSetting.setupTempFileOnly())
+            PDDocument.load(outputFile).use { mergedDocument ->
+                applyVibeSyncWatermark(mergedDocument)
+                mergedDocument.save(outputFile)
+            }
             Result.success(outputFile)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to merge PDFs", e)
@@ -130,9 +138,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
                         if (xObject is PDImageXObject) {
                             val bitmap = xObject.image
                             val imageFile = File(cacheDir, "img_p${pageIndex + 1}_${imageIndex++}.png")
-                            FileOutputStream(imageFile).use { out ->
-                                bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
-                            }
+                            writeVibeSyncWatermarkedPng(bitmap, imageFile)
                             extractedFiles.add(imageFile)
                         }
                     }
@@ -208,6 +214,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 return@withContext Result.failure(IllegalArgumentException("None of the selected images could be decoded"))
             }
 
+            applyVibeSyncWatermark(document)
             document.save(outputFile)
             document.close()
             Result.success(outputFile)
@@ -237,6 +244,8 @@ class PdfBoxToolkitEngine(private val context: Context) {
                     setCanModify(!allowPrinting && !allowCopying)
                 }
 
+                applyVibeSyncWatermark(document)
+
                 // Standard 128-bit / 256-bit AES protection policy
                 val policy = StandardProtectionPolicy(ownerPassword, userPassword, permissions)
                 policy.encryptionKeyLength = 128
@@ -265,6 +274,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "decrypt_src_")
             PDDocument.load(sourceFile, password).use { document ->
                 document.isAllSecurityToBeRemoved = true
+                applyVibeSyncWatermark(document)
                 document.save(outputFile)
             }
             sourceFile.delete()
@@ -428,6 +438,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
                     }
                 }
 
+                applyVibeSyncWatermark(document)
                 document.save(outputFile)
             }
             sourceFile.delete()
@@ -507,6 +518,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
                         acroForm.flatten()
                     }
                 }
+                applyVibeSyncWatermark(document)
                 document.save(outputFile)
             }
             sourceFile.delete()
@@ -517,7 +529,85 @@ class PdfBoxToolkitEngine(private val context: Context) {
         }
     }
 
+    private fun applyVibeSyncWatermark(document: PDDocument) {
+        val documentInfo = document.documentInformation
+        if (documentInfo.getCustomMetadataValue(WATERMARK_METADATA_KEY) == WATERMARK_METADATA_VALUE) {
+            return
+        }
+
+        val font = PDType1Font.HELVETICA_BOLD
+        val watermarkText = VIBESYNC_WATERMARK_TEXT
+
+        for (page in document.pages) {
+            val mediaBox = page.mediaBox
+            val fontSize = (minOf(mediaBox.width, mediaBox.height) / 14f).coerceIn(22f, 38f)
+            val textWidth = font.getStringWidth(watermarkText) / 1000f * fontSize
+            val centerX = mediaBox.width / 2f
+            val centerY = mediaBox.height / 2f
+            val startX = centerX - textWidth / 2f
+
+            PDPageContentStream(
+                document,
+                page,
+                PDPageContentStream.AppendMode.APPEND,
+                true,
+                true
+            ).use { cs ->
+                val graphicsState = PDExtendedGraphicsState().apply {
+                    nonStrokingAlphaConstant = 0.20f
+                }
+                cs.setGraphicsStateParameters(graphicsState)
+                cs.setNonStrokingColor(142, 0, 0)
+                cs.beginText()
+                cs.setFont(font, fontSize)
+                cs.setTextMatrix(
+                    0.9063078,
+                    -0.42261827,
+                    0.42261827,
+                    0.9063078,
+                    startX.toDouble(),
+                    centerY.toDouble()
+                )
+                cs.showText(watermarkText)
+                cs.endText()
+            }
+        }
+
+        documentInfo.setCustomMetadataValue(WATERMARK_METADATA_KEY, WATERMARK_METADATA_VALUE)
+    }
+
+    private fun writeVibeSyncWatermarkedPng(sourceBitmap: Bitmap, outputFile: File) {
+        val mutableBitmap = sourceBitmap.copy(Bitmap.Config.ARGB_8888, true)
+            ?: throw IllegalStateException("Could not create a mutable bitmap for watermarking")
+
+        val canvas = Canvas(mutableBitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(150, 142, 0, 0)
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.08f).coerceIn(18f, 54f)
+        }
+
+        val watermarkText = VIBESYNC_WATERMARK_TEXT
+        canvas.save()
+        canvas.rotate(-24f, mutableBitmap.width / 2f, mutableBitmap.height / 2f)
+        val x = mutableBitmap.width / 2f - paint.measureText(watermarkText) / 2f
+        val y = mutableBitmap.height / 2f
+        canvas.drawText(watermarkText, x, y, paint)
+        canvas.restore()
+
+        FileOutputStream(outputFile).use { output ->
+            if (!mutableBitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                mutableBitmap.recycle()
+                throw IllegalStateException("Could not write watermarked image")
+            }
+        }
+        mutableBitmap.recycle()
+    }
+
     companion object {
         private const val TAG = "PdfBoxToolkitEngine"
+        private const val VIBESYNC_WATERMARK_TEXT = "VibeSync All in ONE PDF Suite"
+        private const val WATERMARK_METADATA_KEY = "VibeSync-Watermarked"
+        private const val WATERMARK_METADATA_VALUE = "true"
     }
 }
