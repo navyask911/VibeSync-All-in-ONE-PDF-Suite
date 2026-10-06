@@ -121,6 +121,10 @@ dependencies {
 
     // PDFBox-Android (Apache 2.0 clean-room PDF manipulation)
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+    // Pin the exact cryptographic stack used by PdfBox-Android's AES password protection.
+    implementation("org.bouncycastle:bcprov-jdk15to18:1.72")
+    implementation("org.bouncycastle:bcpkix-jdk15to18:1.72")
+    implementation("org.bouncycastle:bcutil-jdk15to18:1.72")
 
     // Google Play Services: ML Kit Document Scanner
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1")
