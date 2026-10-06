@@ -36,6 +36,8 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.OutputStream
+import java.security.Security
+import org.bouncycastle.jce.provider.BouncyCastleProvider
 
 /**
  * Production-ready clean-room operational engine utilizing Apache PDFBox-Android (Apache 2.0).
@@ -91,42 +93,39 @@ class PdfBoxToolkitEngine(private val context: Context) {
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
         val tempFiles = mutableListOf<File>()
+        val mergedDocument = PDDocument()
         try {
-            val merger = PDFMergerUtility()
-            merger.destinationFileName = outputFile.absolutePath
+            if (sourceUris.isEmpty()) {
+                mergedDocument.close()
+                return@withContext Result.failure(IllegalArgumentException("Select at least one PDF"))
+            }
 
             for (uri in sourceUris) {
                 val tempFile = UriUtils.copyUriToCacheFile(context, uri, "merge_src_")
                 tempFiles.add(tempFile)
-                merger.addSource(tempFile)
-            }
 
-            // Record each source page rotation before PDFMergerUtility normalizes page dictionaries.
-            val sourceRotations = buildList {
-                tempFiles.forEach { tempFile ->
-                    PDDocument.load(tempFile).use { sourceDocument ->
-                        for (pageIndex in 0 until sourceDocument.numberOfPages) {
-                            add(sourceDocument.getPage(pageIndex).rotation)
-                        }
+                PDDocument.load(tempFile).use { sourceDocument ->
+                    for (pageIndex in 0 until sourceDocument.numberOfPages) {
+                        val sourcePage = sourceDocument.getPage(pageIndex)
+                        val importedPage = mergedDocument.importPage(sourcePage)
+
+                        // Preserve inherited resources when present.
+                        sourcePage.resources?.let { importedPage.resources = it }
+
+                        // Preserve the source page's clockwise rotation exactly.
+                        importedPage.rotation = normalizePageRotation(sourcePage.rotation)
                     }
                 }
             }
 
-            // Execute merge using main memory with temp-file overflow support
-            merger.mergeDocuments(MemoryUsageSetting.setupTempFileOnly())
-            PDDocument.load(outputFile).use { mergedDocument ->
-                // Restore the original rotation for every page after the merge.
-                sourceRotations.take(mergedDocument.numberOfPages).forEachIndexed { pageIndex, rotation ->
-                    mergedDocument.getPage(pageIndex).rotation = rotation
-                }
-                applyVibeSyncWatermark(mergedDocument)
-                mergedDocument.save(outputFile)
-            }
+            applyVibeSyncWatermark(mergedDocument)
+            mergedDocument.save(outputFile)
             Result.success(outputFile)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to merge PDFs", e)
             Result.failure(e)
         } finally {
+            mergedDocument.close()
             tempFiles.forEach { it.delete() }
         }
     }
@@ -250,8 +249,14 @@ class PdfBoxToolkitEngine(private val context: Context) {
         allowCopying: Boolean,
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
+        var sourceFile: File? = null
         try {
-            val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "encrypt_src_")
+            require(userPassword.isNotEmpty()) { "User password cannot be empty" }
+            require(ownerPassword.isNotEmpty()) { "Owner password cannot be empty" }
+
+            ensureBouncyCastleProvider()
+
+            sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "encrypt_src_")
             PDDocument.load(sourceFile).use { document ->
                 val permissions = AccessPermission().apply {
                     setCanPrint(allowPrinting)
@@ -261,19 +266,42 @@ class PdfBoxToolkitEngine(private val context: Context) {
 
                 applyVibeSyncWatermark(document)
 
-                // Standard 128-bit / 256-bit AES protection policy
+                // Use PDFBox's strongest standard password protection supported by
+                // pdfbox-android 2.0.27.0: AES-256 (revision 6).
                 val policy = StandardProtectionPolicy(ownerPassword, userPassword, permissions)
-                policy.encryptionKeyLength = 128
+                policy.encryptionKeyLength = 256
+                policy.preferAES = true
                 policy.permissions = permissions
-                document.protect(policy)
 
+                document.protect(policy)
                 document.save(outputFile)
             }
-            sourceFile.delete()
+
+            // Fail the operation immediately if the produced file cannot be reopened
+            // with both credentials. This prevents broken encrypted PDFs reaching users.
+            PDDocument.load(outputFile, userPassword).use { userDocument ->
+                check(userDocument.isEncrypted) { "Encrypted output did not retain PDF security" }
+                check(userDocument.currentAccessPermission.canPrint() == allowPrinting) {
+                    "Encrypted output printing permission does not match requested policy"
+                }
+                check(userDocument.currentAccessPermission.canExtractContent() == allowCopying) {
+                    "Encrypted output extraction permission does not match requested policy"
+                }
+            }
+            PDDocument.load(outputFile, ownerPassword).use { ownerDocument ->
+                check(ownerDocument.isEncrypted) { "Encrypted output did not retain PDF security" }
+                check(ownerDocument.currentAccessPermission.isOwnerPermission) {
+                    "Owner password did not grant owner access"
+                }
+            }
+
             Result.success(outputFile)
         } catch (e: Exception) {
             Log.e(TAG, "Failed to encrypt PDF", e)
+            outputFile.delete()
             Result.failure(e)
+        } finally {
+            sourceFile?.delete()
         }
     }
 
@@ -286,6 +314,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
+            ensureBouncyCastleProvider()
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "decrypt_src_")
             PDDocument.load(sourceFile, password).use { document ->
                 document.isAllSecurityToBeRemoved = true
@@ -519,6 +548,24 @@ class PdfBoxToolkitEngine(private val context: Context) {
         } catch (e: Exception) {
             Log.e(TAG, "Failed to fill AcroForm", e)
             Result.failure(e)
+        }
+    }
+
+    private fun ensureBouncyCastleProvider() {
+        val provider = Security.getProvider("BC")
+        if (provider == null || provider.javaClass.name != BouncyCastleProvider::class.java.name) {
+            Security.removeProvider("BC")
+            Security.insertProviderAt(BouncyCastleProvider(), 1)
+        }
+    }
+
+    private fun normalizePageRotation(rotation: Int): Int {
+        val normalized = rotation % 360
+        return when {
+            normalized < 0 -> normalized + 360
+            normalized == 360 -> 0
+            normalized % 90 == 0 -> normalized
+            else -> ((normalized + 45) / 90 * 90) % 360
         }
     }
 
