@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.testTag
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.text.input.KeyboardType
@@ -185,6 +186,7 @@ fun PdfViewerScreen(
                     state = listState,
                     modifier = Modifier
                         .fillMaxSize()
+                        .testTag("pdf_page_list")
                         .graphicsLayer(
                             scaleX = scale,
                             scaleY = scale,
