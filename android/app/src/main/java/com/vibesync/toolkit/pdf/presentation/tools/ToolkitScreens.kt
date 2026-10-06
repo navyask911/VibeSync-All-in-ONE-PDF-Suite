@@ -408,3 +408,213 @@ fun EncryptScreen(
         }
     }
 }
+
+// ==========================================
+// 4. IMAGES TO PDF SCREEN
+// ==========================================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ConvertImagesScreen(
+    onNavigateBack: () -> Unit,
+    onSuccess: (File) -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val engine = remember { PdfBoxToolkitEngine(context) }
+    val selectedUris = remember { mutableStateListOf<Uri>() }
+    var isConverting by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val imagePicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        selectedUris.clear()
+        selectedUris.addAll(uris)
+        errorMessage = null
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Images to PDF", fontWeight = FontWeight.SemiBold) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Button(
+                onClick = { imagePicker.launch(arrayOf("image/*")) },
+                enabled = !isConverting,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
+            ) {
+                Text(if (selectedUris.isEmpty()) "Choose Images" else "Change Images (" + selectedUris.size + ")")
+            }
+
+            if (selectedUris.isEmpty()) {
+                Text(
+                    "Select one or more photos. They will be placed into an A4 PDF in selection order.",
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    itemsIndexed(selectedUris) { index, uri ->
+                        Card(modifier = Modifier.fillMaxWidth()) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text((index + 1).toString() + ".", fontWeight = FontWeight.Bold)
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    UriUtils.getFileName(context, uri),
+                                    maxLines = 1,
+                                    modifier = Modifier.weight(1f),
+                                    fontSize = 13.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            errorMessage?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+            }
+
+            Button(
+                onClick = {
+                    if (selectedUris.isEmpty()) return@Button
+                    isConverting = true
+                    errorMessage = null
+                    coroutineScope.launch {
+                        val output = UriUtils.createExportCacheFile(context, "images_to_pdf")
+                        val result = engine.convertImagesToPdf(selectedUris.toList(), output)
+                        isConverting = false
+                        result.fold(
+                            onSuccess = onSuccess,
+                            onFailure = { errorMessage = it.localizedMessage ?: "Failed to create PDF" }
+                        )
+                    }
+                },
+                enabled = selectedUris.isNotEmpty() && !isConverting,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
+            ) {
+                if (isConverting) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text("Create PDF")
+                }
+            }
+        }
+    }
+}
+
+// ==========================================
+// 5. EXTRACT IMAGES SCREEN
+// ==========================================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ExtractImagesScreen(
+    onNavigateBack: () -> Unit,
+    onSuccess: (List<File>) -> Unit
+) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val engine = remember { PdfBoxToolkitEngine(context) }
+    var selectedUri by remember { mutableStateOf<Uri?>(null) }
+    var isExtracting by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    val pickPdfLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        selectedUri = uri
+        errorMessage = null
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Extract Images", fontWeight = FontWeight.SemiBold) },
+                navigationIcon = {
+                    IconButton(onClick = onNavigateBack) {
+                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                    }
+                }
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Button(
+                onClick = { pickPdfLauncher.launch(arrayOf("application/pdf")) },
+                enabled = !isExtracting,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
+            ) {
+                Text(
+                    if (selectedUri == null) "Choose PDF"
+                    else "Change PDF (" + UriUtils.getFileName(context, selectedUri!!) + ")"
+                )
+            }
+
+            Text(
+                "Embedded raster images will be extracted as PNG files. Vector-only artwork is not extracted as a bitmap.",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
+            Spacer(modifier = Modifier.weight(1f))
+
+            errorMessage?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+            }
+
+            Button(
+                onClick = {
+                    val uri = selectedUri ?: return@Button
+                    isExtracting = true
+                    errorMessage = null
+                    coroutineScope.launch {
+                        val result = engine.extractEmbeddedImages(uri)
+                        isExtracting = false
+                        result.fold(
+                            onSuccess = onSuccess,
+                            onFailure = { errorMessage = it.localizedMessage ?: "Failed to extract images" }
+                        )
+                    }
+                },
+                enabled = selectedUri != null && !isExtracting,
+                modifier = Modifier.fillMaxWidth().height(50.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
+            ) {
+                if (isExtracting) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text("Extract Images")
+                }
+            }
+        }
+    }
+}
