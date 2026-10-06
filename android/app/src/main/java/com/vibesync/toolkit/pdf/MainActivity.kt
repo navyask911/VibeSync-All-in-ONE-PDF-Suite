@@ -170,7 +170,7 @@ class MainActivity : ComponentActivity() {
                             arguments = listOf(navArgument("encodedUri") { type = NavType.StringType })
                         ) { backStackEntry ->
                             val encodedUri = backStackEntry.arguments?.getString("encodedUri") ?: ""
-                            val decodedUri = Uri.parse(decodeUriRoute(encodedUri))
+                            val decodedUri = decodeUriRoute(encodedUri)
 
                             PdfEditorScreen(
                                 documentUri = decodedUri,
@@ -254,7 +254,7 @@ class MainActivity : ComponentActivity() {
             setText(defaultName)
             selectAll()
             hint = "File name"
-            singleLine = true
+            setSingleLine(true)
         }
 
         android.app.AlertDialog.Builder(this)
