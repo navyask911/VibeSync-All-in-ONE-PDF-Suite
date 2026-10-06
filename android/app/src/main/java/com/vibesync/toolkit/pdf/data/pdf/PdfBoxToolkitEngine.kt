@@ -540,11 +540,11 @@ class PdfBoxToolkitEngine(private val context: Context) {
 
         for (page in document.pages) {
             val mediaBox = page.mediaBox
-            val fontSize = (minOf(mediaBox.width, mediaBox.height) / 14f).coerceIn(22f, 38f)
+            val fontSize = 8.5f
             val textWidth = font.getStringWidth(watermarkText) / 1000f * fontSize
-            val centerX = mediaBox.width / 2f
-            val centerY = mediaBox.height / 2f
-            val startX = centerX - textWidth / 2f
+            val footerCenterX = mediaBox.lowerLeftX + mediaBox.width / 2f
+            val footerY = mediaBox.lowerLeftY + 9f
+            val startX = footerCenterX - textWidth / 2f
 
             PDPageContentStream(
                 document,
@@ -554,20 +554,13 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 true
             ).use { cs ->
                 val graphicsState = PDExtendedGraphicsState().apply {
-                    nonStrokingAlphaConstant = 0.20f
+                    nonStrokingAlphaConstant = 0.45f
                 }
                 cs.setGraphicsStateParameters(graphicsState)
                 cs.setNonStrokingColor(142, 0, 0)
                 cs.beginText()
                 cs.setFont(font, fontSize)
-                cs.setTextMatrix(
-                    0.9063078,
-                    -0.42261827,
-                    0.42261827,
-                    0.9063078,
-                    startX.toDouble(),
-                    centerY.toDouble()
-                )
+                cs.newLineAtOffset(startX, footerY)
                 cs.showText(watermarkText)
                 cs.endText()
             }
@@ -584,16 +577,13 @@ class PdfBoxToolkitEngine(private val context: Context) {
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.argb(150, 142, 0, 0)
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.08f).coerceIn(18f, 54f)
+            textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.035f).coerceIn(10f, 22f)
         }
 
         val watermarkText = VIBESYNC_WATERMARK_TEXT
-        canvas.save()
-        canvas.rotate(-24f, mutableBitmap.width / 2f, mutableBitmap.height / 2f)
         val x = mutableBitmap.width / 2f - paint.measureText(watermarkText) / 2f
-        val y = mutableBitmap.height / 2f
+        val y = mutableBitmap.height - 10f
         canvas.drawText(watermarkText, x, y, paint)
-        canvas.restore()
 
         FileOutputStream(outputFile).use { output ->
             if (!mutableBitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
