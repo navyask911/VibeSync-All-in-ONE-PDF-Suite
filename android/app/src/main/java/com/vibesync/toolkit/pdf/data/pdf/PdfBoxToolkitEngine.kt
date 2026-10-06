@@ -62,7 +62,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
                     if (start <= end) {
                         val subDoc = PDDocument()
                         for (i in start..end) {
-                            subDoc.addPage(document.getPage(i))
+                            subDoc.importPage(document.getPage(i))
                         }
                         val splitFile = UriUtils.createExportCacheFile(context, "split_part_${index + 1}")
                         subDoc.save(splitFile)
