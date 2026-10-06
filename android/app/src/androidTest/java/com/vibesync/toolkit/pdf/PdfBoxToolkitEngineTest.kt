@@ -17,6 +17,7 @@ import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
 import com.tom_roush.pdfbox.pdmodel.encryption.AccessPermission
 import com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy
+import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
 import kotlinx.coroutines.test.runTest
 import java.io.File
 import java.io.FileOutputStream
@@ -155,9 +156,13 @@ class PdfBoxToolkitEngineTest {
         assertTrue("Encryption should succeed", encryptResult.isSuccess)
         assertTrue("Encrypted file must exist", encryptedOutput.exists())
 
-        // 1. Attempt opening without password -> Must be flagged as encrypted
-        PDDocument.load(encryptedOutput).use { lockedDoc ->
-            assertTrue("Document must report isEncrypted == true", lockedDoc.isEncrypted)
+        // 1. A non-empty user password must block an unauthenticated open.
+        try {
+            PDDocument.load(encryptedOutput).use {
+                throw AssertionError("Encrypted document opened without a password")
+            }
+        } catch (expected: InvalidPasswordException) {
+            // Correct behavior.
         }
 
         // 2. Open with User password and verify permissions
@@ -165,6 +170,12 @@ class PdfBoxToolkitEngineTest {
             val permissions: AccessPermission = userDoc.currentAccessPermission
             assertFalse("Printing must be explicitly restricted", permissions.canPrint())
             assertTrue("Content copying/extraction must be allowed", permissions.canExtractContent())
+            assertFalse("User password must not grant owner access", permissions.isOwnerPermission)
+        }
+
+        // Owner password must grant full owner rights.
+        PDDocument.load(encryptedOutput, ownerPass).use { ownerDoc ->
+            assertTrue("Owner password must grant owner access", ownerDoc.currentAccessPermission.isOwnerPermission)
         }
 
         // 3. Test Decryption back to clean document
