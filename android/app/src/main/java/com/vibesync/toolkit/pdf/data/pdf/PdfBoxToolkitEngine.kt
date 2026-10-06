@@ -290,7 +290,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
      */
     suspend fun watermarkPdf(
         sourceUri: Uri,
-        _watermarkText: String,
+        watermarkText: String,
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
