@@ -29,7 +29,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.consumePositionChange
 import androidx.compose.ui.layout.onSizeChanged
 import com.vibesync.toolkit.pdf.data.model.Point2D
 import com.vibesync.toolkit.pdf.data.model.ToolMode
@@ -57,7 +56,7 @@ fun VectorCanvasOverlay(
                     activePoints = listOf(Point2D(offset.x, offset.y))
                 },
                 onDrag = { change, _ ->
-                    change.consumePositionChange()
+                    change.consume()
                     val position = change.position
                     activePoints = activePoints + Point2D(position.x, position.y)
                 },
