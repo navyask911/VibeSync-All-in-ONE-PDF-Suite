@@ -402,7 +402,7 @@ fun EncryptScreen(
                 if (isEncrypting) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
-                    Text("Apply AES-128/256 Encryption")
+                    Text("Apply AES-128 Encryption")
                 }
             }
         }
