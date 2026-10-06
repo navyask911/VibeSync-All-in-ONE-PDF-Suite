@@ -51,6 +51,7 @@ class DashboardScreenTest {
         composeTestRule.onNodeWithTag("tool_convert").performClick()
         composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("tool_extract"))
         composeTestRule.onNodeWithTag("tool_extract").performClick()
+        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("tool_scanner"))
         composeTestRule.onNodeWithTag("tool_scanner").performClick()
 
         assertEquals(listOf("convert", "extract"), routes)
