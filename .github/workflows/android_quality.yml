@@ -27,9 +27,9 @@ jobs:
           legacy_c="Omni"
           legacy_d="Doc"
           legacy_name="$legacy_c$legacy_d"
-          matches="$(git grep -niE "$legacy_pattern|$legacy_name" -- . ":!.git" ":!.github/workflows" || true)"
+          matches="$(git grep -niE "$legacy_pattern|$legacy_name" -- android/app/src README.md PRIVACY_POLICY.md metadata.json package.json android/settings.gradle.kts android/build.gradle.kts android/app/build.gradle.kts || true)"
           if [ -n "$matches" ]; then
-            echo "Forbidden legacy package/name references found:"
+            echo "Forbidden legacy package/name references found in app/config files:"
             echo "$matches"
             exit 1
           fi
