@@ -44,6 +44,7 @@ data class ToolItem(
 fun DashboardScreen(
     viewModel: DashboardViewModel,
     onNavigateToViewer: (Uri) -> Unit,
+    onNavigateToEditor: (Uri) -> Unit,
     onNavigateToTool: (String) -> Unit,
     onLaunchScanner: () -> Unit,
     onRequestStoragePermission: () -> Unit = {}
@@ -52,11 +53,17 @@ fun DashboardScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showPrivacyDialog by remember { mutableStateOf(false) }
 
-    // SAF Document Picker Launcher
-    val openDocLauncher = rememberLauncherForActivityResult(
+    // SAF Document Pickers: keep View & Read and Edit & Sign as separate actions.
+    val viewerPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
         uri?.let { viewModel.onDocumentSelected(it, onNavigateToViewer) }
+    }
+
+    val editorPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        uri?.let { onNavigateToEditor(it) }
     }
 
     val tools = remember {
@@ -91,7 +98,7 @@ fun DashboardScreen(
                     IconButton(onClick = { viewModel.triggerScanRequest() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Scan Device PDFs", tint = VibeSyncCrimsonPrimary)
                     }
-                    IconButton(onClick = { openDocLauncher.launch(arrayOf("application/pdf")) }) {
+                    IconButton(onClick = { viewerPickerLauncher.launch(arrayOf("application/pdf")) }) {
                         Icon(Icons.Default.FileOpen, contentDescription = "Open Document", tint = VibeSyncCrimsonPrimary)
                     }
                 }
@@ -102,7 +109,7 @@ fun DashboardScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { openDocLauncher.launch(arrayOf("application/pdf")) },
+                onClick = { viewerPickerLauncher.launch(arrayOf("application/pdf")) },
                 containerColor = VibeSyncCrimsonPrimary,
                 contentColor = Color.White,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
@@ -222,7 +229,7 @@ fun DashboardScreen(
                                     if (tool.route == "scanner") {
                                         onLaunchScanner()
                                     } else if (tool.route.endsWith("_picker")) {
-                                        openDocLauncher.launch(arrayOf("application/pdf"))
+                                        viewerPickerLauncher.launch(arrayOf("application/pdf"))
                                     } else {
                                         onNavigateToTool(tool.route)
                                     }
@@ -451,7 +458,7 @@ fun DashboardScreen(
                 OutlinedButton(
                     onClick = {
                         viewModel.dismissPermissionRationale()
-                        openDocLauncher.launch(arrayOf("application/pdf"))
+                        viewerPickerLauncher.launch(arrayOf("application/pdf"))
                     }
                 ) {
                     Text("Select Files Manually (SAF)")
