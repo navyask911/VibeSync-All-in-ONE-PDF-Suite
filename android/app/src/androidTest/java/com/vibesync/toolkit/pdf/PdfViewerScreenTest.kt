@@ -54,7 +54,8 @@ class PdfViewerScreenTest {
                 documentUri = testUri,
                 viewModel = mockViewModel,
                 onNavigateBack = {},
-                onNavigateToEditor = {}
+                onNavigateToEditor = {},
+                onShareDocument = {}
             )
         }
 
