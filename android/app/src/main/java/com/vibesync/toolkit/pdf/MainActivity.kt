@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavType
@@ -37,10 +38,13 @@ import com.vibesync.toolkit.pdf.presentation.tools.SplitScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
 import java.net.URLDecoder
+import kotlinx.coroutines.flow.MutableStateFlow
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
 class MainActivity : ComponentActivity() {
+
+    private val pendingPdfUriState = MutableStateFlow<Uri?>(null)
 
     private val dashboardViewModel: DashboardViewModel by viewModels()
     private val viewerViewModel: PdfViewerViewModel by viewModels()
@@ -70,9 +74,9 @@ class MainActivity : ComponentActivity() {
             val scanResult = scannerManager.parseResult(result.resultCode, result.data)
             scanResult?.pdfUri?.let { scannedPdfUri ->
                 Toast.makeText(this, "Document scanned: ${scanResult.pageCount} pages", Toast.LENGTH_LONG).show()
-                // Route to viewer
-                val encodedUri = URLEncoder.encode(scannedPdfUri.toString(), StandardCharsets.UTF_8.toString())
-                // In production, navigate to viewer
+                // Forward the generated PDF into the same viewer navigation path used by
+                // picked/shared documents.
+                pendingPdfUriState.value = scannedPdfUri
             }
         }
 
@@ -83,7 +87,7 @@ class MainActivity : ComponentActivity() {
         AdMobManager.preloadInterstitial(this)
 
         // 4. Inspect incoming Intent (ACTION_VIEW handler for PDF files)
-        val incomingPdfUri = handleIncomingIntent(intent)
+        pendingPdfUriState.value = handleIncomingIntent(intent)
 
         setContent {
             VibeSyncPdfTheme {
@@ -92,12 +96,16 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
+                    val pendingPdfUri by pendingPdfUriState.collectAsState()
 
-                    // Automatically forward incoming ACTION_VIEW to Viewer
-                    LaunchedEffect(incomingPdfUri) {
-                        incomingPdfUri?.let { uri ->
+                    // Automatically forward ACTION_VIEW, ACTION_SEND, and scanner results to Viewer.
+                    LaunchedEffect(pendingPdfUri) {
+                        pendingPdfUri?.let { uri ->
                             val encoded = URLEncoder.encode(uri.toString(), StandardCharsets.UTF_8.toString())
-                            navController.navigate("viewer/$encoded")
+                            navController.navigate("viewer/$encoded") {
+                                launchSingleTop = true
+                            }
+                            pendingPdfUriState.value = null
                         }
                     }
 
@@ -194,6 +202,26 @@ class MainActivity : ComponentActivity() {
                                 }
                             )
                         }
+
+                        composable("convert") {
+                            ConvertImagesScreen(
+                                onNavigateBack = { navController.popBackStack() },
+                                onSuccess = { outputFile ->
+                                    Toast.makeText(this@MainActivity, "PDF created: " + outputFile.name, Toast.LENGTH_LONG).show()
+                                    navController.popBackStack()
+                                }
+                            )
+                        }
+
+                        composable("extract") {
+                            ExtractImagesScreen(
+                                onNavigateBack = { navController.popBackStack() },
+                                onSuccess = { files ->
+                                    Toast.makeText(this@MainActivity, "Extracted " + files.size + " images", Toast.LENGTH_LONG).show()
+                                    navController.popBackStack()
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -202,7 +230,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handleIncomingIntent(intent)
+        setIntent(intent)
+        pendingPdfUriState.value = handleIncomingIntent(intent)
     }
 
     private fun handleIncomingIntent(intent: Intent?): Uri? {
@@ -212,7 +241,12 @@ class MainActivity : ComponentActivity() {
 
         if ((Intent.ACTION_VIEW == action || Intent.ACTION_SEND == action) && type != null) {
             if ("application/pdf" == type) {
-                return intent.data ?: intent.getParcelableExtra(Intent.EXTRA_STREAM)
+                return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    intent.data ?: intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                } else {
+                    @Suppress("DEPRECATION")
+                    intent.data ?: intent.getParcelableExtra(Intent.EXTRA_STREAM)
+                }
             }
         }
         return intent.data
