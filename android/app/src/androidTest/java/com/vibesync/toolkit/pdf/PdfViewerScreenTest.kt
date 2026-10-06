@@ -80,7 +80,7 @@ class PdfViewerScreenTest {
     @Test
     fun testPasswordDialogSubmissionAndPasswordVisibilityToggle() {
         val stateFlow = MutableStateFlow(
-            com.omnidoc.toolkit.pdf.presentation.viewer.ViewerUiState(
+            com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(
                 fileName = "Protected_Financial_Audit.pdf",
                 pageCount = 0,
                 isLoading = false,
@@ -104,7 +104,7 @@ class PdfViewerScreenTest {
         composeTestRule.onNodeWithText("This document is secured with encryption. Please enter the password to view pages.").assertIsDisplayed()
 
         // 2. Find Password Input and enter text
-        val passwordField = composeTestRule.onNodeWithText("Password")
+        val passwordField = composeTestRule.onNode(hasSetTextAction())
         passwordField.assertIsDisplayed()
         passwordField.performTextInput("SecretVault2026!")
 
