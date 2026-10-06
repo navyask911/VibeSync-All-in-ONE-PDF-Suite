@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.testTag
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncRubyAccent
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncRubyDeep
@@ -224,7 +225,8 @@ fun DashboardScreen(
                                     } else {
                                         onNavigateToTool(tool.route)
                                     }
-                                },
+                                }
+                                .testTag("tool_" + tool.route),
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                         ) {
