@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,6 +46,7 @@ fun PdfEditorScreen(
     onExportComplete: (File) -> Unit
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
     val uiState by viewModel.uiState.collectAsState()
 
     var showSignatureDialog by remember { mutableStateOf(false) }
@@ -232,7 +234,10 @@ fun PdfEditorScreen(
                             contentDescription = "Placed Signature",
                             modifier = Modifier
                                 .offset { IntOffset(sig.x.roundToInt(), sig.y.roundToInt()) }
-                                .size(width = (sig.width / 2.5f).dp, height = (sig.height / 2.5f).dp)
+                                .size(
+                                    width = with(density) { sig.width.toDp() },
+                                    height = with(density) { sig.height.toDp() }
+                                )
                         )
                     }
                 }
