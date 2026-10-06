@@ -168,6 +168,7 @@ fun MergeScreen(
 
     val selectedUris = remember { mutableStateListOf<Uri>() }
     var isMerging by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val pickMultiplePdfsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
@@ -207,6 +208,10 @@ fun MergeScreen(
 
             Text("Document Assembly Order:", fontWeight = FontWeight.Bold, fontSize = 14.sp)
             Spacer(modifier = Modifier.height(8.dp))
+            errorMessage?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+                Spacer(modifier = Modifier.height(4.dp))
+            }
 
             LazyColumn(
                 modifier = Modifier.weight(1f),
@@ -267,15 +272,19 @@ fun MergeScreen(
                 onClick = {
                     if (selectedUris.size >= 2) {
                         isMerging = true
+                        errorMessage = null
                         coroutineScope.launch {
                             val output = UriUtils.createExportCacheFile(context, "merged_output")
                             val result = engine.mergePdfs(selectedUris, output)
                             isMerging = false
-                            result.onSuccess { mergedFile ->
-                                (context as? Activity)?.let { act ->
-                                    AdMobManager.showInterstitial(act) { onSuccess(mergedFile) }
-                                } ?: onSuccess(mergedFile)
-                            }
+                            result.fold(
+                                onSuccess = { mergedFile ->
+                                    (context as? Activity)?.let { act ->
+                                        AdMobManager.showInterstitial(act) { onSuccess(mergedFile) }
+                                    } ?: onSuccess(mergedFile)
+                                },
+                                onFailure = { errorMessage = it.localizedMessage ?: "Failed to merge PDFs" }
+                            )
                         }
                     }
                 },
@@ -308,6 +317,7 @@ fun EncryptScreen(
 
     var selectedUri by remember { mutableStateOf<Uri?>(null) }
     var password by rememberSaveable { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
     var allowPrinting by remember { mutableStateOf(true) }
     var allowCopying by remember { mutableStateOf(false) }
@@ -361,6 +371,10 @@ fun EncryptScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            errorMessage?.let {
+                Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
+            }
+
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = allowPrinting, onCheckedChange = { allowPrinting = it })
                 Text("Allow Printing Document", fontSize = 14.sp)
@@ -377,6 +391,7 @@ fun EncryptScreen(
                 onClick = {
                     val uri = selectedUri ?: return@Button
                     isEncrypting = true
+                    errorMessage = null
                     coroutineScope.launch {
                         val output = UriUtils.createExportCacheFile(context, "encrypted_protected")
                         val result = engine.encryptPdf(
@@ -388,11 +403,14 @@ fun EncryptScreen(
                             outputFile = output
                         )
                         isEncrypting = false
-                        result.onSuccess {
-                            (context as? Activity)?.let { act ->
-                                AdMobManager.showInterstitial(act) { onSuccess(it) }
-                            } ?: onSuccess(it)
-                        }
+                        result.fold(
+                            onSuccess = { file ->
+                                (context as? Activity)?.let { act ->
+                                    AdMobManager.showInterstitial(act) { onSuccess(file) }
+                                } ?: onSuccess(file)
+                            },
+                            onFailure = { errorMessage = it.localizedMessage ?: "Failed to encrypt PDF" }
+                        )
                     }
                 },
                 enabled = selectedUri != null && password.isNotBlank() && !isEncrypting,
