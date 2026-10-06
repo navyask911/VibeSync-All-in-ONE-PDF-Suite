@@ -60,8 +60,9 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_5
-          force-avd-creation: false
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
+          force-avd-creation: true
+          emulator-boot-timeout: 600
+          emulator-options: -no-snapshot-load -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           disable-animations: true
           script: |
             cd android
