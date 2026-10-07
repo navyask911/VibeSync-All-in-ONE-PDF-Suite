@@ -74,7 +74,7 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
         with:
-          gradle-version: 8.7
+          gradle-version: 8.13
           cache-disabled: true
       - name: Install Android 36 SDK
         run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;35.0.0" || true
@@ -100,6 +100,6 @@ jobs:
           disable-animations: true
           working-directory: ./android
           script: |
-            gradle wrapper --gradle-version 8.7 --distribution-type bin
+            gradle wrapper --gradle-version 8.13 --distribution-type bin
             chmod +x gradlew
             ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace
