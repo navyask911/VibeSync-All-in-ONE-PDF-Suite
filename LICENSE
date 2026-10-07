@@ -1,0 +1,113 @@
+Copyright (c) 2026 navyask911. All rights reserved.
+
+VibeSync All in ONE PDF Suite
+Proprietary Software and Documentation License
+
+1. OWNERSHIP
+
+VibeSync All in ONE PDF Suite, including its original source code, object code,
+software architecture, UI/UX designs, graphics, icons, documentation, written
+content, configuration, branding, and other original materials, is proprietary
+property of navyask911 and/or its applicable rights holders.
+
+The copyright owner reserves all rights not expressly granted in this notice.
+
+2. NO LICENSE GRANT
+
+Except for the limited rights that may be required by applicable law or by
+third-party licenses identified in this repository, no permission, license, or
+other right is granted to copy, reproduce, modify, adapt, translate, publish,
+distribute, sublicense, sell, lease, rent, host, transmit, publicly display,
+publicly perform, or create derivative works from the proprietary portions of
+this software or documentation.
+
+Making this repository publicly viewable does not grant a license to reuse,
+repackage, redistribute, or commercially exploit the proprietary portions.
+
+3. PROHIBITED USES
+
+Without prior written permission from the copyright owner, you may not:
+
+- Copy or reproduce the proprietary source code or documentation.
+- Publish or redistribute substantial portions of the proprietary code or
+  documentation.
+- Modify or create derivative works from the proprietary portions.
+- Repackage, resell, sublicense, or commercially distribute the proprietary
+  software.
+- Use the VibeSync branding, product name, logos, icons, screenshots, or other
+  distinctive brand assets to imply endorsement, affiliation, or ownership.
+- Remove or obscure copyright, ownership, attribution, or proprietary notices
+  from copies that are lawfully provided by the copyright owner.
+
+Any rights that cannot legally be restricted are reserved to the fullest extent
+permitted by applicable law.
+
+4. THIRD-PARTY COMPONENTS
+
+This license applies only to original VibeSync materials owned by navyask911.
+Third-party libraries, SDKs, fonts, services, and other components remain the
+property of their respective owners and are governed by their own licenses and
+terms.
+
+In particular, components such as Apache PDFBox-Android, AndroidX/Jetpack,
+Google Play Services / ML Kit, Google Mobile Ads (AdMob), Kotlin, and other
+third-party dependencies are not relicensed by this notice. Their applicable
+license files, notices, copyrights, and terms continue to apply to those
+components.
+
+Nothing in this license is intended to override or restrict rights granted by
+a valid third-party open-source or other applicable license.
+
+5. TRADEMARK AND BRAND PROTECTION
+
+"VibeSync", "VibeSync All in ONE PDF Suite", associated logos, product names,
+branding, visual assets, and distinctive identifiers are protected to the
+extent provided by applicable trademark, copyright, unfair-competition, or
+other laws.
+
+No trademark or branding license is granted by this notice.
+
+6. SECURITY AND REVERSE ENGINEERING
+
+To the fullest extent permitted by applicable law, you may not reverse engineer,
+decompile, disassemble, circumvent technical protection measures, or attempt
+to reconstruct proprietary implementation details of the VibeSync software,
+except where a non-waivable legal right expressly permits such activity.
+
+7. PERMISSION FOR AUTHORIZED USE
+
+Written permission for uses not expressly allowed may be requested from:
+
+Developer Support Team
+Email: vibesyncrotechnologies@gmail.com
+Official repository:
+https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite
+
+Permission, when granted, must be in writing and may include conditions,
+limitations, attribution requirements, scope restrictions, or expiration.
+
+8. NO WARRANTY
+
+The proprietary portions of the software and documentation are provided "AS IS"
+to the maximum extent permitted by law, without warranties of any kind, express
+or implied, including warranties of merchantability, fitness for a particular
+purpose, or non-infringement.
+
+9. LIMITATION OF LIABILITY
+
+To the maximum extent permitted by applicable law, navyask911 and contributors
+to the proprietary portions are not liable for any indirect, incidental,
+special, consequential, exemplary, or punitive damages arising from the use of,
+inability to use, or unauthorized use of the proprietary software or
+documentation.
+
+10. SEVERABILITY AND APPLICABLE LAW
+
+If any provision of this notice is held unenforceable, the remaining provisions
+remain in effect to the fullest extent permitted by law.
+
+This notice is intended to preserve all rights of the copyright owner under
+applicable law. The absence of a specific restriction in this notice does not
+create an implied license.
+
+Copyright (c) 2026 navyask911. All rights reserved.

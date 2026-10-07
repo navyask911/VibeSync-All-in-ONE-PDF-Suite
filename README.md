@@ -3,7 +3,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Android%20%7C%20Jetpack%20Compose-green.svg)](https://developer.android.com/compose)
 [![Target SDK](https://img.shields.io/badge/Target%20SDK-36%20(Android%2016)-blue.svg)](https://developer.android.com)
 [![Min SDK](https://img.shields.io/badge/Min%20SDK-24%20(Android%207.0)-orange.svg)](https://developer.android.com)
-[![License](https://img.shields.io/badge/License-Apache%202.0-red.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-Proprietary%20All%20Rights%20Reserved-red.svg)](LICENSE)
 [![Security](https://img.shields.io/badge/Security-AES--256--GCM%20MasterKey-emerald.svg)](PRIVACY_POLICY.md)
 
 **VibeSync All in ONE PDF Suite** is a high-performance, enterprise-grade, **100% on-device** PDF productivity suite for Android. Engineered with **zero-cloud-transit** architecture, all operations—including multi-page continuous rendering, vector annotation, digital signature vaulting, ML Kit document scanning, PDF splitting, merging, watermarking, and AES-256 encryption—execute locally without exposing sensitive user documents to external networks.
@@ -188,8 +188,9 @@ When completing the **Data Safety form** in Google Play Console:
 
 ## 📄 License & Attribution
 
-- Built with **Jetpack Compose**, **Material 3**, and **Apache PDFBox-Android** (Apache License 2.0).
-- Google Play Services **ML Kit Document Scanner**.
+- Built with **Jetpack Compose**, **Material 3**, and **Apache PDFBox-Android** (third-party components retain their own licenses).
+- Google Play Services **ML Kit Document Scanner** (third-party component; subject to its own terms).
+- **License:** See [LICENSE](LICENSE) for VibeSync proprietary ownership and usage restrictions.
 - **Privacy Policy:** See [PRIVACY_POLICY.md](PRIVACY_POLICY.md).
 - **Developer Support Team:** [vibesyncrotechnologies@gmail.com](mailto:vibesyncrotechnologies@gmail.com)
 - **Official Website / Repository:** [https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite](https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite)
