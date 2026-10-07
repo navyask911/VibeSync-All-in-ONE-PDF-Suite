@@ -49,12 +49,14 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v5
         with:
-          gradle-version: 8.7
+          gradle-version: 8.13
           cache-disabled: true
+      - name: Install Android 36 SDK
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;35.0.0" || true
       - name: Run unit tests
         working-directory: android
         run: |
-          gradle wrapper --gradle-version 8.7 --distribution-type bin
+          gradle wrapper --gradle-version 8.13 --distribution-type bin
           chmod +x gradlew
           ./gradlew testDebugUnitTest --no-daemon --stacktrace
 
@@ -74,6 +76,8 @@ jobs:
         with:
           gradle-version: 8.7
           cache-disabled: true
+      - name: Install Android 36 SDK
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;35.0.0" || true
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

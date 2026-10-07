@@ -26,7 +26,7 @@ jobs:
       - name: Setup Gradle (Bypass Broken GitHub Cache)
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: 8.7
+          gradle-version: 8.13
           cache-disabled: true
           validate-wrappers: false
 
@@ -42,6 +42,9 @@ jobs:
             ls -lh app/release-upload.jks
           fi
 
+      - name: Install Android 36 SDK
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;35.0.0" || true
+
       - name: Build Signed AAB and APK
         working-directory: android
         env:
@@ -50,7 +53,7 @@ jobs:
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
         run: |
           gradle --version
-          gradle wrapper --gradle-version 8.7 --distribution-type bin
+          gradle wrapper --gradle-version 8.13 --distribution-type bin
           chmod +x gradlew
           ./gradlew --version
           ./gradlew :app:bundleRelease --no-daemon --stacktrace -x test -x lint

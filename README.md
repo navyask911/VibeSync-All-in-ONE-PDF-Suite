@@ -156,7 +156,7 @@ Navigate to **GitHub Repository → Settings → Secrets and variables → Actio
 ### 3. Workflow Triggers
 The workflow automatically executes on:
 - Any `git push` to `main` or `master`.
-- Any version release tag push (`git tag v1.0.0 && git push --tags`).
+- Any version release tag push (`git tag v1.0.1 && git push --tags`).
 - **Manual 1-Click Trigger:** Go to the **Actions** tab in GitHub, select **"Build & Sign Android Release (AAB & APK)"**, and click **"Run workflow"**.
 
 ### 4. 📲 How to Download & Install the APK onto Your Phone

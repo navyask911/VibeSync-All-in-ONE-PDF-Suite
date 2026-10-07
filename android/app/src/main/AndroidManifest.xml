@@ -32,7 +32,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.VibeSyncPDFStudio"
-        tools:targetApi="35">
+        tools:targetApi="36">
 
         <!-- Google AdMob Application ID (Official Production App ID) -->
         <meta-data
