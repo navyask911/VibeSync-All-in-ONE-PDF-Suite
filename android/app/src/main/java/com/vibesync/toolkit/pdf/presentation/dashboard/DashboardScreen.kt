@@ -31,6 +31,11 @@ import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncRubyAccent
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncRubyDeep
 import com.vibesync.toolkit.pdf.presentation.monetization.BannerAd
 
+private const val VIBESYNC_PUBLIC_INFO_URL = "https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite-Read-Me"
+private const val VIBESYNC_PRIVACY_URL = "https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite-Read-Me/blob/main/PRIVACY_POLICY.md"
+private const val VIBESYNC_LICENSE_URL = "https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite-Read-Me/blob/main/LICENSE"
+private const val VIBESYNC_TERMS_URL = "https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite-Read-Me/blob/main/TERMS.md"
+
 data class ToolItem(
     val title: String,
     val subtitle: String,
@@ -529,21 +534,55 @@ fun DashboardScreen(
                 }
             },
             confirmButton = {
-                Button(
-                    onClick = {
-                        val intent = Intent(
-                            Intent.ACTION_VIEW,
-                            Uri.parse("https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite/blob/main/PRIVACY_POLICY.md")
-                        )
-                        try {
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
-                            // Fallback if browser not configured
-                        }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF10B981))
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.End,
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    Text("Full Policy (Web)")
+                    TextButton(
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_PUBLIC_INFO_URL))
+                                )
+                            }
+                        }
+                    ) {
+                        Text("Public VibeSync Information")
+                    }
+                    TextButton(
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_PRIVACY_URL))
+                                )
+                            }
+                        }
+                    ) {
+                        Text("Privacy Policy")
+                    }
+                    TextButton(
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_LICENSE_URL))
+                                )
+                            }
+                        }
+                    ) {
+                        Text("License & Copyright")
+                    }
+                    TextButton(
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_TERMS_URL))
+                                )
+                            }
+                        }
+                    ) {
+                        Text("Terms of Use")
+                    }
                 }
             },
             dismissButton = {
