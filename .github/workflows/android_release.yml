@@ -59,6 +59,32 @@ jobs:
           ./gradlew :app:bundleRelease --no-daemon --stacktrace -x test -x lint
           ./gradlew :app:assembleRelease --no-daemon --stacktrace -x test -x lint
 
+      - name: Verify and stage Google Play symbols
+        working-directory: android
+        run: |
+          set -euo pipefail
+          mapping="app/build/outputs/mapping/release/mapping.txt"
+          native_symbols="app/build/outputs/native-debug-symbols/release/native-debug-symbols.zip"
+
+          test -s "$mapping"
+          test -s "$native_symbols"
+
+          rm -rf play-symbols
+          mkdir -p play-symbols
+          cp "$mapping" play-symbols/mapping.txt
+          cp "$native_symbols" play-symbols/native-debug-symbols.zip
+
+          echo "Verified R8 mapping: $mapping"
+          echo "Verified native symbols: $native_symbols"
+
+      - name: Upload Google Play mapping and native symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: VibeSync-GooglePlay-Symbols
+          path: android/play-symbols/*
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Secure Clean Keystore
         if: always()
         working-directory: android

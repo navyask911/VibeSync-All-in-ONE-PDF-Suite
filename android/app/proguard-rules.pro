@@ -1,4 +1,4 @@
-# OmniPDF Studio - Production ProGuard & R8 Optimization Rules
+# VibeSync All in ONE PDF Suite - Production ProGuard & R8 Optimization Rules
 
 # ==========================================
 # Apache PDFBox-Android Keep Rules

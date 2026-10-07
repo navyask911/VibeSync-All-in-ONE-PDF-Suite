@@ -35,8 +35,15 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            ndk {
+                debugSymbolLevel = "FULL"
+            }
             val keystoreFile = rootProject.file("app/release-upload.jks")
             signingConfig = if (keystoreFile.exists() && keystoreFile.length() > 0) {
                 signingConfigs.getByName("release")
