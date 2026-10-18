@@ -54,12 +54,15 @@ class PdfBoxToolkitEngine(private val context: Context) {
         sourceUri: Uri,
         pageIntervals: List<IntRange>
     ): Result<List<File>> = withContext(Dispatchers.IO) {
+        val outputFiles = mutableListOf<File>()
+        var sourceFileToDelete: File? = null
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "split_src_")
-            val outputFiles = mutableListOf<File>()
+            sourceFileToDelete = sourceFile
 
             PDDocument.load(sourceFile).use { document ->
                 val totalPages = document.numberOfPages
+                require(totalPages > 0) { "The source PDF contains no pages." }
 
                 pageIntervals.forEachIndexed { index, range ->
                     val start = range.first.coerceIn(1, totalPages) - 1
@@ -67,22 +70,30 @@ class PdfBoxToolkitEngine(private val context: Context) {
 
                     if (start <= end) {
                         val subDoc = PDDocument()
-                        for (i in start..end) {
-                            subDoc.importPage(document.getPage(i))
-                        }
                         val splitFile = UriUtils.createExportCacheFile(context, "split_part_${index + 1}")
-                        applyVibeSyncWatermark(subDoc)
-                        subDoc.save(splitFile)
-                        subDoc.close()
                         outputFiles.add(splitFile)
+                        try {
+                            for (i in start..end) {
+                                subDoc.importPage(document.getPage(i))
+                            }
+                            applyVibeSyncWatermark(subDoc)
+                            subDoc.save(splitFile)
+                        } finally {
+                            subDoc.close()
+                        }
                     }
                 }
             }
-            sourceFile.delete()
             Result.success(outputFiles)
+        } catch (cancelled: CancellationException) {
+            outputFiles.forEach { it.delete() }
+            throw cancelled
         } catch (e: Exception) {
+            outputFiles.forEach { it.delete() }
             Log.e(TAG, "Failed to split PDF", e)
             Result.failure(e)
+        } finally {
+            sourceFileToDelete?.delete()
         }
     }
 
@@ -137,10 +148,15 @@ class PdfBoxToolkitEngine(private val context: Context) {
     suspend fun extractEmbeddedImages(
         sourceUri: Uri
     ): Result<List<File>> = withContext(Dispatchers.IO) {
+        val extractedFiles = mutableListOf<File>()
+        var sourceFileToDelete: File? = null
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "extract_src_")
-            val extractedFiles = mutableListOf<File>()
-            val cacheDir = File(context.cacheDir, "pdf_cache/extracted_images").apply { if (!exists()) mkdirs() }
+            sourceFileToDelete = sourceFile
+            val cacheDir = File(context.cacheDir, "pdf_cache/extracted_images").apply {
+                if (!exists() && !mkdirs()) throw java.io.IOException("Unable to prepare the image export directory.")
+                if (!isDirectory) throw java.io.IOException("The image export path is not a directory.")
+            }
 
             PDDocument.load(sourceFile).use { document ->
                 var imageIndex = 1
@@ -159,15 +175,20 @@ class PdfBoxToolkitEngine(private val context: Context) {
                     }
                 }
             }
-            sourceFile.delete()
             if (extractedFiles.isEmpty()) {
                 Result.failure(IllegalArgumentException(context.getString(R.string.error_no_embedded_raster_images)))
             } else {
                 Result.success(extractedFiles)
             }
+        } catch (cancelled: CancellationException) {
+            extractedFiles.forEach { it.delete() }
+            throw cancelled
         } catch (e: Exception) {
+            extractedFiles.forEach { it.delete() }
             Log.e(TAG, "Failed to extract embedded images", e)
             Result.failure(e)
+        } finally {
+            sourceFileToDelete?.delete()
         }
     }
 
@@ -178,21 +199,26 @@ class PdfBoxToolkitEngine(private val context: Context) {
         imageUris: List<Uri>,
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
+        var documentToClose: PDDocument? = null
         try {
             if (imageUris.isEmpty()) {
                 return@withContext Result.failure(IllegalArgumentException(context.getString(R.string.error_select_at_least_one_image)))
             }
 
-            val document = PDDocument()
+            val document = PDDocument().also { documentToClose = it }
             var decodedImageCount = 0
 
             for (imageUri in imageUris) {
                 val sourceFile = UriUtils.copyUriToCacheFile(context, imageUri, "image_src_")
-                val bitmap = BitmapFactory.decodeFile(sourceFile.absolutePath)
-                sourceFile.delete()
+                val bitmap = try {
+                    BitmapFactory.decodeFile(sourceFile.absolutePath)
+                } finally {
+                    sourceFile.delete()
+                }
 
                 if (bitmap != null) {
                     decodedImageCount++
+                    try {
                     // Standard A4 dimensions in PDF Points (72 DPI)
                     val pageWidthPt = PDRectangle.A4.width
                     val pageHeightPt = PDRectangle.A4.height
@@ -221,21 +247,29 @@ class PdfBoxToolkitEngine(private val context: Context) {
                     PDPageContentStream(document, page).use { contentStream ->
                         contentStream.drawImage(pdImage, xOffset, yOffset, renderWidth, renderHeight)
                     }
+                    } finally {
+                        if (!bitmap.isRecycled) bitmap.recycle()
+                    }
                 }
             }
 
             if (decodedImageCount == 0) {
-                document.close()
+                outputFile.delete()
                 return@withContext Result.failure(IllegalArgumentException(context.getString(R.string.error_decode_selected_images)))
             }
 
             applyVibeSyncWatermark(document)
             document.save(outputFile)
-            document.close()
             Result.success(outputFile)
+        } catch (cancelled: CancellationException) {
+            outputFile.delete()
+            throw cancelled
         } catch (e: Exception) {
+            outputFile.delete()
             Log.e(TAG, "Failed to convert images to PDF", e)
             Result.failure(e)
+        } finally {
+            runCatching { documentToClose?.close() }
         }
     }
 
