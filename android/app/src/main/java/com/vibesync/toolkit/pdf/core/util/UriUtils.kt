@@ -74,7 +74,11 @@ object UriUtils {
                 throw java.io.IOException("Unable to prepare the PDF cache directory.")
             }
         }
-        val tempFile = File(cacheDir, "${prefix}_${System.currentTimeMillis()}.pdf")
+        val safePrefix = prefix
+            .filter { it.isLetterOrDigit() || it == '_' || it == '-' }
+            .take(40)
+            .let { if (it.length >= 3) it else it.padEnd(3, '_') }
+        val tempFile = File.createTempFile("${safePrefix}_", ".pdf", cacheDir)
         var copiedSuccessfully = false
 
         try {
@@ -120,9 +124,23 @@ object UriUtils {
      * Creates a new cached destination file for export operations.
      */
     fun createExportCacheFile(context: Context, baseName: String, extension: String = ".pdf"): File {
-        val cacheDir = File(context.cacheDir, "pdf_cache").apply { if (!exists()) mkdirs() }
+        val cacheDir = File(context.cacheDir, "pdf_cache").apply {
+            if (!exists() && !mkdirs()) {
+                throw java.io.IOException("Unable to prepare the PDF export directory.")
+            }
+            if (!isDirectory) throw java.io.IOException("The PDF export cache path is not a directory.")
+        }
+        // Keep user-entered names inside the private export directory and prevent timestamp collisions.
+        val safeBaseName = baseName
+            .substringAfterLast('/')
+            .substringAfterLast('\\\\')
+            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .trim('.', '_')
+            .take(48)
+            .ifBlank { "document" }
+        val safeExtension = extension.takeIf { Regex("\\.[A-Za-z0-9]{1,8}").matches(it) } ?: ".pdf"
         val timeStamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
-        return File(cacheDir, "${baseName}_$timeStamp$extension")
+        return File.createTempFile("${safeBaseName}_${timeStamp}_", safeExtension, cacheDir)
     }
 
     /**
