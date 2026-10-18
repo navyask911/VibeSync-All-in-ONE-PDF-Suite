@@ -133,7 +133,7 @@ object UriUtils {
         // Keep user-entered names inside the private export directory and prevent timestamp collisions.
         val safeBaseName = baseName
             .substringAfterLast('/')
-            .substringAfterLast('\\\\')
+            .substringAfterLast('\\')
             .replace(Regex("[^A-Za-z0-9._-]"), "_")
             .trim('.', '_')
             .take(48)
