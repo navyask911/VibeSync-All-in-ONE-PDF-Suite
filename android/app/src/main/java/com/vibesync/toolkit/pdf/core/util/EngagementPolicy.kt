@@ -3,7 +3,29 @@ package com.vibesync.toolkit.pdf.core.util
 import android.content.Context
 
 internal object EngagementPolicy {
+    const val UPDATE_CHECK_COOLDOWN_MS = 6L * 60L * 60L * 1000L
+    const val UPDATE_PROMPT_COOLDOWN_MS = 24L * 60L * 60L * 1000L
     const val OFFLINE_PROMPT_COOLDOWN_MS = 6L * 60L * 60L * 1000L
+
+    fun shouldCheckForUpdate(
+        isInternetValidated: Boolean,
+        nowMs: Long,
+        lastCheckMs: Long,
+        force: Boolean = false,
+        immediateUpdateInProgress: Boolean = false,
+        cooldownMs: Long = UPDATE_CHECK_COOLDOWN_MS
+    ): Boolean {
+        if (!isInternetValidated) return false
+        if (force || immediateUpdateInProgress || lastCheckMs <= 0L) return true
+        return nowMs >= lastCheckMs && nowMs - lastCheckMs >= cooldownMs
+    }
+
+    fun shouldPromptForUpdate(
+        updateAvailable: Boolean,
+        isInternetValidated: Boolean,
+        nowMs: Long,
+        snoozeUntilMs: Long
+    ): Boolean = updateAvailable && isInternetValidated && nowMs >= snoozeUntilMs
     const val REVIEW_COOLDOWN_MS = 120L * 24L * 60L * 60L * 1000L
     const val SESSION_GAP_MS = 30L * 60L * 1000L
 
