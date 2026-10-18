@@ -122,7 +122,9 @@ jobs:
           aab="$(find app/build/outputs/bundle/release -maxdepth 1 -type f -name '*.aab' -print -quit)"
           test -n "$apk" && test -s "$apk"
           test -n "$aab" && test -s "$aab"
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$apk"
+          apksigner_path="$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name apksigner -print | sort -V | tail -n 1)"
+          test -n "$apksigner_path"
+          "$apksigner_path" verify --verbose "$apk"
           jarsigner -verify "$aab"
 
       - name: Upload Signed APK
