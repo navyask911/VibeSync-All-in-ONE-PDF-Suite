@@ -34,6 +34,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
+import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.R
 import kotlinx.coroutines.launch
 
@@ -55,10 +56,14 @@ fun PdfViewerScreen(
     var offsetY by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(documentUri) {
+        // Do not retain the previous document's scroll position when the URI changes.
+        listState.scrollToItem(0)
         viewModel.loadDocument(documentUri)
     }
 
-    DisposableEffect(documentUri, viewModel) {
+    // The renderer's openDocument() serializes and closes previous native renderer state itself.
+    // Closing on every URI key change can race the subsequent load and close the new document.
+    DisposableEffect(viewModel) {
         onDispose {
             viewModel.closeDocument()
         }
@@ -208,14 +213,18 @@ fun PdfViewerScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    items(uiState.pageCount) { pageIndex ->
+                    items(
+                        count = uiState.pageCount,
+                        key = { pageIndex -> "${documentUri}#${pageIndex}" }
+                    ) { pageIndex ->
                         val metadata = uiState.pagesMetadata.getOrNull(pageIndex)
                         val aspectRatio = metadata?.aspectRatio ?: (595f / 842f)
 
                         PdfPageItem(
                             pageIndex = pageIndex,
                             aspectRatio = aspectRatio,
-                            viewModel = viewModel
+                            viewModel = viewModel,
+                            documentKey = documentUri.toString()
                         )
                     }
                 }
@@ -291,10 +300,27 @@ fun PdfViewerScreen(
 fun PdfPageItem(
     pageIndex: Int,
     aspectRatio: Float,
-    viewModel: PdfViewerViewModel
+    viewModel: PdfViewerViewModel,
+    documentKey: String
 ) {
-    val bitmapState = produceState<Bitmap?>(initialValue = null, key1 = pageIndex) {
+    val bitmapState = produceState<Bitmap?>(
+        initialValue = null,
+        key1 = documentKey,
+        key2 = pageIndex
+    ) {
         value = viewModel.getPageBitmap(pageIndex, scale = 1.5f)
+    }
+    val bitmap = bitmapState.value
+    val cacheKey = if (bitmap != null && !bitmap.isRecycled) {
+        viewModel.cacheKeyForPage(pageIndex, scale = 1.5f)
+    } else null
+
+    // Prevent LruCache eviction from recycling an image while Compose is displaying it.
+    DisposableEffect(cacheKey) {
+        cacheKey?.let { BitmapCache.getInstance().markActive(it) }
+        onDispose {
+            cacheKey?.let { BitmapCache.getInstance().markInactive(it) }
+        }
     }
 
     Card(
@@ -305,7 +331,6 @@ fun PdfPageItem(
         shape = RoundedCornerShape(4.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        val bitmap = bitmapState.value
         if (bitmap != null && !bitmap.isRecycled) {
             Image(
                 bitmap = bitmap.asImageBitmap(),
