@@ -659,6 +659,7 @@ class MainActivity : AppCompatActivity() {
     private fun applyConnectivityState(available: Boolean) {
         val wasAvailable = internetAvailable
         internetAvailable = available
+        AdMobManager.onConnectivityChanged(applicationContext, available)
         if (available) {
             offlinePromptVisible = false
             if (!wasAvailable) maybeCheckForUpdate(force = true)
