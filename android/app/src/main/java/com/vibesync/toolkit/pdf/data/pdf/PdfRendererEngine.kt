@@ -14,6 +14,8 @@ import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.PageMetadata
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -148,10 +150,12 @@ class PdfRendererEngine(private val context: Context) {
      * Reads metadata (dimensions) of all pages.
      */
     suspend fun getPagesMetadata(): List<PageMetadata> = withContext(Dispatchers.IO) {
+        val coroutineContext = currentCoroutineContext()
         synchronized(renderLock) {
             val renderer = pdfRenderer ?: return@withContext emptyList()
             val list = mutableListOf<PageMetadata>()
             for (i in 0 until renderer.pageCount) {
+                coroutineContext.ensureActive()
                 var page: PdfRenderer.Page? = null
                 try {
                     page = renderer.openPage(i)
@@ -162,6 +166,8 @@ class PdfRendererEngine(private val context: Context) {
                             heightPt = page.height.toFloat()
                         )
                     )
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
                 } catch (e: Exception) {
                     list.add(PageMetadata(pageIndex = i, widthPt = 595f, heightPt = 842f))
                 } finally {
