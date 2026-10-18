@@ -851,15 +851,20 @@ class MainActivity : AppCompatActivity() {
         try {
             val manager = ReviewManagerFactory.create(this)
             manager.requestReviewFlow().addOnCompleteListener { request ->
-                if (request.isSuccessful) {
-                    // Start the cooldown only when Play accepted the review-flow request.
+                if (request.isSuccessful &&
+                    lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
+                    !isFinishing && !isDestroyed
+                ) {
+                    // Start the cooldown only when Play accepted the request and the Activity
+                    // is still safe to present UI. Play never reports whether a review was submitted.
                     reviewEligibilityTracker.markAttempt()
                     manager.launchReviewFlow(this, request.result).addOnCompleteListener {
-                        // Play intentionally does not report whether the user submitted a review.
                         reviewFlowLaunching = false
                     }
                 } else {
-                    Log.w(TAG, "Google Play review request failed.", request.exception)
+                    if (!request.isSuccessful) {
+                        Log.w(TAG, "Google Play review request failed.", request.exception)
+                    }
                     reviewFlowLaunching = false
                 }
             }
