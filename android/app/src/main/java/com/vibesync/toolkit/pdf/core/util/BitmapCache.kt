@@ -64,14 +64,17 @@ class BitmapCache private constructor() {
     }
 
     fun remove(key: String) {
-        memoryCache.remove(key)?.let {
-            if (!it.isRecycled) it.recycle()
+        memoryCache.remove(key)?.let { bitmap ->
+            // The cache may no longer own this bitmap exclusively; displayed images must remain valid.
+            if (!activeKeys.contains(key) && !bitmap.isRecycled) bitmap.recycle()
         }
     }
 
     fun clear() {
+        // entryRemoved() preserves currently displayed bitmaps. Keep activeKeys until their
+        // corresponding composables are disposed, otherwise a subsequent cache insertion for the
+        // same page could be recycled while still visible.
         memoryCache.evictAll()
-        activeKeys.clear()
         System.gc()
     }
 
