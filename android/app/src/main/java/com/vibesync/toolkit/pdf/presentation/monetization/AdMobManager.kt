@@ -38,6 +38,10 @@ object AdMobManager {
     // Official Production Ad Unit IDs
     const val BANNER_PROD_ID = "ca-app-pub-4783826505860771/3755922842"
 
+    // The real production interstitial unit must be supplied by the AdMob owner.
+    // Keep empty rather than serving Google's test unit in production.
+    const val INTERSTITIAL_PROD_ID = ""
+
     /**
      * Resolves the active Banner Ad Unit ID based on the build variant.
      * Uses test ID in debug builds to prevent AdMob invalid traffic strikes,
@@ -81,12 +85,17 @@ object AdMobManager {
      */
     fun preloadInterstitial(context: Context) {
         if (interstitialAd != null || isAdLoading) return
+        val interstitialUnitId = if (BuildConfig.DEBUG) INTERSTITIAL_TEST_ID else INTERSTITIAL_PROD_ID
+        if (interstitialUnitId.isBlank()) {
+            Log.w(TAG, "Production interstitial ad unit is not configured; skipping interstitial load.")
+            return
+        }
 
         isAdLoading = true
         val adRequest = AdRequest.Builder().build()
         InterstitialAd.load(
             context,
-            INTERSTITIAL_TEST_ID,
+            interstitialUnitId,
             adRequest,
             object : InterstitialAdLoadCallback() {
                 override fun onAdLoaded(ad: InterstitialAd) {
@@ -183,7 +192,6 @@ fun BannerAd(
                 when (event) {
                     Lifecycle.Event.ON_PAUSE -> adView.pause()
                     Lifecycle.Event.ON_RESUME -> adView.resume()
-                    Lifecycle.Event.ON_DESTROY -> adView.destroy()
                     else -> {}
                 }
             }
