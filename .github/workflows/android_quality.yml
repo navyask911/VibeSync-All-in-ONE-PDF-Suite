@@ -80,8 +80,8 @@ jobs:
               if missing or extra:
                   sys.exit(f"{locale}: missing={missing}; extra={extra}")
               for name, source in baseline.items():
-                  source_args = sorted(re.findall(r"%(?:[0-9]+\\$)?[a-zA-Z]", source))
-                  target_args = sorted(re.findall(r"%(?:[0-9]+\\$)?[a-zA-Z]", items[name]))
+                  source_args = sorted(re.findall(r"%(?:[0-9]+\$)?[a-zA-Z]", source))
+                  target_args = sorted(re.findall(r"%(?:[0-9]+\$)?[a-zA-Z]", items[name]))
                   if source_args != target_args:
                       sys.exit(f"{locale}: placeholders differ for {name}: {source_args} != {target_args}")
           print(f"Localization resource audit passed: {len(baseline)} keys across {len(buckets)} locales.")
