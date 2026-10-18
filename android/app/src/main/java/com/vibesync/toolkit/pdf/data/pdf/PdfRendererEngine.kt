@@ -39,6 +39,18 @@ class PdfRendererEngine(private val context: Context) {
             pdfRenderer?.pageCount ?: 0
         }
 
+    /** Returns the currently opened document's cache key for a page, if that page is valid. */
+    fun cacheKeyForPage(pageIndex: Int, scale: Float): String? = synchronized(renderLock) {
+        val renderer = pdfRenderer
+        if (renderer == null || pageIndex < 0 || pageIndex >= renderer.pageCount ||
+            !scale.isFinite() || scale <= 0f
+        ) {
+            null
+        } else {
+            BitmapCache.generateKey(currentDocumentId, pageIndex, scale.coerceIn(0.1f, 4.0f))
+        }
+    }
+
     /**
      * Opens a PDF document from a content or file Uri.
      */
