@@ -1,9 +1,9 @@
 package com.vibesync.toolkit.pdf
 
 import com.vibesync.toolkit.pdf.core.util.EngagementPolicy
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
 
 class EngagementPolicyTest {
     @Test
