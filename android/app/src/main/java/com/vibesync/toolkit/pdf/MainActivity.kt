@@ -217,7 +217,7 @@ class MainActivity : AppCompatActivity() {
                     LaunchedEffect(currentBackStackEntry?.destination?.route) {
                         activeRoute = currentBackStackEntry?.destination?.route ?: "dashboard"
                     }
-                    LaunchedEffect(activeRoute, internetAvailable) {
+                    LaunchedEffect(activeRoute, internetAvailable, reviewEligibilityRevision) {
                         if (internetAvailable) {
                             offlinePromptVisible = false
                             return@LaunchedEffect
@@ -228,7 +228,9 @@ class MainActivity : AppCompatActivity() {
                             return@LaunchedEffect
                         }
                         delay(1_600L)
-                        if (!internetAvailable && activeRoute == "dashboard" && !hasShownOfflinePromptThisSession) {
+                        if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED) &&
+                            !internetAvailable && activeRoute == "dashboard" && !hasShownOfflinePromptThisSession
+                        ) {
                             hasShownOfflinePromptThisSession = true
                             offlinePromptVisible = true
                             engagementPreferences.edit().putLong(KEY_OFFLINE_PROMPT_LAST_SHOWN, System.currentTimeMillis()).apply()
