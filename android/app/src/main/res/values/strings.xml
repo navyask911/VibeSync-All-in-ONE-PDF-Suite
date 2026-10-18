@@ -174,4 +174,19 @@
     <string name="error_create_mutable_bitmap">Could not create a mutable bitmap for watermarking.</string>
     <string name="error_write_watermarked_image">Could not write the watermarked image.</string>
 
+    <!-- Google Play update, review and connectivity prompts -->
+    <string name="update_available_title">App Update Available</string>
+    <string name="update_available_message">A new version of VibeSync is available with improvements and fixes. Please update to enjoy the latest experience.</string>
+    <string name="update_now">Update Now</string>
+    <string name="update_later">Later</string>
+    <string name="update_ready_title">Update Ready to Install</string>
+    <string name="update_ready_message">The update has downloaded. Restart VibeSync to finish installing it.</string>
+    <string name="restart_to_update">Restart and Install</string>
+    <string name="offline_support_title">Stay Connected and Support VibeSync</string>
+    <string name="offline_support_message">You are currently offline. Connecting to the internet helps us load ads that support VibeSync development and help us buy a coffee while we continue improving the app.\n\nYour privacy matters: your PDF files remain on your device, and connecting to the internet does not mean your documents will be uploaded.</string>
+    <string name="connect_to_internet">Connect to Internet</string>
+    <string name="not_now">Not Now</string>
+    <string name="update_store_unavailable">Could not open the Google Play listing. Please try again when the internet is available.</string>
+    <string name="internet_settings_unavailable">Could not open network settings. Please open Wi-Fi settings manually.</string>
+
 </resources>
