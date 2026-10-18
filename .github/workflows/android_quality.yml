@@ -43,6 +43,50 @@ jobs:
             exit 1
           fi
 
+      - name: Verify localized string resources
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import re
+          import sys
+          import xml.etree.ElementTree as ET
+
+          root = pathlib.Path("android/app/src/main/res")
+          buckets = {
+              "default": root / "values/strings.xml",
+              "de": root / "values-de/strings.xml",
+              "fr": root / "values-fr/strings.xml",
+              "es": root / "values-es/strings.xml",
+              "ru": root / "values-ru/strings.xml",
+          }
+          parsed = {}
+          for locale, path in buckets.items():
+              nodes = ET.parse(path).getroot().findall("string")
+              items = {}
+              duplicates = []
+              for node in nodes:
+                  name = node.attrib["name"]
+                  if name in items:
+                      duplicates.append(name)
+                  items[name] = "".join(node.itertext())
+              if duplicates:
+                  sys.exit(f"{locale}: duplicate string IDs: {sorted(set(duplicates))}")
+              parsed[locale] = items
+
+          baseline = parsed["default"]
+          for locale, items in parsed.items():
+              missing = sorted(set(baseline) - set(items))
+              extra = sorted(set(items) - set(baseline))
+              if missing or extra:
+                  sys.exit(f"{locale}: missing={missing}; extra={extra}")
+              for name, source in baseline.items():
+                  source_args = sorted(re.findall(r"%(?:[0-9]+\\$)?[a-zA-Z]", source))
+                  target_args = sorted(re.findall(r"%(?:[0-9]+\\$)?[a-zA-Z]", items[name]))
+                  if source_args != target_args:
+                      sys.exit(f"{locale}: placeholders differ for {name}: {source_args} != {target_args}")
+          print(f"Localization resource audit passed: {len(baseline)} keys across {len(buckets)} locales.")
+          PY
+
       - name: Set up JDK 17
         uses: actions/setup-java@v6
         with:
