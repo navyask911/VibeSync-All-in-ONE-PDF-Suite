@@ -152,8 +152,9 @@ class PdfRendererEngine(private val context: Context) {
             val renderer = pdfRenderer ?: return@withContext emptyList()
             val list = mutableListOf<PageMetadata>()
             for (i in 0 until renderer.pageCount) {
+                var page: PdfRenderer.Page? = null
                 try {
-                    val page = renderer.openPage(i)
+                    page = renderer.openPage(i)
                     list.add(
                         PageMetadata(
                             pageIndex = i,
@@ -161,9 +162,14 @@ class PdfRendererEngine(private val context: Context) {
                             heightPt = page.height.toFloat()
                         )
                     )
-                    page.close()
                 } catch (e: Exception) {
                     list.add(PageMetadata(pageIndex = i, widthPt = 595f, heightPt = 842f))
+                } finally {
+                    try {
+                        page?.close()
+                    } catch (closeError: Exception) {
+                        Log.w(TAG, "Error closing metadata page $i", closeError)
+                    }
                 }
             }
             list
