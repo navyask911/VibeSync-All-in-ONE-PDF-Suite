@@ -20,6 +20,8 @@ import com.google.android.gms.ads.LoadAdError
 import com.google.android.gms.ads.interstitial.InterstitialAd
 import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback
 import com.vibesync.toolkit.pdf.BuildConfig
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * AdMob monetization layer adhering to Google Play Data Safety standards:
@@ -46,6 +48,22 @@ object AdMobManager {
 
     private var interstitialAd: InterstitialAd? = null
     private var isAdLoading = false
+    private var lastKnownValidatedInternet: Boolean? = null
+    private val _reconnectionGeneration = MutableStateFlow(0L)
+    val reconnectionGeneration: StateFlow<Long> = _reconnectionGeneration
+
+    /**
+     * Reuse MainActivity's single connectivity callback. Retry failed ad requests only after
+     * a confirmed offline-to-online transition; never loop/reload while the device is offline.
+     */
+    fun onConnectivityChanged(context: Context, isValidated: Boolean) {
+        val previous = lastKnownValidatedInternet
+        lastKnownValidatedInternet = isValidated
+        if (previous == false && isValidated) {
+            _reconnectionGeneration.value = _reconnectionGeneration.value + 1
+            if (interstitialAd == null && !isAdLoading) preloadInterstitial(context.applicationContext)
+        }
+    }
 
     /**
      * Calculates the orientation-anchored adaptive banner size based on device screen width.
@@ -124,6 +142,8 @@ fun BannerAd(
     adUnitId: String = AdMobManager.BANNER_AD_UNIT_ID
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
+    val reconnectionGeneration by AdMobManager.reconnectionGeneration.collectAsState()
+    var lastReloadGeneration by remember { mutableStateOf(0L) }
     var adViewRef by remember { mutableStateOf<AdView?>(null) }
 
     AndroidView(
@@ -138,10 +158,20 @@ fun BannerAd(
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 )
                 loadAd(AdRequest.Builder().build())
+                lastReloadGeneration = reconnectionGeneration
                 adViewRef = this
             }
         }
     )
+
+    // Reload an existing banner once after a confirmed offline-to-online transition.
+    LaunchedEffect(reconnectionGeneration, adViewRef) {
+        val adView = adViewRef
+        if (adView != null && reconnectionGeneration > lastReloadGeneration) {
+            adView.loadAd(AdRequest.Builder().build())
+            lastReloadGeneration = reconnectionGeneration
+        }
+    }
 
     // Handle AdView lifecycle events safely to avoid memory leaks
     DisposableEffect(lifecycleOwner, adViewRef) {
