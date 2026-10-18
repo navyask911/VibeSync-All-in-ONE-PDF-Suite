@@ -672,7 +672,14 @@ class MainActivity : AppCompatActivity() {
         val now = System.currentTimeMillis()
         val lastCheck = engagementPreferences.getLong(KEY_LAST_UPDATE_CHECK, 0L)
         val immediateInProgress = engagementPreferences.getBoolean(KEY_IMMEDIATE_UPDATE_IN_PROGRESS, false)
-        if (!force && !immediateInProgress && now - lastCheck < UPDATE_CHECK_COOLDOWN_MS) {
+        if (!EngagementPolicy.shouldCheckForUpdate(
+                isInternetValidated = internetAvailable,
+                nowMs = now,
+                lastCheckMs = lastCheck,
+                force = force,
+                immediateUpdateInProgress = immediateInProgress
+            )
+        ) {
             showPendingUpdatePrompt()
             return
         }
@@ -710,8 +717,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showPendingUpdatePrompt() {
-        val notSnoozed = System.currentTimeMillis() >= engagementPreferences.getLong(KEY_UPDATE_SNOOZE_UNTIL, 0L)
-        if (pendingUpdateInfo != null && notSnoozed && internetAvailable && activeRoute == "dashboard" && !updateDownloaded) {
+        val shouldPrompt = EngagementPolicy.shouldPromptForUpdate(
+            updateAvailable = pendingUpdateInfo != null,
+            isInternetValidated = internetAvailable,
+            nowMs = System.currentTimeMillis(),
+            snoozeUntilMs = engagementPreferences.getLong(KEY_UPDATE_SNOOZE_UNTIL, 0L)
+        )
+        if (shouldPrompt && activeRoute == "dashboard" && !updateDownloaded) {
             updatePromptVisible = true
         }
     }
