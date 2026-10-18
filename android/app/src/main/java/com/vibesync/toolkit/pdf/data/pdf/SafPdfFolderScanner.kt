@@ -40,11 +40,25 @@ class SafPdfFolderScanner(context: Context) {
             val (node, depth) = stack.removeLast()
             visited++
 
-            if (node.isDirectory) {
+            val isDirectory = try {
+                node.isDirectory
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (e: RuntimeException) {
+                if (node.uri == root.uri) throw e
+                Log.w(TAG, "Skipping a provider entry whose type could not be read: ${node.uri}", e)
+                continue
+            }
+
+            if (isDirectory) {
                 if (depth >= MAX_DEPTH) continue
                 try {
-                    node.listFiles().reversed().forEach { child ->
-                        stack.addLast(child to (depth + 1))
+                    val children = node.listFiles()
+                    // Keep traversal memory bounded even when a provider returns a very large folder.
+                    for (index in children.indices.reversed()) {
+                        currentCoroutineContext().ensureActive()
+                        if (visited + stack.size >= MAX_VISITED_NODES) break
+                        stack.addLast(children[index] to (depth + 1))
                     }
                 } catch (cancelled: CancellationException) {
                     throw cancelled
@@ -58,8 +72,15 @@ class SafPdfFolderScanner(context: Context) {
                 continue
             }
 
-            val name = node.name.orEmpty()
-            val isPdf = node.type.equals("application/pdf", ignoreCase = true) ||
+            val (name, mimeType) = try {
+                node.name.orEmpty() to node.type.orEmpty()
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (e: RuntimeException) {
+                Log.w(TAG, "Skipping a provider entry whose metadata could not be read: ${node.uri}", e)
+                continue
+            }
+            val isPdf = mimeType.equals("application/pdf", ignoreCase = true) ||
                 name.endsWith(".pdf", ignoreCase = true)
             if (!isPdf) continue
 
