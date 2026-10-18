@@ -8,6 +8,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vibesync.toolkit.pdf.core.security.SecurityVault
+import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.*
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
@@ -223,7 +224,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                 onFailure = { error ->
                     _uiState.value = _uiState.value.copy(
                         isSaving = false,
-                        errorMessage = error.localizedMessage ?: "Failed to flatten PDF"
+                        errorMessage = error.localizedMessage ?: getApplication<Application>().getString(R.string.editor_failed_flatten)
                     )
                 }
             )

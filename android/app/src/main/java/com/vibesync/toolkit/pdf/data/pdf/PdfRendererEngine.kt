@@ -12,6 +12,7 @@ import android.util.Log
 import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.PageMetadata
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -57,8 +58,14 @@ class PdfRendererEngine(private val context: Context) {
                 val count = pageCount
                 Log.d(TAG, "Document opened successfully with $count pages.")
                 Result.success(count)
+            } catch (e: CancellationException) {
+                // Cancellation must reach the caller, but any partially opened native resources
+                // still need to be released.
+                closeDocument()
+                throw e
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to open PDF document", e)
+                closeDocument()
                 Result.failure(e)
             }
         }
@@ -143,6 +150,16 @@ class PdfRendererEngine(private val context: Context) {
                 }
             }
             list
+        }
+    }
+
+    /**
+     * Closes native PDF resources on an I/O dispatcher and serializes cleanup against
+     * concurrent document opens/renders.
+     */
+    suspend fun closeDocumentSafely() = withContext(Dispatchers.IO) {
+        mutex.withLock {
+            closeDocument()
         }
     }
 

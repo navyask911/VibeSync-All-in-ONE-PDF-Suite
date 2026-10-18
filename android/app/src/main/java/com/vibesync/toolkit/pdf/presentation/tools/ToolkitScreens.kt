@@ -20,14 +20,17 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
 import com.vibesync.toolkit.pdf.core.util.UriUtils
+import com.vibesync.toolkit.pdf.presentation.common.rememberUriDisplayName
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.presentation.monetization.AdMobManager
 import kotlinx.coroutines.launch
@@ -53,15 +56,20 @@ fun SplitScreen(
 
     val pickPdfLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? -> selectedUri = uri }
+    ) { uri: Uri? ->
+        uri?.let {
+            UriUtils.persistReadPermission(context, it)
+            selectedUri = it
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Split Document", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.tool_split_document), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
@@ -80,16 +88,16 @@ fun SplitScreen(
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text("Select PDF to Split", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.tool_select_pdf_to_split), fontWeight = FontWeight.Bold)
                     Spacer(modifier = Modifier.height(8.dp))
                     if (selectedUri != null) {
-                        Text("Selected: ${UriUtils.getFileName(context, selectedUri!!)}", fontSize = 13.sp)
+                        Text(stringResource(R.string.selected_file_name, rememberUriDisplayName(selectedUri)), fontSize = 13.sp)
                     } else {
                         Button(
                             onClick = { pickPdfLauncher.launch(arrayOf("application/pdf")) },
                             colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
                         ) {
-                            Text("Choose PDF Document")
+                            Text(stringResource(R.string.tool_choose_pdf_document))
                         }
                     }
                 }
@@ -98,7 +106,7 @@ fun SplitScreen(
             OutlinedTextField(
                 value = intervalsInput,
                 onValueChange = { intervalsInput = it },
-                label = { Text("Page Intervals (e.g. 1-2, 3, 4-5)") },
+                label = { Text(stringResource(R.string.tool_page_intervals_hint)) },
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -146,7 +154,7 @@ fun SplitScreen(
                 if (isProcessing) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
-                    Text("Split and Save Files")
+                    Text(stringResource(R.string.tool_split_and_save_files))
                 }
             }
         }
@@ -173,16 +181,17 @@ fun MergeScreen(
     val pickMultiplePdfsLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris: List<Uri> ->
+        uris.forEach { UriUtils.persistReadPermission(context, it) }
         selectedUris.addAll(uris)
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Merge Documents", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.tool_merge_documents), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
@@ -201,12 +210,12 @@ fun MergeScreen(
             ) {
                 Icon(Icons.Default.Add, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Add PDF Files to Merge")
+                Text(stringResource(R.string.tool_add_pdf_files_to_merge))
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            Text("Document Assembly Order:", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Text(stringResource(R.string.tool_document_assembly_order), fontWeight = FontWeight.Bold, fontSize = 14.sp)
             Spacer(modifier = Modifier.height(8.dp))
             errorMessage?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
@@ -228,7 +237,7 @@ fun MergeScreen(
                         ) {
                             Text("${index + 1}.", fontWeight = FontWeight.Bold, modifier = Modifier.width(28.dp))
                             Text(
-                                UriUtils.getFileName(context, uri),
+                                rememberUriDisplayName(uri),
                                 modifier = Modifier.weight(1f),
                                 maxLines = 1,
                                 fontSize = 13.sp
@@ -244,7 +253,7 @@ fun MergeScreen(
                                 },
                                 enabled = index > 0
                             ) {
-                                Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Move Up")
+                                Icon(Icons.Default.KeyboardArrowUp, contentDescription = stringResource(R.string.tool_move_up))
                             }
                             // Down Arrow
                             IconButton(
@@ -257,11 +266,11 @@ fun MergeScreen(
                                 },
                                 enabled = index < selectedUris.size - 1
                             ) {
-                                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Move Down")
+                                Icon(Icons.Default.KeyboardArrowDown, contentDescription = stringResource(R.string.tool_move_down))
                             }
                             // Delete
                             IconButton(onClick = { selectedUris.removeAt(index) }) {
-                                Icon(Icons.Default.Close, contentDescription = "Remove", tint = Color.Red)
+                                Icon(Icons.Default.Close, contentDescription = stringResource(R.string.tool_remove), tint = Color.Red)
                             }
                         }
                     }
@@ -283,7 +292,7 @@ fun MergeScreen(
                                         AdMobManager.showInterstitial(act) { onSuccess(mergedFile) }
                                     } ?: onSuccess(mergedFile)
                                 },
-                                onFailure = { errorMessage = it.localizedMessage ?: "Failed to merge PDFs" }
+                                onFailure = { errorMessage = it.localizedMessage ?: context.getString(R.string.tool_failed_merge) }
                             )
                         }
                     }
@@ -295,7 +304,7 @@ fun MergeScreen(
                 if (isMerging) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
-                    Text("Merge (${selectedUris.size}) Documents")
+                    Text(stringResource(R.string.tool_merge_button, selectedUris.size))
                 }
             }
         }
@@ -325,15 +334,20 @@ fun EncryptScreen(
 
     val pickPdfLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? -> selectedUri = uri }
+    ) { uri: Uri? ->
+        uri?.let {
+            UriUtils.persistReadPermission(context, it)
+            selectedUri = it
+        }
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Encrypt & Protect", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.tool_encrypt_protect), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
@@ -351,19 +365,19 @@ fun EncryptScreen(
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
             ) {
-                Text(if (selectedUri != null) "Change PDF (${UriUtils.getFileName(context, selectedUri!!)})" else "Select PDF to Protect")
+                Text(if (selectedUri != null) stringResource(R.string.tool_change_pdf, rememberUriDisplayName(selectedUri)) else stringResource(R.string.tool_select_pdf_to_protect))
             }
 
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Document Password") },
+                label = { Text(stringResource(R.string.tool_document_password)) },
                 singleLine = true,
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 trailingIcon = {
                     val image = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff
-                    val description = if (passwordVisible) "Hide password" else "Show password"
+                    val description = if (passwordVisible) context.getString(R.string.tool_hide_password) else context.getString(R.string.tool_show_password)
                     IconButton(onClick = { passwordVisible = !passwordVisible }) {
                         Icon(imageVector = image, contentDescription = description)
                     }
@@ -377,12 +391,12 @@ fun EncryptScreen(
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = allowPrinting, onCheckedChange = { allowPrinting = it })
-                Text("Allow Printing Document", fontSize = 14.sp)
+                Text(stringResource(R.string.tool_allow_printing), fontSize = 14.sp)
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Checkbox(checked = allowCopying, onCheckedChange = { allowCopying = it })
-                Text("Allow Content Copying / Extraction", fontSize = 14.sp)
+                Text(stringResource(R.string.tool_allow_copying), fontSize = 14.sp)
             }
 
             Spacer(modifier = Modifier.weight(1f))
@@ -409,7 +423,7 @@ fun EncryptScreen(
                                     AdMobManager.showInterstitial(act) { onSuccess(file) }
                                 } ?: onSuccess(file)
                             },
-                            onFailure = { errorMessage = it.localizedMessage ?: "Failed to encrypt PDF" }
+                            onFailure = { errorMessage = it.localizedMessage ?: context.getString(R.string.tool_failed_encrypt) }
                         )
                     }
                 },
@@ -420,7 +434,7 @@ fun EncryptScreen(
                 if (isEncrypting) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
-                    Text("Apply AES-128 Encryption")
+                    Text(stringResource(R.string.tool_apply_aes128))
                 }
             }
         }
@@ -446,6 +460,7 @@ fun ConvertImagesScreen(
     val imagePicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
+        uris.forEach { UriUtils.persistReadPermission(context, it) }
         selectedUris.clear()
         selectedUris.addAll(uris)
         errorMessage = null
@@ -454,10 +469,10 @@ fun ConvertImagesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Images to PDF", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.tool_images_to_pdf), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
@@ -476,12 +491,12 @@ fun ConvertImagesScreen(
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
             ) {
-                Text(if (selectedUris.isEmpty()) "Choose Images" else "Change Images (" + selectedUris.size + ")")
+                Text(if (selectedUris.isEmpty()) stringResource(R.string.tool_choose_images) else stringResource(R.string.tool_change_images, selectedUris.size))
             }
 
             if (selectedUris.isEmpty()) {
                 Text(
-                    "Select one or more photos. They will be placed into an A4 PDF in selection order.",
+                    stringResource(R.string.tool_images_to_pdf_subtitle),
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -499,7 +514,7 @@ fun ConvertImagesScreen(
                                 Text((index + 1).toString() + ".", fontWeight = FontWeight.Bold)
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    UriUtils.getFileName(context, uri),
+                                    rememberUriDisplayName(uri),
                                     maxLines = 1,
                                     modifier = Modifier.weight(1f),
                                     fontSize = 13.sp
@@ -525,7 +540,7 @@ fun ConvertImagesScreen(
                         isConverting = false
                         result.fold(
                             onSuccess = onSuccess,
-                            onFailure = { errorMessage = it.localizedMessage ?: "Failed to create PDF" }
+                            onFailure = { errorMessage = it.localizedMessage ?: context.getString(R.string.tool_failed_create_pdf) }
                         )
                     }
                 },
@@ -536,7 +551,7 @@ fun ConvertImagesScreen(
                 if (isConverting) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
-                    Text("Create PDF")
+                    Text(stringResource(R.string.tool_create_pdf))
                 }
             }
         }
@@ -569,10 +584,10 @@ fun ExtractImagesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Extract Images", fontWeight = FontWeight.SemiBold) },
+                title = { Text(stringResource(R.string.tool_extract_images), fontWeight = FontWeight.SemiBold) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
@@ -592,13 +607,13 @@ fun ExtractImagesScreen(
                 colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
             ) {
                 Text(
-                    if (selectedUri == null) "Choose PDF"
-                    else "Change PDF (" + UriUtils.getFileName(context, selectedUri!!) + ")"
+                    if (selectedUri == null) stringResource(R.string.tool_choose_pdf)
+                    else stringResource(R.string.tool_change_pdf, rememberUriDisplayName(selectedUri))
                 )
             }
 
             Text(
-                "Embedded raster images will be extracted as PNG files. Vector-only artwork is not extracted as a bitmap.",
+                stringResource(R.string.tool_embedded_images_note),
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -619,7 +634,7 @@ fun ExtractImagesScreen(
                         isExtracting = false
                         result.fold(
                             onSuccess = onSuccess,
-                            onFailure = { errorMessage = it.localizedMessage ?: "Failed to extract images" }
+                            onFailure = { errorMessage = it.localizedMessage ?: context.getString(R.string.tool_failed_extract_images) }
                         )
                     }
                 },
@@ -630,7 +645,7 @@ fun ExtractImagesScreen(
                 if (isExtracting) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
-                    Text("Extract Images")
+                    Text(stringResource(R.string.tool_extract_images))
                 }
             }
         }

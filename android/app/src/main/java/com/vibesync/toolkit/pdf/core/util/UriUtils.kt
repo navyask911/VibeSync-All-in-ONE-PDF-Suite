@@ -1,6 +1,8 @@
 package com.vibesync.toolkit.pdf.core.util
 
 import android.content.Context
+import android.content.Intent
+import com.vibesync.toolkit.pdf.R
 import android.database.Cursor
 import android.net.Uri
 import android.os.ParcelFileDescriptor
@@ -20,7 +22,7 @@ object UriUtils {
      * Resolves the user-facing display name of a Content Uri.
      */
     fun getFileName(context: Context, uri: Uri): String {
-        var name = "document.pdf"
+        var name = context.getString(R.string.default_pdf_filename)
         if (uri.scheme == "content") {
             val cursor: Cursor? = context.contentResolver.query(uri, null, null, null, null)
             cursor?.use {
@@ -67,22 +69,51 @@ object UriUtils {
      * so that native tools (PdfBox / PdfRenderer) have immediate, seekable random access.
      */
     fun copyUriToCacheFile(context: Context, uri: Uri, prefix: String = "doc_"): File {
-        val cacheDir = File(context.cacheDir, "pdf_cache").apply { if (!exists()) mkdirs() }
-        val tempFile = File(cacheDir, "${prefix}_${System.currentTimeMillis()}.pdf")
-        
-        val inputStream: InputStream = when (uri.scheme?.lowercase(Locale.US)) {
-            "file" -> FileInputStream(requireNotNull(uri.path) { "File Uri has no path: $uri" })
-            else -> context.contentResolver.openInputStream(uri)
-                ?: throw IllegalArgumentException("Cannot open input stream for Uri: $uri")
-        }
-
-        inputStream.use { input ->
-            FileOutputStream(tempFile).use { output ->
-                input.copyTo(output)
+        val cacheDir = File(context.cacheDir, "pdf_cache").apply {
+            if (!exists() && !mkdirs()) {
+                throw java.io.IOException("Unable to prepare the PDF cache directory.")
             }
         }
+        val tempFile = File(cacheDir, "${prefix}_${System.currentTimeMillis()}.pdf")
+        var copiedSuccessfully = false
 
-        return tempFile
+        try {
+            val inputStream: InputStream = when (uri.scheme?.lowercase(Locale.US)) {
+                "file" -> FileInputStream(requireNotNull(uri.path) { "File Uri has no path: $uri" })
+                else -> context.contentResolver.openInputStream(uri)
+                    ?: throw IllegalArgumentException("Cannot open input stream for Uri: $uri")
+            }
+
+            inputStream.use { input ->
+                FileOutputStream(tempFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+            copiedSuccessfully = true
+            return tempFile
+        } finally {
+            // A failed or cancelled stream copy must not leave partial PDFs in the cache.
+            if (!copiedSuccessfully) tempFile.delete()
+        }
+    }
+
+    /**
+     * Keeps read access to a SAF-selected document/tree across process restarts when the
+     * provider grants persistable permissions. PDF processing only needs read access.
+     */
+    fun persistReadPermission(context: Context, uri: Uri): Boolean {
+        if (uri.scheme != "content") return true
+        return try {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            true
+        } catch (_: SecurityException) {
+            false
+        } catch (_: IllegalArgumentException) {
+            false
+        }
     }
 
     /**

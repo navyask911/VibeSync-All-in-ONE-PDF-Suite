@@ -2,6 +2,8 @@ name: Android Quality & UI Tests
 
 on:
   push:
+    branches: [ main, master, "fix/**" ]
+  pull_request:
     branches: [ main, master ]
   workflow_dispatch:
 

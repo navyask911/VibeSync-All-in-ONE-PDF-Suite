@@ -18,6 +18,7 @@ import com.tom_roush.pdfbox.io.MemoryUsageSetting
 import com.tom_roush.pdfbox.multipdf.PDFMergerUtility
 import com.tom_roush.pdfbox.multipdf.Splitter
 import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.vibesync.toolkit.pdf.R
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
@@ -97,7 +98,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
         try {
             if (sourceUris.isEmpty()) {
                 mergedDocument.close()
-                return@withContext Result.failure(IllegalArgumentException("Select at least one PDF"))
+                return@withContext Result.failure(IllegalArgumentException(context.getString(R.string.error_select_at_least_one_pdf)))
             }
 
             for (uri in sourceUris) {
@@ -160,7 +161,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
             }
             sourceFile.delete()
             if (extractedFiles.isEmpty()) {
-                Result.failure(IllegalArgumentException("No embedded raster images were found in this PDF"))
+                Result.failure(IllegalArgumentException(context.getString(R.string.error_no_embedded_raster_images)))
             } else {
                 Result.success(extractedFiles)
             }
@@ -179,7 +180,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
     ): Result<File> = withContext(Dispatchers.IO) {
         try {
             if (imageUris.isEmpty()) {
-                return@withContext Result.failure(IllegalArgumentException("Select at least one image"))
+                return@withContext Result.failure(IllegalArgumentException(context.getString(R.string.error_select_at_least_one_image)))
             }
 
             val document = PDDocument()
@@ -225,7 +226,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
 
             if (decodedImageCount == 0) {
                 document.close()
-                return@withContext Result.failure(IllegalArgumentException("None of the selected images could be decoded"))
+                return@withContext Result.failure(IllegalArgumentException(context.getString(R.string.error_decode_selected_images)))
             }
 
             applyVibeSyncWatermark(document)
@@ -611,7 +612,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
 
     private fun writeVibeSyncWatermarkedPng(sourceBitmap: Bitmap, outputFile: File) {
         val mutableBitmap = sourceBitmap.copy(Bitmap.Config.ARGB_8888, true)
-            ?: throw IllegalStateException("Could not create a mutable bitmap for watermarking")
+            ?: throw IllegalStateException(context.getString(R.string.error_create_mutable_bitmap))
 
         val canvas = Canvas(mutableBitmap)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -628,7 +629,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
         FileOutputStream(outputFile).use { output ->
             if (!mutableBitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
                 mutableBitmap.recycle()
-                throw IllegalStateException("Could not write watermarked image")
+                throw IllegalStateException(context.getString(R.string.error_write_watermarked_image))
             }
         }
         mutableBitmap.recycle()

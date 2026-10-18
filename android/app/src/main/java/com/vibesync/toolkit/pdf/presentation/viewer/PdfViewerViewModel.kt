@@ -5,14 +5,19 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.PageMetadata
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.data.pdf.PdfRendererEngine
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 data class ViewerUiState(
@@ -34,18 +39,34 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
     val uiState: StateFlow<ViewerUiState> = _uiState.asStateFlow()
 
     private var activeUri: Uri? = null
+    private var loadJob: Job? = null
 
     fun loadDocument(uri: Uri, password: String? = null) {
+        loadJob?.cancel()
         activeUri = uri
-        val fileName = UriUtils.getFileName(getApplication(), uri)
         _uiState.value = _uiState.value.copy(
-            fileName = fileName,
+            fileName = uri.lastPathSegment?.substringAfterLast('/') ?: getApplication<Application>().getString(R.string.default_pdf_filename),
             isLoading = true,
             isPasswordRequired = false,
-            errorMessage = null
+            errorMessage = null,
+            pageCount = 0,
+            pagesMetadata = emptyList(),
+            currentPageIndex = 0
         )
 
-        viewModelScope.launch {
+        loadJob = viewModelScope.launch {
+            // Providers can block while resolving DISPLAY_NAME; never query them on Main.
+            val fileName = withContext(Dispatchers.IO) {
+                try {
+                    UriUtils.getFileName(getApplication(), uri)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    uri.lastPathSegment?.substringAfterLast('/') ?: getApplication<Application>().getString(R.string.default_pdf_filename)
+                }
+            }
+            _uiState.value = _uiState.value.copy(fileName = fileName)
+
             val targetUri = if (!password.isNullOrBlank()) {
                 val decryptedFile = UriUtils.createExportCacheFile(getApplication(), "unlocked_doc")
                 val decryptResult = toolkitEngine.decryptPdf(uri, password, decryptedFile)
@@ -55,7 +76,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isPasswordRequired = true,
-                        errorMessage = "Invalid password. Please check your credentials."
+                        errorMessage = getApplication<Application>().getString(R.string.invalid_password)
                     )
                     return@launch
                 }
@@ -75,7 +96,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                     )
                 },
                 onFailure = { error ->
-                    val msg = error.localizedMessage ?: "Failed to open PDF"
+                    val msg = error.localizedMessage ?: getApplication<Application>().getString(R.string.failed_to_open_pdf)
                     val isEncrypted = msg.contains("password", ignoreCase = true) ||
                             msg.contains("encrypt", ignoreCase = true) ||
                             msg.contains("security", ignoreCase = true)
@@ -83,7 +104,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isPasswordRequired = isEncrypted,
-                        errorMessage = if (isEncrypted) "Document is encrypted. Enter password to view." else msg
+                        errorMessage = if (isEncrypted) getApplication<Application>().getString(R.string.encrypted_document) else msg
                     )
                 }
             )
@@ -98,6 +119,15 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun dismissPasswordDialog() {
         _uiState.value = _uiState.value.copy(isPasswordRequired = false)
+    }
+
+    /** Called when the viewer leaves composition; cleanup runs off the main thread. */
+    fun closeDocument() {
+        loadJob?.cancel()
+        loadJob = null
+        viewModelScope.launch {
+            rendererEngine.closeDocumentSafely()
+        }
     }
 
     suspend fun getPageBitmap(pageIndex: Int, scale: Float = 1.0f): Bitmap? {

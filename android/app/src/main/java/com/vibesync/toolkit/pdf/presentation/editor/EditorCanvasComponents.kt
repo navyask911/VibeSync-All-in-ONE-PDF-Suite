@@ -15,6 +15,8 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
+import com.vibesync.toolkit.pdf.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -129,7 +131,7 @@ fun SignaturePadDialog(
 
     AlertDialog(
         onDismissRequest = onDismissRequest,
-        title = { Text("Draw your signature") },
+        title = { Text(stringResource(R.string.signature_draw_title)) },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Box(
@@ -217,16 +219,16 @@ fun SignaturePadDialog(
                     onSignatureCaptured(bitmap)
                 }
             ) {
-                Text("Use Signature")
+                Text(stringResource(R.string.signature_use_action))
             }
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 TextButton(onClick = { strokes = emptyList(); activeStroke = emptyList() }) {
-                    Text("Clear")
+                    Text(stringResource(R.string.signature_clear_action))
                 }
                 TextButton(onClick = onDismissRequest) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         }

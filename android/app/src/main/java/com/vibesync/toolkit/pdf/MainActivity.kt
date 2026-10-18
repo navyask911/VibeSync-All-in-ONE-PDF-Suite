@@ -11,7 +11,8 @@ import android.os.Bundle
 import android.widget.EditText
 import android.widget.Toast
 import java.io.File
-import androidx.activity.ComponentActivity
+import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AppCompatDelegate
 import androidx.activity.compose.setContent
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
@@ -26,6 +27,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
+import androidx.core.os.LocaleListCompat
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -52,7 +54,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.nio.charset.StandardCharsets
 
-class MainActivity : ComponentActivity() {
+class MainActivity : AppCompatActivity() {
 
     private val pendingPdfUriState = MutableStateFlow<Uri?>(null)
 
@@ -70,7 +72,7 @@ class MainActivity : ComponentActivity() {
     ) { permissions ->
         val granted = permissions.entries.all { it.value }
         if (!granted) {
-            Toast.makeText(this, "Limited storage permissions granted.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.storage_permissions_denied), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -84,7 +86,7 @@ class MainActivity : ComponentActivity() {
         ) { result ->
             val scanResult = scannerManager.parseResult(result.resultCode, result.data)
             scanResult?.pdfUri?.let { scannedPdfUri ->
-                Toast.makeText(this, "Document scanned: ${scanResult.pageCount} pages", Toast.LENGTH_LONG).show()
+                Toast.makeText(this, getString(R.string.document_scanned_page_count, scanResult.pageCount), Toast.LENGTH_LONG).show()
                 lifecycleScope.launch(Dispatchers.IO) {
                     val watermarkedFile = UriUtils.createExportCacheFile(this@MainActivity, "VibeSync_Scanned_Document")
                     val watermarkResult = toolkitEngine.watermarkPdf(
@@ -96,15 +98,16 @@ class MainActivity : ComponentActivity() {
                         watermarkResult.onSuccess {
                             pendingPdfUriState.value = Uri.fromFile(watermarkedFile)
                         }.onFailure {
-                            Toast.makeText(this@MainActivity, "Could not apply VibeSync watermark to scanned PDF", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this@MainActivity, getString(R.string.error_watermark_scanned_pdf), Toast.LENGTH_LONG).show()
                         }
                     }
                 }
             }
         }
 
-        // 2. Request appropriate runtime storage/media permissions
-        checkAndRequestPermissions()
+        // SAF is the default document access path and does not require broad storage
+        // permissions. Legacy/storage-discovery access is only requested after the user
+        // explicitly asks to scan the entire device.
 
         // 3. Preload AdMob interstitial
         AdMobManager.preloadInterstitial(this)
@@ -150,11 +153,19 @@ class MainActivity : ComponentActivity() {
                                 },
                                 onLaunchScanner = {
                                     scannerManager.startScan(scannerLauncher) { error ->
-                                        Toast.makeText(this@MainActivity, "Scanner Error: ${error.message}", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(this@MainActivity, getString(R.string.error_scanner, error.message ?: ""), Toast.LENGTH_SHORT).show()
                                     }
                                 },
                                 onRequestStoragePermission = {
                                     requestStoragePermissionFlow()
+                                },
+                                onSelectLanguage = { languageTag ->
+                                    val locales = if (languageTag.isBlank()) {
+                                        LocaleListCompat.getEmptyLocaleList()
+                                    } else {
+                                        LocaleListCompat.forLanguageTags(languageTag)
+                                    }
+                                    AppCompatDelegate.setApplicationLocales(locales)
                                 }
                             )
                         }
@@ -270,7 +281,7 @@ class MainActivity : ComponentActivity() {
                 result.onSuccess {
                     shareFiles(listOf(output), "application/pdf", "VibeSync_Viewed_Document")
                 }.onFailure { error ->
-                    Toast.makeText(this@MainActivity, error.localizedMessage ?: "Could not prepare the PDF for sharing", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.error_prepare_pdf_sharing), Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -278,7 +289,7 @@ class MainActivity : ComponentActivity() {
     private fun shareFiles(files: List<File>, mimeType: String, defaultBaseName: String) {
         val validFiles = files.filter { it.exists() && it.length() > 0L }
         if (validFiles.isEmpty()) {
-            Toast.makeText(this, "No output files were created", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, getString(R.string.error_no_output_files), Toast.LENGTH_LONG).show()
             return
         }
 
@@ -287,22 +298,22 @@ class MainActivity : ComponentActivity() {
         val input = EditText(this).apply {
             setText(defaultName)
             selectAll()
-            hint = "File name"
+            hint = getString(R.string.file_name)
             setSingleLine(true)
         }
 
         android.app.AlertDialog.Builder(this)
-            .setTitle("Name your output file")
-            .setMessage("VibeSync watermark will be included. Extension is added automatically.")
+            .setTitle(getString(R.string.output_name_dialog_title))
+            .setMessage(getString(R.string.output_name_dialog_message))
             .setView(input)
-            .setNegativeButton("Cancel", null)
-            .setPositiveButton("Continue") { _, _ ->
+            .setNegativeButton(getString(R.string.cancel), null)
+            .setPositiveButton(getString(R.string.continue_label)) { _, _ ->
                 val requested = sanitizeOutputBaseName(input.text?.toString().orEmpty(), defaultName)
                 lifecycleScope.launch(Dispatchers.IO) {
                     val renamedFiles = renameOutputFiles(validFiles, requested, extension)
                     launch(Dispatchers.Main) {
                         if (renamedFiles.isEmpty()) {
-                            Toast.makeText(this@MainActivity, "Could not rename output files", Toast.LENGTH_LONG).show()
+                            Toast.makeText(this@MainActivity, getString(R.string.error_rename_output_files), Toast.LENGTH_LONG).show()
                             return@launch
                         }
                         shareRenamedFiles(renamedFiles, mimeType)
@@ -329,7 +340,7 @@ class MainActivity : ComponentActivity() {
                 clipData = ClipData.newUri(contentResolver, "VibeSync output", uris.first())
             }
         }
-        startActivity(Intent.createChooser(shareIntent, "Share VibeSync output"))
+        startActivity(Intent.createChooser(shareIntent, getString(R.string.share_vibesync_output)))
     }
 
     private fun renameOutputFiles(files: List<File>, baseName: String, extension: String): List<File> {
