@@ -178,8 +178,9 @@ class PdfBoxToolkitEngine(private val context: Context) {
                                 ".png",
                                 cacheDir
                             )
-                            writeVibeSyncWatermarkedPng(bitmap, imageFile)
+                            // Track immediately so the operation-level finally/catch cleans a partial file too.
                             extractedFiles.add(imageFile)
+                            writeVibeSyncWatermarkedPng(bitmap, imageFile)
                         }
                     }
                 }
@@ -694,25 +695,30 @@ class PdfBoxToolkitEngine(private val context: Context) {
         val mutableBitmap = sourceBitmap.copy(Bitmap.Config.ARGB_8888, true)
             ?: throw IllegalStateException(context.getString(R.string.error_create_mutable_bitmap))
 
-        val canvas = Canvas(mutableBitmap)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(150, 142, 0, 0)
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.035f).coerceIn(10f, 22f)
-        }
-
-        val watermarkText = VIBESYNC_WATERMARK_TEXT
-        val x = mutableBitmap.width / 2f - paint.measureText(watermarkText) / 2f
-        val y = mutableBitmap.height - 10f
-        canvas.drawText(watermarkText, x, y, paint)
-
-        FileOutputStream(outputFile).use { output ->
-            if (!mutableBitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
-                mutableBitmap.recycle()
-                throw IllegalStateException(context.getString(R.string.error_write_watermarked_image))
+        try {
+            val canvas = Canvas(mutableBitmap)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(150, 142, 0, 0)
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.035f).coerceIn(10f, 22f)
             }
+
+            val watermarkText = VIBESYNC_WATERMARK_TEXT
+            val x = mutableBitmap.width / 2f - paint.measureText(watermarkText) / 2f
+            val y = mutableBitmap.height - 10f
+            canvas.drawText(watermarkText, x, y, paint)
+
+            FileOutputStream(outputFile).use { output ->
+                if (!mutableBitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                    throw IllegalStateException(context.getString(R.string.error_write_watermarked_image))
+                }
+            }
+        } catch (error: Exception) {
+            outputFile.delete()
+            throw error
+        } finally {
+            if (!mutableBitmap.isRecycled) mutableBitmap.recycle()
         }
-        mutableBitmap.recycle()
     }
 
     companion object {
