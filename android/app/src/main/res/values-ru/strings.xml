@@ -166,4 +166,19 @@
     <string name="error_create_mutable_bitmap">Не удалось создать изменяемое растровое изображение для водяного знака.</string>
     <string name="error_write_watermarked_image">Не удалось записать изображение с водяным знаком.</string>
 
+    <!-- Google Play update, review and connectivity prompts -->
+    <string name="update_available_title">Доступно обновление приложения</string>
+    <string name="update_available_message">Доступна новая версия VibeSync с улучшениями и исправлениями. Обновите приложение, чтобы пользоваться последней версией.</string>
+    <string name="update_now">Обновить</string>
+    <string name="update_later">Позже</string>
+    <string name="update_ready_title">Обновление готово к установке</string>
+    <string name="update_ready_message">Обновление загружено. Перезапустите VibeSync, чтобы завершить установку.</string>
+    <string name="restart_to_update">Перезапустить и установить</string>
+    <string name="offline_support_title">Оставайтесь на связи и поддержите VibeSync</string>
+    <string name="offline_support_message">Сейчас вы не в сети. Подключение к Интернету помогает загружать рекламу, которая поддерживает разработку VibeSync и помогает нам выпить чашку кофе, пока мы продолжаем улучшать приложение.\n\nВаша конфиденциальность важна: PDF-файлы остаются на вашем устройстве, а подключение к Интернету не означает, что ваши документы будут загружены в сеть.</string>
+    <string name="connect_to_internet">Подключиться к Интернету</string>
+    <string name="not_now">Не сейчас</string>
+    <string name="update_store_unavailable">Не удалось открыть страницу Google Play. Повторите попытку, когда появится подключение к Интернету.</string>
+    <string name="internet_settings_unavailable">Не удалось открыть настройки сети. Откройте настройки Wi-Fi вручную.</string>
+
 </resources>
