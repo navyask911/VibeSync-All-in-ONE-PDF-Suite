@@ -166,4 +166,19 @@
     <string name="error_create_mutable_bitmap">Für das Wasserzeichen konnte keine bearbeitbare Bitmap erstellt werden.</string>
     <string name="error_write_watermarked_image">Das Bild mit Wasserzeichen konnte nicht gespeichert werden.</string>
 
+    <!-- Google Play update, review and connectivity prompts -->
+    <string name="update_available_title">App-Update verfügbar</string>
+    <string name="update_available_message">Eine neue Version von VibeSync mit Verbesserungen und Fehlerbehebungen ist verfügbar. Aktualisiere die App für die neueste Version.</string>
+    <string name="update_now">Jetzt aktualisieren</string>
+    <string name="update_later">Später</string>
+    <string name="update_ready_title">Update zur Installation bereit</string>
+    <string name="update_ready_message">Das Update wurde heruntergeladen. Starte VibeSync neu, um die Installation abzuschließen.</string>
+    <string name="restart_to_update">Neu starten und installieren</string>
+    <string name="offline_support_title">Verbunden bleiben und VibeSync unterstützen</string>
+    <string name="offline_support_message">Du bist derzeit offline. Wenn du dich mit dem Internet verbindest, können Anzeigen geladen werden, die die Entwicklung von VibeSync unterstützen und uns helfen, bei der Weiterentwicklung einen Kaffee zu spendieren.\n\nDeine Privatsphäre ist wichtig: Deine PDF-Dateien bleiben auf deinem Gerät. Eine Internetverbindung bedeutet nicht, dass deine Dokumente hochgeladen werden.</string>
+    <string name="connect_to_internet">Mit dem Internet verbinden</string>
+    <string name="not_now">Nicht jetzt</string>
+    <string name="update_store_unavailable">Der Google-Play-Eintrag konnte nicht geöffnet werden. Bitte versuche es erneut, sobald Internet verfügbar ist.</string>
+    <string name="internet_settings_unavailable">Die Netzwerkeinstellungen konnten nicht geöffnet werden. Öffne die WLAN-Einstellungen bitte manuell.</string>
+
 </resources>
