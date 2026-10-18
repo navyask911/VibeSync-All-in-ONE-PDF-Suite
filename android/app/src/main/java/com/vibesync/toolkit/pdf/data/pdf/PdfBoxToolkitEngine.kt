@@ -173,7 +173,11 @@ class PdfBoxToolkitEngine(private val context: Context) {
                         val xObject = resources.getXObject(xName)
                         if (xObject is PDImageXObject) {
                             val bitmap = xObject.image
-                            val imageFile = File(cacheDir, "img_p${pageIndex + 1}_${imageIndex++}.png")
+                            val imageFile = File.createTempFile(
+                                "img_p${pageIndex + 1}_${imageIndex++}_",
+                                ".png",
+                                cacheDir
+                            )
                             writeVibeSyncWatermarkedPng(bitmap, imageFile)
                             extractedFiles.add(imageFile)
                         }
@@ -207,6 +211,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
         var documentToClose: PDDocument? = null
         try {
             if (imageUris.isEmpty()) {
+                outputFile.delete()
                 return@withContext Result.failure(IllegalArgumentException(context.getString(R.string.error_select_at_least_one_image)))
             }
 
