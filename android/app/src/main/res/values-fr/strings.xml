@@ -166,4 +166,19 @@
     <string name="error_create_mutable_bitmap">Impossible de créer un bitmap modifiable pour le filigrane.</string>
     <string name="error_write_watermarked_image">Impossible d’enregistrer l’image filigranée.</string>
 
+    <!-- Google Play update, review and connectivity prompts -->
+    <string name="update_available_title">Mise à jour disponible</string>
+    <string name="update_available_message">Une nouvelle version de VibeSync avec des améliorations et des corrections est disponible. Mettez l’application à jour pour profiter de la meilleure expérience.</string>
+    <string name="update_now">Mettre à jour</string>
+    <string name="update_later">Plus tard</string>
+    <string name="update_ready_title">Mise à jour prête à installer</string>
+    <string name="update_ready_message">La mise à jour est téléchargée. Redémarrez VibeSync pour terminer l’installation.</string>
+    <string name="restart_to_update">Redémarrer et installer</string>
+    <string name="offline_support_title">Restez connecté et soutenez VibeSync</string>
+    <string name="offline_support_message">Vous êtes actuellement hors ligne. Une connexion Internet aide au chargement des publicités qui soutiennent le développement de VibeSync et nous permettent de prendre un café tout en continuant à améliorer l’application.\n\nVotre confidentialité compte : vos fichiers PDF restent sur votre appareil, et la connexion Internet ne signifie pas que vos documents seront envoyés en ligne.</string>
+    <string name="connect_to_internet">Se connecter à Internet</string>
+    <string name="not_now">Pas maintenant</string>
+    <string name="update_store_unavailable">Impossible d’ouvrir la fiche Google Play. Réessayez lorsque la connexion Internet sera disponible.</string>
+    <string name="internet_settings_unavailable">Impossible d’ouvrir les paramètres réseau. Ouvrez manuellement les paramètres Wi-Fi.</string>
+
 </resources>
