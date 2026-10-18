@@ -1,9 +1,16 @@
 package com.vibesync.toolkit.pdf
 
 import android.Manifest
+import android.app.Activity
+import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.provider.Settings
 import android.util.Base64
+import android.util.Log
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -20,20 +27,38 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.google.android.play.core.appupdate.AppUpdateInfo
+import com.google.android.play.core.appupdate.AppUpdateManager
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory
+import com.google.android.play.core.appupdate.AppUpdateOptions
+import com.google.android.play.core.install.InstallStateUpdatedListener
+import com.google.android.play.core.install.model.AppUpdateType
+import com.google.android.play.core.install.model.InstallStatus
+import com.google.android.play.core.install.model.UpdateAvailability
+import com.google.android.play.core.review.ReviewManagerFactory
+import com.vibesync.toolkit.pdf.BuildConfig
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
+import com.vibesync.toolkit.pdf.core.util.EngagementPolicy
+import com.vibesync.toolkit.pdf.core.util.ReviewEligibilityTracker
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.presentation.dashboard.DashboardScreen
@@ -50,11 +75,56 @@ import com.vibesync.toolkit.pdf.presentation.tools.SplitScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import java.nio.charset.StandardCharsets
 
 class MainActivity : AppCompatActivity() {
+
+    private val engagementPreferences by lazy { getSharedPreferences("vibesync_engagement", MODE_PRIVATE) }
+    private val reviewEligibilityTracker by lazy { ReviewEligibilityTracker(this) }
+    private lateinit var appUpdateManager: AppUpdateManager
+    private lateinit var updateFlowLauncher: ActivityResultLauncher<IntentSenderRequest>
+    private var pendingUpdateInfo: AppUpdateInfo? = null
+    private var updatePromptVisible by mutableStateOf(false)
+    private var updateDownloaded by mutableStateOf(false)
+    private var updateReadyDialogVisible by mutableStateOf(false)
+    private var offlinePromptVisible by mutableStateOf(false)
+    private var internetAvailable by mutableStateOf(false)
+    private var activeRoute by mutableStateOf("dashboard")
+    private var reviewEligibilityRevision by mutableStateOf(0)
+    private var updateCheckInProgress = false
+    private var updateFlowStarted = false
+    private var reviewFlowLaunching = false
+    private var connectivityCallbackRegistered = false
+    private var hasShownOfflinePromptThisSession = false
+
+    private val updateInstallStateListener = InstallStateUpdatedListener { state ->
+        when (state.installStatus()) {
+            InstallStatus.DOWNLOADED -> runOnUiThread {
+                updateDownloaded = true
+                updatePromptVisible = false
+                updateReadyDialogVisible = true
+                updateFlowStarted = false
+            }
+            InstallStatus.FAILED -> {
+                Log.w(TAG, "Google Play in-app update download failed.")
+                runOnUiThread { updateFlowStarted = false }
+            }
+            else -> Unit
+        }
+    }
+
+    private val connectivityCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) = refreshInternetStatus()
+        override fun onLost(network: Network) = refreshInternetStatus()
+        override fun onCapabilitiesChanged(network: Network, capabilities: NetworkCapabilities) {
+            val validated = capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            runOnUiThread { applyConnectivityState(validated) }
+        }
+    }
 
     private val pendingPdfUriState = MutableStateFlow<Uri?>(null)
 
@@ -79,6 +149,23 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        updateFlowLauncher = registerForActivityResult(
+            ActivityResultContracts.StartIntentSenderForResult()
+        ) { result ->
+            updateFlowStarted = false
+            if (result.resultCode != Activity.RESULT_OK) {
+                engagementPreferences.edit()
+                    .putBoolean(KEY_IMMEDIATE_UPDATE_IN_PROGRESS, false)
+                    .putLong(KEY_UPDATE_SNOOZE_UNTIL, System.currentTimeMillis() + UPDATE_PROMPT_COOLDOWN_MS)
+                    .apply()
+                pendingUpdateInfo = null
+                updatePromptVisible = false
+            }
+        }
+        appUpdateManager = AppUpdateManagerFactory.create(this)
+        runCatching { appUpdateManager.registerListener(updateInstallStateListener) }
+            .onFailure { Log.w(TAG, "Could not register Play update listener.", it) }
+
         // 1. Initialize ML Kit Document Scanner
         scannerManager = DocumentScannerManager(this)
         scannerLauncher = registerForActivityResult(
@@ -97,6 +184,7 @@ class MainActivity : AppCompatActivity() {
                     launch(Dispatchers.Main) {
                         watermarkResult.onSuccess {
                             pendingPdfUriState.value = Uri.fromFile(watermarkedFile)
+                            recordSuccessfulPdfOperation()
                         }.onFailure {
                             Toast.makeText(this@MainActivity, getString(R.string.error_watermark_scanned_pdf), Toast.LENGTH_LONG).show()
                         }
@@ -122,7 +210,41 @@ class MainActivity : AppCompatActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     val navController = rememberNavController()
+                    val currentBackStackEntry by navController.currentBackStackEntryAsState()
                     val pendingPdfUri by pendingPdfUriState.collectAsState()
+
+                    LaunchedEffect(currentBackStackEntry?.destination?.route) {
+                        activeRoute = currentBackStackEntry?.destination?.route ?: "dashboard"
+                    }
+                    LaunchedEffect(activeRoute, internetAvailable) {
+                        if (internetAvailable) {
+                            offlinePromptVisible = false
+                            return@LaunchedEffect
+                        }
+                        if (activeRoute != "dashboard" || hasShownOfflinePromptThisSession) return@LaunchedEffect
+                        val lastShown = engagementPreferences.getLong(KEY_OFFLINE_PROMPT_LAST_SHOWN, 0L)
+                        if (!EngagementPolicy.shouldShowOfflinePrompt(false, System.currentTimeMillis(), lastShown)) {
+                            return@LaunchedEffect
+                        }
+                        delay(1_600L)
+                        if (!internetAvailable && activeRoute == "dashboard" && !hasShownOfflinePromptThisSession) {
+                            hasShownOfflinePromptThisSession = true
+                            offlinePromptVisible = true
+                            engagementPreferences.edit().putLong(KEY_OFFLINE_PROMPT_LAST_SHOWN, System.currentTimeMillis()).apply()
+                        }
+                    }
+                    LaunchedEffect(activeRoute, internetAvailable, reviewEligibilityRevision, updatePromptVisible,
+                        offlinePromptVisible, updateDownloaded, updateReadyDialogVisible) {
+                        if (activeRoute == "dashboard" && internetAvailable) {
+                            showPendingUpdatePrompt()
+                            if (!updatePromptVisible && !offlinePromptVisible && !updateDownloaded &&
+                                !updateReadyDialogVisible && reviewEligibilityTracker.isEligible()
+                            ) {
+                                delay(30_000L)
+                                maybeLaunchReviewIfEligible()
+                            }
+                        }
+                    }
 
                     // Automatically forward ACTION_VIEW, ACTION_SEND, and scanner results to Viewer.
                     LaunchedEffect(pendingPdfUri) {
@@ -205,6 +327,7 @@ class MainActivity : AppCompatActivity() {
                                 viewModel = editorViewModel,
                                 onNavigateBack = { navController.popBackStack() },
                                 onExportComplete = { savedFile ->
+                                    recordSuccessfulPdfOperation()
                                     shareFiles(listOf(savedFile), "application/pdf", "VibeSync_Edit_Signed")
                                     navController.popBackStack()
                                 }
@@ -216,6 +339,7 @@ class MainActivity : AppCompatActivity() {
                             SplitScreen(
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { files ->
+                                    recordSuccessfulPdfOperation()
                                     shareFiles(files, "application/pdf", "VibeSync_Split_Document")
                                     navController.popBackStack()
                                 }
@@ -227,6 +351,7 @@ class MainActivity : AppCompatActivity() {
                             MergeScreen(
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { mergedFile ->
+                                    recordSuccessfulPdfOperation()
                                     shareFiles(listOf(mergedFile), "application/pdf", "VibeSync_Merged_Document")
                                     navController.popBackStack()
                                 }
@@ -238,6 +363,7 @@ class MainActivity : AppCompatActivity() {
                             EncryptScreen(
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { encryptedFile ->
+                                    recordSuccessfulPdfOperation()
                                     shareFiles(listOf(encryptedFile), "application/pdf", "VibeSync_Protected_Document")
                                     navController.popBackStack()
                                 }
@@ -248,6 +374,7 @@ class MainActivity : AppCompatActivity() {
                             ConvertImagesScreen(
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { outputFile ->
+                                    recordSuccessfulPdfOperation()
                                     shareFiles(listOf(outputFile), "application/pdf", "VibeSync_Images_To_PDF")
                                     navController.popBackStack()
                                 }
@@ -258,11 +385,44 @@ class MainActivity : AppCompatActivity() {
                             ExtractImagesScreen(
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { files ->
+                                    recordSuccessfulPdfOperation()
                                     shareFiles(files, "image/png", "VibeSync_Extracted_Images")
                                     navController.popBackStack()
                                 }
                             )
                         }
+                    }
+
+                    if (updatePromptVisible && activeRoute == "dashboard" && !updateDownloaded) {
+                        AlertDialog(
+                            onDismissRequest = { deferUpdatePrompt() },
+                            title = { Text(getString(R.string.update_available_title)) },
+                            text = { Text(getString(R.string.update_available_message)) },
+                            confirmButton = { TextButton(onClick = { beginUpdateFlow() }) { Text(getString(R.string.update_now)) } },
+                            dismissButton = { TextButton(onClick = { deferUpdatePrompt() }) { Text(getString(R.string.update_later)) } }
+                        )
+                    }
+                    if (updateReadyDialogVisible && updateDownloaded && activeRoute == "dashboard") {
+                        AlertDialog(
+                            onDismissRequest = { updateReadyDialogVisible = false },
+                            title = { Text(getString(R.string.update_ready_title)) },
+                            text = { Text(getString(R.string.update_ready_message)) },
+                            confirmButton = { TextButton(onClick = { completeDownloadedUpdate() }) { Text(getString(R.string.restart_to_update)) } },
+                            dismissButton = { TextButton(onClick = { updateReadyDialogVisible = false }) { Text(getString(R.string.update_later)) } }
+                        )
+                    }
+                    if (offlinePromptVisible && !internetAvailable && activeRoute == "dashboard") {
+                        AlertDialog(
+                            onDismissRequest = { dismissOfflinePrompt() },
+                            title = { Text(getString(R.string.offline_support_title)) },
+                            text = { Text(getString(R.string.offline_support_message)) },
+                            confirmButton = {
+                                TextButton(onClick = { dismissOfflinePrompt(); openInternetSettings() }) {
+                                    Text(getString(R.string.connect_to_internet))
+                                }
+                            },
+                            dismissButton = { TextButton(onClick = { dismissOfflinePrompt() }) { Text(getString(R.string.not_now)) } }
+                        )
                     }
                 }
             }
@@ -279,6 +439,7 @@ class MainActivity : AppCompatActivity() {
             )
             launch(Dispatchers.Main) {
                 result.onSuccess {
+                    recordSuccessfulPdfOperation()
                     shareFiles(listOf(output), "application/pdf", "VibeSync_Viewed_Document")
                 }.onFailure { error ->
                     Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.error_prepare_pdf_sharing), Toast.LENGTH_LONG).show()
@@ -440,9 +601,247 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    override fun onStart() {
+        super.onStart()
+        registerConnectivityCallback()
+    }
+
+    override fun onStop() {
+        unregisterConnectivityCallback()
+        super.onStop()
+    }
+
     override fun onResume() {
         super.onResume()
+        reviewEligibilityTracker.recordSessionIfDue()
+        reviewEligibilityRevision += 1
         dashboardViewModel.checkPermissionAndScan()
+        refreshInternetStatus()
+        maybeCheckForUpdate()
+    }
+
+    override fun onDestroy() {
+        if (::appUpdateManager.isInitialized) runCatching { appUpdateManager.unregisterListener(updateInstallStateListener) }
+        super.onDestroy()
+    }
+
+    private fun registerConnectivityCallback() {
+        if (connectivityCallbackRegistered) return
+        val manager = getSystemService(ConnectivityManager::class.java) ?: return
+        try {
+            manager.registerDefaultNetworkCallback(connectivityCallback)
+            connectivityCallbackRegistered = true
+        } catch (error: Exception) {
+            Log.w(TAG, "Could not register connectivity callback.", error)
+        }
+        refreshInternetStatus()
+    }
+
+    private fun unregisterConnectivityCallback() {
+        if (!connectivityCallbackRegistered) return
+        getSystemService(ConnectivityManager::class.java)?.let {
+            runCatching { it.unregisterNetworkCallback(connectivityCallback) }
+        }
+        connectivityCallbackRegistered = false
+    }
+
+    private fun refreshInternetStatus() {
+        val manager = getSystemService(ConnectivityManager::class.java) ?: return
+        val network = manager.activeNetwork
+        val caps = network?.let { manager.getNetworkCapabilities(it) }
+        val validated = caps?.let {
+            it.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                it.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+        } == true
+        runOnUiThread { applyConnectivityState(validated) }
+    }
+
+    private fun applyConnectivityState(available: Boolean) {
+        val wasAvailable = internetAvailable
+        internetAvailable = available
+        if (available) {
+            offlinePromptVisible = false
+            if (!wasAvailable) maybeCheckForUpdate(force = true)
+            reviewEligibilityRevision += 1
+        } else updatePromptVisible = false
+    }
+
+    private fun maybeCheckForUpdate(force: Boolean = false) {
+        if (!::appUpdateManager.isInitialized || !internetAvailable || isFinishing || isDestroyed || updateCheckInProgress) return
+        val now = System.currentTimeMillis()
+        val lastCheck = engagementPreferences.getLong(KEY_LAST_UPDATE_CHECK, 0L)
+        val immediateInProgress = engagementPreferences.getBoolean(KEY_IMMEDIATE_UPDATE_IN_PROGRESS, false)
+        if (!force && !immediateInProgress && now - lastCheck < UPDATE_CHECK_COOLDOWN_MS) {
+            showPendingUpdatePrompt()
+            return
+        }
+        updateCheckInProgress = true
+        engagementPreferences.edit().putLong(KEY_LAST_UPDATE_CHECK, now).apply()
+        appUpdateManager.appUpdateInfo
+            .addOnSuccessListener { info ->
+                updateCheckInProgress = false
+                if (info.installStatus() == InstallStatus.DOWNLOADED) {
+                    updateDownloaded = true
+                    updateReadyDialogVisible = true
+                    updatePromptVisible = false
+                    return@addOnSuccessListener
+                }
+                when (info.updateAvailability()) {
+                    UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS -> {
+                        if (info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) beginUpdateFlow(info, AppUpdateType.IMMEDIATE)
+                    }
+                    UpdateAvailability.UPDATE_AVAILABLE -> {
+                        if (info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE) || info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) {
+                            pendingUpdateInfo = info
+                            showPendingUpdatePrompt()
+                        }
+                    }
+                    else -> {
+                        pendingUpdateInfo = null
+                        updatePromptVisible = false
+                    }
+                }
+            }
+            .addOnFailureListener { error ->
+                updateCheckInProgress = false
+                Log.w(TAG, "Google Play update availability check failed.", error)
+            }
+    }
+
+    private fun showPendingUpdatePrompt() {
+        val notSnoozed = System.currentTimeMillis() >= engagementPreferences.getLong(KEY_UPDATE_SNOOZE_UNTIL, 0L)
+        if (pendingUpdateInfo != null && notSnoozed && internetAvailable && activeRoute == "dashboard" && !updateDownloaded) {
+            updatePromptVisible = true
+        }
+    }
+
+    private fun deferUpdatePrompt() {
+        updatePromptVisible = false
+        engagementPreferences.edit()
+            .putBoolean(KEY_IMMEDIATE_UPDATE_IN_PROGRESS, false)
+            .putLong(KEY_UPDATE_SNOOZE_UNTIL, System.currentTimeMillis() + UPDATE_PROMPT_COOLDOWN_MS)
+            .apply()
+    }
+
+    private fun beginUpdateFlow() {
+        val info = pendingUpdateInfo ?: run {
+            updatePromptVisible = false
+            maybeCheckForUpdate(force = true)
+            return
+        }
+        val type = when {
+            info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE) -> AppUpdateType.FLEXIBLE
+            info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE) -> AppUpdateType.IMMEDIATE
+            else -> null
+        }
+        if (type == null) fallbackToPlayStoreAndSnooze() else beginUpdateFlow(info, type)
+    }
+
+    private fun beginUpdateFlow(info: AppUpdateInfo, type: Int) {
+        if (updateFlowStarted) return
+        updateFlowStarted = true
+        updatePromptVisible = false
+        if (type == AppUpdateType.IMMEDIATE) engagementPreferences.edit().putBoolean(KEY_IMMEDIATE_UPDATE_IN_PROGRESS, true).apply()
+        try {
+            val started = appUpdateManager.startUpdateFlowForResult(info, updateFlowLauncher, AppUpdateOptions.newBuilder(type).build())
+            if (!started) {
+                updateFlowStarted = false
+                fallbackToPlayStoreAndSnooze()
+            }
+        } catch (error: Exception) {
+            updateFlowStarted = false
+            Log.w(TAG, "Could not start Google Play in-app update.", error)
+            fallbackToPlayStoreAndSnooze()
+        }
+    }
+
+    private fun completeDownloadedUpdate() {
+        appUpdateManager.completeUpdate()
+            .addOnSuccessListener {
+                updateReadyDialogVisible = false
+                updateDownloaded = false
+                pendingUpdateInfo = null
+                engagementPreferences.edit()
+                    .putBoolean(KEY_IMMEDIATE_UPDATE_IN_PROGRESS, false)
+                    .putLong(KEY_UPDATE_SNOOZE_UNTIL, 0L)
+                    .apply()
+            }
+            .addOnFailureListener { error -> Log.w(TAG, "Could not complete the downloaded update.", error) }
+    }
+
+    private fun fallbackToPlayStoreAndSnooze() {
+        pendingUpdateInfo = null
+        updatePromptVisible = false
+        engagementPreferences.edit()
+            .putBoolean(KEY_IMMEDIATE_UPDATE_IN_PROGRESS, false)
+            .putLong(KEY_UPDATE_SNOOZE_UNTIL, System.currentTimeMillis() + UPDATE_PROMPT_COOLDOWN_MS)
+            .apply()
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${BuildConfig.APPLICATION_ID}")))
+            return
+        } catch (_: ActivityNotFoundException) {
+            // Try the HTTPS Play listing.
+        } catch (error: Exception) {
+            Log.w(TAG, "Could not open Play Store.", error)
+        }
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=${BuildConfig.APPLICATION_ID}")))
+        } catch (error: Exception) {
+            Log.w(TAG, "Could not open Play listing.", error)
+            Toast.makeText(this, getString(R.string.update_store_unavailable), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun openInternetSettings() {
+        try {
+            startActivity(Intent(Settings.ACTION_WIFI_SETTINGS))
+        } catch (_: Exception) {
+            try {
+                startActivity(Intent(Settings.ACTION_WIRELESS_SETTINGS))
+            } catch (error: Exception) {
+                Log.w(TAG, "Could not open network settings.", error)
+                Toast.makeText(this, getString(R.string.internet_settings_unavailable), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun dismissOfflinePrompt() {
+        offlinePromptVisible = false
+        hasShownOfflinePromptThisSession = true
+        engagementPreferences.edit().putLong(KEY_OFFLINE_PROMPT_LAST_SHOWN, System.currentTimeMillis()).apply()
+    }
+
+    private fun recordSuccessfulPdfOperation() {
+        reviewEligibilityTracker.recordSuccessfulOperation()
+        reviewEligibilityRevision += 1
+    }
+
+    private fun maybeLaunchReviewIfEligible() {
+        if (reviewFlowLaunching || !internetAvailable || activeRoute != "dashboard" || updatePromptVisible ||
+            offlinePromptVisible || updateDownloaded || updateReadyDialogVisible
+        ) return
+        if (pendingUpdateInfo != null && System.currentTimeMillis() >= engagementPreferences.getLong(KEY_UPDATE_SNOOZE_UNTIL, 0L)) return
+        val now = System.currentTimeMillis()
+        if (!reviewEligibilityTracker.isEligible(now)) return
+        reviewEligibilityTracker.markAttempt(now)
+        reviewFlowLaunching = true
+        try {
+            val manager = ReviewManagerFactory.create(this)
+            manager.requestReviewFlow().addOnCompleteListener { request ->
+                if (request.isSuccessful) {
+                    manager.launchReviewFlow(this, request.result).addOnCompleteListener {
+                        // Play intentionally does not report whether the user submitted a review.
+                        reviewFlowLaunching = false
+                    }
+                } else {
+                    Log.w(TAG, "Google Play review request failed.", request.exception)
+                    reviewFlowLaunching = false
+                }
+            }
+        } catch (error: Exception) {
+            Log.w(TAG, "Google Play in-app review is unavailable.", error)
+            reviewFlowLaunching = false
+        }
     }
 
     private fun requestStoragePermissionFlow() {
@@ -459,5 +858,15 @@ class MainActivity : AppCompatActivity() {
         } else {
             checkAndRequestPermissions()
         }
+    }
+
+    private companion object {
+        const val TAG = "VibeSyncMainActivity"
+        const val KEY_LAST_UPDATE_CHECK = "last_update_check_ms"
+        const val KEY_UPDATE_SNOOZE_UNTIL = "update_snooze_until_ms"
+        const val KEY_IMMEDIATE_UPDATE_IN_PROGRESS = "immediate_update_in_progress"
+        const val KEY_OFFLINE_PROMPT_LAST_SHOWN = "offline_prompt_last_shown_ms"
+        const val UPDATE_CHECK_COOLDOWN_MS = 6L * 60L * 60L * 1000L
+        const val UPDATE_PROMPT_COOLDOWN_MS = 24L * 60L * 60L * 1000L
     }
 }
