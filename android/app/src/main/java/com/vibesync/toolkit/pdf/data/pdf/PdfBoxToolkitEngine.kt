@@ -31,6 +31,7 @@ import com.tom_roush.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState
 import com.tom_roush.pdfbox.pdmodel.interactive.form.PDAcroForm
 import com.tom_roush.pdfbox.pdmodel.interactive.form.PDCheckBox
 import com.tom_roush.pdfbox.pdmodel.interactive.form.PDTextField
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -108,7 +109,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
         val mergedDocument = PDDocument()
         try {
             if (sourceUris.isEmpty()) {
-                mergedDocument.close()
+                outputFile.delete()
                 return@withContext Result.failure(IllegalArgumentException(context.getString(R.string.error_select_at_least_one_pdf)))
             }
 
@@ -133,7 +134,11 @@ class PdfBoxToolkitEngine(private val context: Context) {
             applyVibeSyncWatermark(mergedDocument)
             mergedDocument.save(outputFile)
             Result.success(outputFile)
+        } catch (cancelled: CancellationException) {
+            outputFile.delete()
+            throw cancelled
         } catch (e: Exception) {
+            outputFile.delete()
             Log.e(TAG, "Failed to merge PDFs", e)
             Result.failure(e)
         } finally {
@@ -331,6 +336,9 @@ class PdfBoxToolkitEngine(private val context: Context) {
             }
 
             Result.success(outputFile)
+        } catch (cancelled: CancellationException) {
+            outputFile.delete()
+            throw cancelled
         } catch (e: Exception) {
             Log.e(TAG, "Failed to encrypt PDF", e)
             outputFile.delete()
@@ -348,19 +356,26 @@ class PdfBoxToolkitEngine(private val context: Context) {
         password: String,
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
+        var sourceFileToDelete: File? = null
         try {
             ensureBouncyCastleProvider()
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "decrypt_src_")
+            sourceFileToDelete = sourceFile
             PDDocument.load(sourceFile, password).use { document ->
                 document.isAllSecurityToBeRemoved = true
                 applyVibeSyncWatermark(document)
                 document.save(outputFile)
             }
-            sourceFile.delete()
             Result.success(outputFile)
+        } catch (cancelled: CancellationException) {
+            outputFile.delete()
+            throw cancelled
         } catch (e: Exception) {
+            outputFile.delete()
             Log.e(TAG, "Failed to decrypt PDF with provided credentials", e)
             Result.failure(e)
+        } finally {
+            sourceFileToDelete?.delete()
         }
     }
 
@@ -372,17 +387,24 @@ class PdfBoxToolkitEngine(private val context: Context) {
         watermarkText: String,
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
+        var sourceFileToDelete: File? = null
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "watermark_src_")
+            sourceFileToDelete = sourceFile
             PDDocument.load(sourceFile).use { document ->
                 applyVibeSyncWatermark(document)
                 document.save(outputFile)
             }
-            sourceFile.delete()
             Result.success(outputFile)
+        } catch (cancelled: CancellationException) {
+            outputFile.delete()
+            throw cancelled
         } catch (e: Exception) {
+            outputFile.delete()
             Log.e(TAG, "Failed to watermark PDF", e)
             Result.failure(e)
+        } finally {
+            sourceFileToDelete?.delete()
         }
     }
     /**
@@ -395,8 +417,10 @@ class PdfBoxToolkitEngine(private val context: Context) {
         screenWidthPx: Float,
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
+        var sourceFileToDelete: File? = null
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "flatten_src_")
+            sourceFileToDelete = sourceFile
             PDDocument.load(sourceFile).use { document ->
 
                 pageAnnotationsMap.forEach { (pageIndex, annotations) ->
@@ -498,11 +522,16 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 applyVibeSyncWatermark(document)
                 document.save(outputFile)
             }
-            sourceFile.delete()
             Result.success(outputFile)
+        } catch (cancelled: CancellationException) {
+            outputFile.delete()
+            throw cancelled
         } catch (e: Exception) {
+            outputFile.delete()
             Log.e(TAG, "Failed to flatten annotations onto PDF", e)
             Result.failure(e)
+        } finally {
+            sourceFileToDelete?.delete()
         }
     }
 
@@ -510,8 +539,10 @@ class PdfBoxToolkitEngine(private val context: Context) {
      * Extracts AcroForm fields from an interactive PDF.
      */
     suspend fun getAcroFormFields(sourceUri: Uri): Result<List<FormFieldItem>> = withContext(Dispatchers.IO) {
+        var sourceFileToDelete: File? = null
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "acro_src_")
+            sourceFileToDelete = sourceFile
             val fieldList = mutableListOf<FormFieldItem>()
 
             PDDocument.load(sourceFile).use { document ->
@@ -536,11 +567,14 @@ class PdfBoxToolkitEngine(private val context: Context) {
                     }
                 }
             }
-            sourceFile.delete()
             Result.success(fieldList)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Log.e(TAG, "Failed to extract AcroForm fields", e)
             Result.failure(e)
+        } finally {
+            sourceFileToDelete?.delete()
         }
     }
 
@@ -553,8 +587,10 @@ class PdfBoxToolkitEngine(private val context: Context) {
         flatten: Boolean,
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
+        var sourceFileToDelete: File? = null
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "acro_fill_")
+            sourceFileToDelete = sourceFile
             PDDocument.load(sourceFile).use { document ->
                 val acroForm: PDAcroForm? = document.documentCatalog.acroForm
                 if (acroForm != null) {
@@ -578,11 +614,16 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 applyVibeSyncWatermark(document)
                 document.save(outputFile)
             }
-            sourceFile.delete()
             Result.success(outputFile)
+        } catch (cancelled: CancellationException) {
+            outputFile.delete()
+            throw cancelled
         } catch (e: Exception) {
+            outputFile.delete()
             Log.e(TAG, "Failed to fill AcroForm", e)
             Result.failure(e)
+        } finally {
+            sourceFileToDelete?.delete()
         }
     }
 
