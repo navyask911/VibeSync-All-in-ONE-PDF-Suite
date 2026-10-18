@@ -25,6 +25,7 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
@@ -841,14 +842,16 @@ class MainActivity : AppCompatActivity() {
             offlinePromptVisible || updateDownloaded || updateReadyDialogVisible
         ) return
         if (pendingUpdateInfo != null) return
+        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
         val now = System.currentTimeMillis()
         if (!reviewEligibilityTracker.isEligible(now)) return
-        reviewEligibilityTracker.markAttempt(now)
         reviewFlowLaunching = true
         try {
             val manager = ReviewManagerFactory.create(this)
             manager.requestReviewFlow().addOnCompleteListener { request ->
                 if (request.isSuccessful) {
+                    // Start the cooldown only when Play accepted the review-flow request.
+                    reviewEligibilityTracker.markAttempt()
                     manager.launchReviewFlow(this, request.result).addOnCompleteListener {
                         // Play intentionally does not report whether the user submitted a review.
                         reviewFlowLaunching = false
@@ -886,7 +889,6 @@ class MainActivity : AppCompatActivity() {
         const val KEY_UPDATE_SNOOZE_UNTIL = "update_snooze_until_ms"
         const val KEY_IMMEDIATE_UPDATE_IN_PROGRESS = "immediate_update_in_progress"
         const val KEY_OFFLINE_PROMPT_LAST_SHOWN = "offline_prompt_last_shown_ms"
-        const val UPDATE_CHECK_COOLDOWN_MS = 6L * 60L * 60L * 1000L
         const val UPDATE_PROMPT_COOLDOWN_MS = 24L * 60L * 60L * 1000L
     }
 }
