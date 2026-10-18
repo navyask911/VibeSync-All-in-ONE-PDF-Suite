@@ -724,6 +724,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun beginUpdateFlow() {
+        if (!internetAvailable) {
+            updatePromptVisible = false
+            return
+        }
         val info = pendingUpdateInfo ?: run {
             updatePromptVisible = false
             maybeCheckForUpdate(force = true)
@@ -823,7 +827,7 @@ class MainActivity : AppCompatActivity() {
         if (reviewFlowLaunching || !internetAvailable || activeRoute != "dashboard" || updatePromptVisible ||
             offlinePromptVisible || updateDownloaded || updateReadyDialogVisible
         ) return
-        if (pendingUpdateInfo != null && System.currentTimeMillis() >= engagementPreferences.getLong(KEY_UPDATE_SNOOZE_UNTIL, 0L)) return
+        if (pendingUpdateInfo != null) return
         val now = System.currentTimeMillis()
         if (!reviewEligibilityTracker.isEligible(now)) return
         reviewEligibilityTracker.markAttempt(now)
