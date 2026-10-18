@@ -702,10 +702,10 @@ class MainActivity : AppCompatActivity() {
                         if (info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) beginUpdateFlow(info, AppUpdateType.IMMEDIATE)
                     }
                     UpdateAvailability.UPDATE_AVAILABLE -> {
-                        if (info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE) || info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) {
-                            pendingUpdateInfo = info
-                            showPendingUpdatePrompt()
-                        }
+                        // Show the confirmed availability even if an update flow type cannot be started;
+                        // beginUpdateFlow() will safely fall back to the Play Store listing in that case.
+                        pendingUpdateInfo = info
+                        showPendingUpdatePrompt()
                     }
                     else -> {
                         pendingUpdateInfo = null
