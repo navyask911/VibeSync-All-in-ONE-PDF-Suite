@@ -134,6 +134,9 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
         return rendererEngine.renderPage(pageIndex, scale)
     }
 
+    fun cacheKeyForPage(pageIndex: Int, scale: Float): String? =
+        rendererEngine.cacheKeyForPage(pageIndex, scale)
+
     fun onPageScrolled(pageIndex: Int) {
         if (_uiState.value.currentPageIndex != pageIndex) {
             _uiState.value = _uiState.value.copy(currentPageIndex = pageIndex)
