@@ -40,9 +40,13 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
 
     private var activeUri: Uri? = null
     private var loadJob: Job? = null
+    private var closeJob: Job? = null
+    private var unlockedDocumentFile: File? = null
 
     fun loadDocument(uri: Uri, password: String? = null) {
-        loadJob?.cancel()
+        val previousLoad = loadJob
+        previousLoad?.cancel()
+        val previousClose = closeJob
         activeUri = uri
         _uiState.value = _uiState.value.copy(
             fileName = uri.lastPathSegment?.substringAfterLast('/') ?: getApplication<Application>().getString(R.string.default_pdf_filename),
@@ -55,6 +59,12 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
         )
 
         loadJob = viewModelScope.launch {
+            // Serialize canceled loads and view-exit cleanup before touching the native renderer.
+            previousLoad?.join()
+            previousClose?.join()
+            unlockedDocumentFile?.delete()
+            unlockedDocumentFile = null
+
             // Providers can block while resolving DISPLAY_NAME; never query them on Main.
             val fileName = withContext(Dispatchers.IO) {
                 try {
@@ -71,6 +81,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 val decryptedFile = UriUtils.createExportCacheFile(getApplication(), "unlocked_doc")
                 val decryptResult = toolkitEngine.decryptPdf(uri, password, decryptedFile)
                 if (decryptResult.isSuccess) {
+                    unlockedDocumentFile = decryptedFile
                     Uri.fromFile(decryptedFile)
                 } else {
                     _uiState.value = _uiState.value.copy(
@@ -123,10 +134,16 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** Called when the viewer leaves composition; cleanup runs off the main thread. */
     fun closeDocument() {
-        loadJob?.cancel()
+        val previousLoad = loadJob
+        previousLoad?.cancel()
         loadJob = null
-        viewModelScope.launch {
+        val previousClose = closeJob
+        closeJob = viewModelScope.launch {
+            previousClose?.join()
+            previousLoad?.join()
             rendererEngine.closeDocumentSafely()
+            unlockedDocumentFile?.delete()
+            unlockedDocumentFile = null
         }
     }
 
@@ -151,5 +168,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
     override fun onCleared() {
         super.onCleared()
         rendererEngine.closeDocument()
+        unlockedDocumentFile?.delete()
+        unlockedDocumentFile = null
     }
 }
