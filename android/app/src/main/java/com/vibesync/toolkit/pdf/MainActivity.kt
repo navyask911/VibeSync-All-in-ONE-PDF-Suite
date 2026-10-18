@@ -747,6 +747,9 @@ class MainActivity : AppCompatActivity() {
             if (!started) {
                 updateFlowStarted = false
                 fallbackToPlayStoreAndSnooze()
+            } else {
+                // Play documents AppUpdateInfo as single-use for starting an update flow.
+                pendingUpdateInfo = null
             }
         } catch (error: Exception) {
             updateFlowStarted = false
