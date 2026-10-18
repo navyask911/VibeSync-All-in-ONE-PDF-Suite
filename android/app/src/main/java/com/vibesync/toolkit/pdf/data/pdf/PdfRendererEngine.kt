@@ -75,46 +75,63 @@ class PdfRendererEngine(private val context: Context) {
      * Renders a specific page at the requested display scale factor.
      */
     suspend fun renderPage(pageIndex: Int, scale: Float = 1.0f): Bitmap? = withContext(Dispatchers.IO) {
-        val cacheKey = BitmapCache.generateKey(currentDocumentId, pageIndex, scale)
+        if (!scale.isFinite() || scale <= 0f) return@withContext null
+        val renderScale = scale.coerceIn(0.1f, 4.0f)
         val bitmapCache = BitmapCache.getInstance()
 
-        // 1. Check memory cache first
-        bitmapCache.get(cacheKey)?.let {
-            return@withContext it
-        }
-
-        // 2. Render from native engine with thread synchronization
+        // Native renderer state and cache identity must be read under the same lock to avoid
+        // mixing a previous document's cache key with a newly opened document.
         synchronized(renderLock) {
             val renderer = pdfRenderer ?: return@withContext null
             if (pageIndex < 0 || pageIndex >= renderer.pageCount) return@withContext null
 
+            val cacheKey = BitmapCache.generateKey(currentDocumentId, pageIndex, renderScale)
+            bitmapCache.get(cacheKey)?.let { return@withContext it }
+
             var page: PdfRenderer.Page? = null
+            var allocatedBitmap: Bitmap? = null
             try {
                 page = renderer.openPage(pageIndex)
-                val targetWidth = (page.width * scale).toInt().coerceAtLeast(1)
-                val targetHeight = (page.height * scale).toInt().coerceAtLeast(1)
-
-                // Allocate bitmap safely with ARGB_8888 for crystal clear vector rendering
+                val targetWidth = (page.width * renderScale).toInt().coerceAtLeast(1)
+                val targetHeight = (page.height * renderScale).toInt().coerceAtLeast(1)
                 val bitmap = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
-                // Fill pure white background
+                allocatedBitmap = bitmap
                 bitmap.eraseColor(Color.WHITE)
-
-                val matrix = Matrix().apply {
-                    postScale(scale, scale)
-                }
-
-                // Render page to bitmap
+                val matrix = Matrix().apply { postScale(renderScale, renderScale) }
                 page.render(bitmap, null, matrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-
-                // Cache bitmap in memory pool
                 bitmapCache.put(cacheKey, bitmap)
                 return@withContext bitmap
             } catch (e: OutOfMemoryError) {
-                Log.e(TAG, "OOM rendering page $pageIndex, clearing cache and retrying in 565", e)
+                Log.e(TAG, "OOM rendering page $pageIndex; clearing cache and retrying at lower resolution.", e)
+                allocatedBitmap?.let { if (!it.isRecycled) it.recycle() }
                 bitmapCache.clear()
                 System.gc()
-                return@withContext null
+
+                // Retry at reduced resolution and RGB_565 (half the bitmap memory per pixel).
+                val openPage = page ?: return@withContext null
+                var fallbackBitmap: Bitmap? = null
+                try {
+                    val fallbackScale = minOf(renderScale, 0.5f)
+                    val width = (openPage.width * fallbackScale).toInt().coerceAtLeast(1)
+                    val height = (openPage.height * fallbackScale).toInt().coerceAtLeast(1)
+                    val retryBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
+                    fallbackBitmap = retryBitmap
+                    retryBitmap.eraseColor(Color.WHITE)
+                    val retryMatrix = Matrix().apply { postScale(fallbackScale, fallbackScale) }
+                    openPage.render(retryBitmap, null, retryMatrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                    bitmapCache.put(cacheKey, retryBitmap)
+                    return@withContext retryBitmap
+                } catch (retryError: OutOfMemoryError) {
+                    fallbackBitmap?.let { if (!it.isRecycled) it.recycle() }
+                    Log.e(TAG, "OOM during reduced-memory retry for page $pageIndex.", retryError)
+                    return@withContext null
+                } catch (retryError: Exception) {
+                    fallbackBitmap?.let { if (!it.isRecycled) it.recycle() }
+                    Log.e(TAG, "Reduced-memory retry failed for page $pageIndex.", retryError)
+                    return@withContext null
+                }
             } catch (e: Exception) {
+                allocatedBitmap?.let { if (!it.isRecycled) it.recycle() }
                 Log.e(TAG, "Error rendering page $pageIndex", e)
                 return@withContext null
             } finally {
