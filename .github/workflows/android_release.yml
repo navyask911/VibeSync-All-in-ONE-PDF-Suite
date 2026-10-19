@@ -67,6 +67,32 @@ jobs:
           ./gradlew :app:bundleRelease --no-daemon --stacktrace
           ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
+      - name: Verify Android App Bundle metadata
+        working-directory: android
+        run: |
+          set -euo pipefail
+          gradle_file="app/build.gradle.kts"
+          expected_code="$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+)[[:space:]]*$/\\1/p' "$gradle_file" | head -n 1)"
+          expected_name="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)"[[:space:]]*$/\\1/p' "$gradle_file" | head -n 1)"
+          expected_app_id="$(sed -nE 's/^[[:space:]]*applicationId = "([^"]+)"[[:space:]]*$/\\1/p' "$gradle_file" | head -n 1)"
+          test -n "$expected_code"
+          test -n "$expected_name"
+          test -n "$expected_app_id"
+          aab="$(find app/build/outputs/bundle/release -maxdepth 1 -type f -name '*.aab' -print -quit)"
+          test -n "$aab" && test -s "$aab"
+          bundletool="$RUNNER_TEMP/bundletool-all-1.17.2.jar"
+          curl --fail --silent --show-error --location \\
+            "https://github.com/google/bundletool/releases/download/1.17.2/bundletool-all-1.17.2.jar" \\
+            --output "$bundletool"
+          manifest="$(java -jar "$bundletool" dump manifest --bundle="$aab" --module=base)"
+          printf '%s\\n' "$manifest" | grep -F "android:versionCode=\"$expected_code\"" >/dev/null
+          printf '%s\\n' "$manifest" | grep -F "android:versionName=\"$expected_name\"" >/dev/null
+          printf '%s\\n' "$manifest" | grep -F "package=\"$expected_app_id\"" >/dev/null
+          java -jar "$bundletool" validate --bundle="$aab"
+          echo "Verified AAB package: $expected_app_id"
+          echo "Verified AAB versionCode: $expected_code"
+          echo "Verified AAB versionName: $expected_name"
+
       - name: Verify and stage Google Play symbols
         working-directory: android
         run: |
@@ -89,7 +115,9 @@ jobs:
 
           {
             echo "VibeSync Google Play symbol package"
-            echo "Release version: 1.0.2 (versionCode 3)"
+          release_version_name="$(sed -nE 's/^[[:space:]]*versionName = "([^"]+)"[[:space:]]*$/\\1/p' app/build.gradle.kts | head -n 1)"
+          release_version_code="$(sed -nE 's/^[[:space:]]*versionCode = ([0-9]+)[[:space:]]*$/\\1/p' app/build.gradle.kts | head -n 1)"
+          echo "Release version: $release_version_name (versionCode $release_version_code)"
             echo "R8 mapping: present"
             echo "Native symbols: $native_status"
           } > play-symbols/native-debug-symbols-status.txt
