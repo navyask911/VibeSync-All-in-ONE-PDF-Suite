@@ -30,6 +30,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vibesync.toolkit.pdf.R
@@ -97,6 +98,7 @@ fun PdfEditorScreen(
                                 } ?: onExportComplete(savedFile)
                             }
                         },
+                        enabled = uiState.isDocumentLoaded && !uiState.isSaving,
                         colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
                     ) {
                         if (uiState.isSaving) {
@@ -196,8 +198,18 @@ fun PdfEditorScreen(
                 .background(Color(0xFFCBD5E1)),
             contentAlignment = Alignment.Center
         ) {
-            val pageBitmapState = produceState<Bitmap?>(initialValue = null, key1 = uiState.currentPageIndex) {
-                value = viewModel.getPageBitmap(uiState.currentPageIndex)
+            var pageRenderAttempt by remember(documentUri) { mutableIntStateOf(0) }
+            val pageBitmapState = produceState(
+                initialValue = EditorPageBitmapState(isLoading = true),
+                key1 = listOf(documentUri, uiState.currentPageIndex, uiState.isDocumentLoaded, pageRenderAttempt)
+            ) {
+                if (!uiState.isDocumentLoaded) {
+                    value = EditorPageBitmapState(isLoading = false)
+                } else {
+                    value = EditorPageBitmapState(isLoading = true)
+                    val bitmap = viewModel.getPageBitmap(uiState.currentPageIndex)
+                    value = EditorPageBitmapState(isLoading = false, bitmap = bitmap)
+                }
             }
 
             Box(
@@ -212,14 +224,54 @@ fun PdfEditorScreen(
                         screenWidthPx = coordinates.size.width.toFloat()
                     }
             ) {
-                val bitmap = pageBitmapState.value
-                if (bitmap != null && !bitmap.isRecycled) {
-                    Image(
-                        bitmap = bitmap.asImageBitmap(),
-                        contentDescription = stringResource(R.string.editor_page_canvas),
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Fit
-                    )
+                val bitmap = pageBitmapState.value.bitmap
+                when {
+                    uiState.isDocumentLoading || (uiState.isDocumentLoaded && pageBitmapState.value.isLoading) -> {
+                        CircularProgressIndicator(
+                            modifier = Modifier.align(Alignment.Center).size(36.dp),
+                            color = VibeSyncCrimsonPrimary
+                        )
+                    }
+                    !uiState.isDocumentLoaded -> {
+                        Column(
+                            modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = uiState.errorMessage ?: stringResource(R.string.document_load_error),
+                                textAlign = TextAlign.Center,
+                                color = VibeSyncRubyDeep
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(onClick = { viewModel.initEditor(documentUri) }) {
+                                Text(stringResource(R.string.retry))
+                            }
+                        }
+                    }
+                    bitmap != null && !bitmap.isRecycled -> {
+                        Image(
+                            bitmap = bitmap.asImageBitmap(),
+                            contentDescription = stringResource(R.string.editor_page_canvas),
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
+                    else -> {
+                        Column(
+                            modifier = Modifier.align(Alignment.Center).padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = stringResource(R.string.page_render_failed),
+                                textAlign = TextAlign.Center,
+                                color = VibeSyncRubyDeep
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(onClick = { pageRenderAttempt++ }) {
+                                Text(stringResource(R.string.retry))
+                            }
+                        }
+                    }
                 }
 
                 // Render placed text annotations
@@ -321,6 +373,11 @@ fun PdfEditorScreen(
         )
     }
 }
+
+private data class EditorPageBitmapState(
+    val isLoading: Boolean,
+    val bitmap: Bitmap? = null
+)
 
 @Composable
 private fun ToolIconButton(

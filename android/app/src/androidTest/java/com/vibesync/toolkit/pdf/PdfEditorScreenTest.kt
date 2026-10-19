@@ -6,6 +6,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -22,6 +23,7 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.flow.MutableStateFlow
+import java.util.concurrent.atomic.AtomicInteger
 import org.junit.Rule
 import org.junit.Test
 
@@ -53,6 +55,42 @@ class PdfEditorScreenTest {
         composeTestRule.onNodeWithText("Place Text").performClick()
 
         verify(exactly = 1) { viewModel.addTextAnnotation("Hello", any(), any()) }
+    }
+
+    @Test
+    fun firstPageIsRequestedOnlyAfterDocumentLoadingCompletes() {
+        val viewModel = mockk<EditorViewModel>(relaxed = true)
+        val state = MutableStateFlow(EditorUiState(isDocumentLoading = true, isDocumentLoaded = false))
+        every { viewModel.uiState } returns state
+        val renderCalls = AtomicInteger(0)
+        val bitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
+        coEvery { viewModel.getPageBitmap(any()) } coAnswers {
+            renderCalls.incrementAndGet()
+            bitmap
+        }
+
+        composeTestRule.setContent {
+            VibeSyncPdfTheme {
+                PdfEditorScreen(
+                    documentUri = Uri.parse("content://test/sample.pdf"),
+                    viewModel = viewModel,
+                    onNavigateBack = {},
+                    onExportComplete = {}
+                )
+            }
+        }
+
+        composeTestRule.runOnIdle {
+            assert(renderCalls.get() == 0) { "The editor must not request a page before its document is opened." }
+            state.value = state.value.copy(
+                isDocumentLoading = false,
+                isDocumentLoaded = true,
+                totalPages = 1
+            )
+        }
+
+        composeTestRule.waitUntil(timeoutMillis = 5_000) { renderCalls.get() == 1 }
+        composeTestRule.onNodeWithContentDescription("PDF page canvas").assertIsDisplayed()
     }
 
     @Test

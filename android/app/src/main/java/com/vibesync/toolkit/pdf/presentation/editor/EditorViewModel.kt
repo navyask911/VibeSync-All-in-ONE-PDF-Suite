@@ -14,18 +14,26 @@ import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.*
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.data.pdf.PdfRendererEngine
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 
 data class EditorUiState(
     val currentPageIndex: Int = 0,
     val totalPages: Int = 1,
+    val isDocumentLoading: Boolean = true,
+    val isDocumentLoaded: Boolean = false,
     val toolMode: ToolMode = ToolMode.PEN,
     val selectedColor: Color = Color(0xFF1A237E),
     val strokeWidth: Float = 6f,
@@ -49,6 +57,9 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
 
     private var activeDocumentUri: Uri? = null
+    private var requestedDocumentUri: Uri? = null
+    @Volatile private var stagedSourceFile: File? = null
+    private var loadDocumentJob: Job? = null
     private val pageAnnotationsMap = mutableMapOf<Int, PageAnnotations>()
 
     // Undo / Redo history stores complete page annotation snapshots so text,
@@ -57,17 +68,146 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private val redoStack = mutableListOf<PageAnnotations>()
 
     fun initEditor(uri: Uri) {
-        activeDocumentUri = uri
-        viewModelScope.launch {
-            rendererEngine.openDocument(uri).onSuccess { count ->
-                _uiState.value = _uiState.value.copy(totalPages = count)
+        if (
+            requestedDocumentUri == uri &&
+            (_uiState.value.isDocumentLoaded ||
+                (_uiState.value.isDocumentLoading && loadDocumentJob?.isActive == true))
+        ) {
+            return
+        }
+
+        requestedDocumentUri = uri
+        loadDocumentJob?.cancel()
+        loadDocumentJob = viewModelScope.launch {
+            val operationContext = currentCoroutineContext()
+            var newSourceFile: File? = null
+
+            // The source scratch file remains available for the editor's export operation.
+            // PdfRendererEngine independently stages its own renderer-owned copy.
+            val previousSourceFile = stagedSourceFile
+            stagedSourceFile = null
+            activeDocumentUri = null
+            pageAnnotationsMap.clear()
+            undoStack.clear()
+            redoStack.clear()
+            _uiState.value = _uiState.value.copy(
+                currentPageIndex = 0,
+                totalPages = 0,
+                isDocumentLoading = true,
+                isDocumentLoaded = false,
+                currentStrokes = emptyList(),
+                currentTextAnnotations = emptyList(),
+                currentSignatures = emptyList(),
+                canUndo = false,
+                canRedo = false,
+                errorMessage = null
+            )
+
+            try {
+                withContext(Dispatchers.IO) {
+                    previousSourceFile?.let { file ->
+                        if (file.exists() && !file.delete()) {
+                            Log.w(TAG, "editor.source_cleanup_failed")
+                        }
+                    }
+                }
+
+                Log.i(TAG, "editor.open.start scheme=${uri.scheme ?: "unknown"}")
+                // URI grants can be provider-specific or short-lived. Stage content:// and file://
+                // sources into private, seekable app cache before initializing the edit workflow.
+                newSourceFile = withContext(Dispatchers.IO) {
+                    UriUtils.copyUriToCacheFile(
+                        context = getApplication<Application>(),
+                        uri = uri,
+                        prefix = "edit_source",
+                        cancellationCheck = { operationContext.ensureActive() }
+                    )
+                }
+                val sourceFile = requireNotNull(newSourceFile)
+                Log.i(TAG, "editor.source_cache.success bytes=${sourceFile.length()}")
+
+                val openResult = rendererEngine.openDocument(Uri.fromFile(sourceFile))
+                val openError = openResult.exceptionOrNull()
+                if (openError != null) {
+                    Log.e(
+                        TAG,
+                        "editor.open.failed stage=renderer_open category=${openError.javaClass.simpleName}",
+                        openError
+                    )
+                    _uiState.value = _uiState.value.copy(
+                        isDocumentLoading = false,
+                        isDocumentLoaded = false,
+                        errorMessage = getApplication<Application>().getString(R.string.document_load_error)
+                    )
+                    return@launch
+                }
+
+                val count = openResult.getOrThrow()
+                stagedSourceFile = sourceFile
+                activeDocumentUri = Uri.fromFile(sourceFile)
+                newSourceFile = null
+                _uiState.value = _uiState.value.copy(
+                    currentPageIndex = 0,
+                    totalPages = count,
+                    isDocumentLoading = false,
+                    isDocumentLoaded = true,
+                    errorMessage = null
+                )
                 loadPageAnnotations(0)
+                Log.i(TAG, "editor.open.success pages=$count")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.e(
+                    TAG,
+                    "editor.open.failed stage=source_cache category=${error.javaClass.simpleName}",
+                    error
+                )
+                _uiState.value = _uiState.value.copy(
+                    isDocumentLoading = false,
+                    isDocumentLoaded = false,
+                    errorMessage = getApplication<Application>().getString(R.string.document_load_error)
+                )
+            } finally {
+                newSourceFile?.let { file ->
+                    withContext(NonCancellable + Dispatchers.IO) {
+                        if (file.exists() && !file.delete()) {
+                            Log.w(TAG, "editor.source_cleanup_failed")
+                        }
+                    }
+                }
             }
         }
     }
 
     suspend fun getPageBitmap(pageIndex: Int): Bitmap? {
-        return rendererEngine.renderPage(pageIndex, scale = 1.5f)
+        if (!_uiState.value.isDocumentLoaded) return null
+        return try {
+            val bitmap = rendererEngine.renderPage(pageIndex, scale = 1.5f)
+            if (bitmap == null) {
+                Log.e(TAG, "editor.page_render_failed page=$pageIndex")
+                _uiState.value = _uiState.value.copy(
+                    errorMessage = getApplication<Application>().getString(R.string.page_render_failed)
+                )
+            } else if (_uiState.value.errorMessage ==
+                getApplication<Application>().getString(R.string.page_render_failed)
+            ) {
+                _uiState.value = _uiState.value.copy(errorMessage = null)
+            }
+            bitmap
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Log.e(
+                TAG,
+                "editor.page_render_failed page=$pageIndex category=${error.javaClass.simpleName}",
+                error
+            )
+            _uiState.value = _uiState.value.copy(
+                errorMessage = getApplication<Application>().getString(R.string.page_render_failed)
+            )
+            null
+        }
     }
 
     fun selectTool(mode: ToolMode) {
@@ -208,7 +348,14 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun saveFlattenedDocument(screenWidthPx: Float, onComplete: (File) -> Unit) {
         persistCurrentPageAnnotations()
-        val sourceUri = activeDocumentUri ?: return
+        val sourceUri = activeDocumentUri
+        if (!_uiState.value.isDocumentLoaded || sourceUri == null) {
+            _uiState.value = _uiState.value.copy(
+                isSaving = false,
+                errorMessage = getApplication<Application>().getString(R.string.document_load_error)
+            )
+            return
+        }
         _uiState.value = _uiState.value.copy(isSaving = true)
 
         viewModelScope.launch {
@@ -236,18 +383,29 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     override fun onCleared() {
+        loadDocumentJob?.cancel()
+        activeDocumentUri = null
+        val sourceFileToDelete = stagedSourceFile
+        stagedSourceFile = null
         super.onCleared()
-        // Rendering and native close share the renderer lock. Never block the main thread
-        // waiting for an in-flight PDF page render during lifecycle teardown.
+
+        // Renderer/native cleanup and scratch-file removal must not block the main thread.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
                 rendererEngine.closeDocumentSafely()
             } catch (error: Exception) {
-                Log.w(
-                    "EditorViewModel",
-                    "renderer.cleanup_failed category=" + error.javaClass.simpleName
-                )
+                Log.w(TAG, "renderer.cleanup_failed category=${error.javaClass.simpleName}", error)
+            } finally {
+                sourceFileToDelete?.let { file ->
+                    if (file.exists() && !file.delete()) {
+                        Log.w(TAG, "editor.source_cleanup_failed")
+                    }
+                }
             }
         }
+    }
+
+    private companion object {
+        const val TAG = "EditorViewModel"
     }
 }
