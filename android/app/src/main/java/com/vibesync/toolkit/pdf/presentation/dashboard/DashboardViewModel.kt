@@ -7,11 +7,16 @@ import androidx.lifecycle.viewModelScope
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.DocumentMetadata
 import com.vibesync.toolkit.pdf.data.pdf.DevicePdfScanner
+import com.vibesync.toolkit.pdf.data.pdf.SafPdfFolderScanner
 import com.vibesync.toolkit.pdf.data.pdf.DiscoveredPdf
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 data class DashboardUiState(
     val recentDocuments: List<DocumentMetadata> = emptyList(),
@@ -20,12 +25,15 @@ data class DashboardUiState(
     val showPermissionRationale: Boolean = false,
     val hasStoragePermission: Boolean = false,
     val isProcessing: Boolean = false,
-    val message: String? = null
+    val message: String? = null,
+    val isFolderScanResult: Boolean = false
 )
 
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
 
     private val scanner = DevicePdfScanner(application)
+    private val folderScanner = SafPdfFolderScanner(application)
+    private var scanJob: Job? = null
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
@@ -37,7 +45,9 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
     fun checkPermissionAndScan() {
         val hasPermission = scanner.hasStoragePermission()
         _uiState.value = _uiState.value.copy(hasStoragePermission = hasPermission)
-        if (hasPermission) {
+        if (_uiState.value.isFolderScanResult) {
+            refreshCurrentSource()
+        } else if (hasPermission) {
             refreshDevicePdfs()
         }
     }
@@ -54,51 +64,151 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.value = _uiState.value.copy(showPermissionRationale = false)
     }
 
+    /** Re-scans whichever source is currently displayed without changing its scope. */
+    fun refreshCurrentSource() {
+        if (!_uiState.value.isFolderScanResult) {
+            refreshDevicePdfs()
+            return
+        }
+
+        val savedTreeUri = getApplication<Application>()
+            .getSharedPreferences(PREFERENCES_NAME, android.content.Context.MODE_PRIVATE)
+            .getString(KEY_SELECTED_PDF_TREE_URI, null)
+
+        if (savedTreeUri.isNullOrBlank()) {
+            refreshDevicePdfs()
+        } else {
+            scanSelectedFolder(Uri.parse(savedTreeUri))
+        }
+    }
+
     fun refreshDevicePdfs() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isScanning = true)
-            val pdfs = scanner.scanDevicePdfs()
+        scanJob?.cancel()
+        scanJob = viewModelScope.launch {
+            _uiState.value = _uiState.value.copy(isScanning = true, isFolderScanResult = false)
+            try {
+                val pdfs = scanner.scanDevicePdfs()
+                _uiState.value = _uiState.value.copy(
+                    discoveredPdfs = pdfs,
+                    isScanning = false,
+                    isFolderScanResult = false
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isScanning = false,
+                    message = getApplication<Application>().getString(com.vibesync.toolkit.pdf.R.string.folder_scan_failed)
+                )
+            }
+        }
+    }
+
+    /**
+     * Scans only the folder explicitly selected by the user through ACTION_OPEN_DOCUMENT_TREE.
+     * Persisting the tree URI lets the app retain access without broad storage permissions.
+     */
+    fun scanSelectedFolder(treeUri: Uri) {
+        scanJob?.cancel()
+        scanJob = viewModelScope.launch {
             _uiState.value = _uiState.value.copy(
-                discoveredPdfs = pdfs,
-                isScanning = false
+                isScanning = true,
+                isFolderScanResult = true,
+                message = null
             )
+            getApplication<Application>()
+                .getSharedPreferences(PREFERENCES_NAME, android.content.Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_SELECTED_PDF_TREE_URI, treeUri.toString())
+                .apply()
+
+            try {
+                val pdfs = folderScanner.scanFolder(treeUri)
+                _uiState.value = _uiState.value.copy(
+                    discoveredPdfs = pdfs,
+                    isScanning = false,
+                    isFolderScanResult = true,
+                    message = getApplication<Application>().getString(
+                        com.vibesync.toolkit.pdf.R.string.folder_scan_complete,
+                        pdfs.size
+                    )
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: SecurityException) {
+                _uiState.value = _uiState.value.copy(
+                    isScanning = false,
+                    isFolderScanResult = true,
+                    message = getApplication<Application>().getString(
+                        com.vibesync.toolkit.pdf.R.string.folder_access_denied
+                    )
+                )
+            } catch (_: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isScanning = false,
+                    isFolderScanResult = true,
+                    message = getApplication<Application>().getString(
+                        com.vibesync.toolkit.pdf.R.string.folder_scan_failed
+                    )
+                )
+            }
         }
     }
 
     private fun loadRecentDocuments() {
         viewModelScope.launch {
-            val cacheDir = getApplication<Application>().cacheDir
-            val pdfDir = java.io.File(cacheDir, "pdf_cache")
-            if (pdfDir.exists()) {
-                val files = pdfDir.listFiles { _, name -> name.endsWith(".pdf") } ?: emptyArray()
-                val list = files.take(5).map { file ->
-                    DocumentMetadata(
-                        fileName = file.name,
-                        uriString = Uri.fromFile(file).toString(),
-                        pageCount = 1,
-                        fileSize = file.length()
-                    )
+            val list = withContext(Dispatchers.IO) {
+                val pdfDir = java.io.File(getApplication<Application>().cacheDir, "pdf_cache")
+                if (!pdfDir.exists()) emptyList() else {
+                    (pdfDir.listFiles { _, name -> name.endsWith(".pdf", ignoreCase = true) }
+                        ?: emptyArray())
+                        .sortedByDescending { it.lastModified() }
+                        .take(5)
+                        .map { file ->
+                            DocumentMetadata(
+                                fileName = file.name,
+                                uriString = Uri.fromFile(file).toString(),
+                                pageCount = 1,
+                                fileSize = file.length()
+                            )
+                        }
                 }
-                _uiState.value = _uiState.value.copy(recentDocuments = list)
             }
+            _uiState.value = _uiState.value.copy(recentDocuments = list)
         }
     }
 
     fun onDocumentSelected(uri: Uri, onNavigateToViewer: (Uri) -> Unit) {
-        val fileName = UriUtils.getFileName(getApplication(), uri)
-        val fileSize = UriUtils.getFileSize(getApplication(), uri)
-        val doc = DocumentMetadata(
-            fileName = fileName,
-            uriString = uri.toString(),
-            pageCount = 1,
-            fileSize = fileSize
-        )
-        val updated = listOf(doc) + _uiState.value.recentDocuments.filter { it.uriString != uri.toString() }
-        _uiState.value = _uiState.value.copy(recentDocuments = updated.take(5))
+        // Navigate immediately so a slow document provider cannot delay the loading screen.
         onNavigateToViewer(uri)
+        viewModelScope.launch {
+            // Activity Result callbacks run on Main. ContentResolver metadata queries must not.
+            val metadata = withContext(Dispatchers.IO) {
+                try {
+                    UriUtils.getFileName(getApplication(), uri) to UriUtils.getFileSize(getApplication(), uri)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    getApplication<Application>().getString(com.vibesync.toolkit.pdf.R.string.default_pdf_filename) to 0L
+                }
+            }
+            val doc = DocumentMetadata(
+                fileName = metadata.first,
+                uriString = uri.toString(),
+                pageCount = 1,
+                fileSize = metadata.second
+            )
+            val updated = listOf(doc) + _uiState.value.recentDocuments.filter { it.uriString != uri.toString() }
+            _uiState.value = _uiState.value.copy(recentDocuments = updated.take(5))
+        }
     }
 
     fun clearMessage() {
         _uiState.value = _uiState.value.copy(message = null)
+    }
+
+    private companion object {
+        const val PREFERENCES_NAME = "document_picker_preferences"
+        const val KEY_SELECTED_PDF_TREE_URI = "selected_pdf_tree_uri"
     }
 }

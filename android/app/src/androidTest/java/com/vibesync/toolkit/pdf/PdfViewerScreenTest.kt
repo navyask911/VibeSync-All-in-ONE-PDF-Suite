@@ -7,7 +7,9 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.data.model.PageMetadata
+import com.vibesync.toolkit.pdf.presentation.viewer.PdfPageItem
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
 import io.mockk.*
@@ -46,8 +48,9 @@ class PdfViewerScreenTest {
             )
         )
         every { mockViewModel.uiState } returns stateFlow
-        coEvery { mockViewModel.getPageBitmap(any(), any()) } returns
-            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        coEvery { mockViewModel.acquirePageBitmap(any(), any()) } answers {
+            fakeLease(Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888))
+        }
 
         composeTestRule.setContent {
             PdfViewerScreen(
@@ -102,8 +105,8 @@ class PdfViewerScreenTest {
         }
 
         // 1. Verify Password Dialog is displayed with accessibility metadata
-        composeTestRule.onNodeWithText("Password Protected PDF").assertIsDisplayed()
-        composeTestRule.onNodeWithText("This document is secured with encryption. Please enter the password to view pages.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Password-protected PDF").assertIsDisplayed()
+        composeTestRule.onNodeWithText("This document is encrypted. Enter the password to view its pages.").assertIsDisplayed()
 
         // 2. Find Password Input and enter text
         val passwordField = composeTestRule.onNode(hasSetTextAction())
@@ -132,4 +135,60 @@ class PdfViewerScreenTest {
         // Verify viewModel received password submission
         verify(exactly = 1) { mockViewModel.submitPassword("SecretVault2026!") }
     }
+
+    @Test
+    fun nullPageBitmapShowsTerminalErrorAndRetryCanRecover() {
+        val recoveredBitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
+        coEvery { mockViewModel.acquirePageBitmap(0, 1.5f) } returnsMany listOf(null, fakeLease(recoveredBitmap))
+
+        composeTestRule.setContent {
+            PdfPageItem(
+                pageIndex = 0,
+                aspectRatio = 595f / 842f,
+                viewModel = mockViewModel,
+                documentKey = "regression-document"
+            )
+        }
+
+        composeTestRule.onNodeWithText("Could not render this page.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Retry").performClick()
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule.onAllNodesWithContentDescription("PDF page 1")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        coVerify(exactly = 2) { mockViewModel.acquirePageBitmap(0, 1.5f) }
+    }
+
+    @Test
+    fun documentLoadErrorOffersRetryAction() {
+        val stateFlow = MutableStateFlow(
+            com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(
+                fileName = "unavailable.pdf",
+                isLoading = false,
+                errorMessage = "Could not open this PDF. Check that the file is accessible, then retry."
+            )
+        )
+        every { mockViewModel.uiState } returns stateFlow
+
+        composeTestRule.setContent {
+            PdfViewerScreen(
+                documentUri = testUri,
+                viewModel = mockViewModel,
+                onNavigateBack = {},
+                onNavigateToEditor = {},
+                onShareDocument = {}
+            )
+        }
+
+        composeTestRule.onNodeWithText("Retry").assertIsDisplayed().performClick()
+        verify(exactly = 1) { mockViewModel.retryLastDocument() }
+    }
+
+    private fun fakeLease(bitmap: Bitmap): BitmapCache.BitmapLease {
+        val lease = mockk<BitmapCache.BitmapLease>(relaxed = true)
+        every { lease.key } returns "ui-test-${System.identityHashCode(bitmap)}"
+        every { lease.bitmap } returns bitmap
+        return lease
+    }
+
 }

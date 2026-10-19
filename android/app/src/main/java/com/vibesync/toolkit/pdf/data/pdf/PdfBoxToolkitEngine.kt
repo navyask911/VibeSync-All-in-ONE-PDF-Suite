@@ -18,6 +18,7 @@ import com.tom_roush.pdfbox.io.MemoryUsageSetting
 import com.tom_roush.pdfbox.multipdf.PDFMergerUtility
 import com.tom_roush.pdfbox.multipdf.Splitter
 import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.vibesync.toolkit.pdf.R
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
@@ -30,6 +31,7 @@ import com.tom_roush.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState
 import com.tom_roush.pdfbox.pdmodel.interactive.form.PDAcroForm
 import com.tom_roush.pdfbox.pdmodel.interactive.form.PDCheckBox
 import com.tom_roush.pdfbox.pdmodel.interactive.form.PDTextField
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -53,12 +55,15 @@ class PdfBoxToolkitEngine(private val context: Context) {
         sourceUri: Uri,
         pageIntervals: List<IntRange>
     ): Result<List<File>> = withContext(Dispatchers.IO) {
+        val outputFiles = mutableListOf<File>()
+        var sourceFileToDelete: File? = null
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "split_src_")
-            val outputFiles = mutableListOf<File>()
+            sourceFileToDelete = sourceFile
 
             PDDocument.load(sourceFile).use { document ->
                 val totalPages = document.numberOfPages
+                require(totalPages > 0) { "The source PDF contains no pages." }
 
                 pageIntervals.forEachIndexed { index, range ->
                     val start = range.first.coerceIn(1, totalPages) - 1
@@ -66,22 +71,30 @@ class PdfBoxToolkitEngine(private val context: Context) {
 
                     if (start <= end) {
                         val subDoc = PDDocument()
-                        for (i in start..end) {
-                            subDoc.importPage(document.getPage(i))
-                        }
                         val splitFile = UriUtils.createExportCacheFile(context, "split_part_${index + 1}")
-                        applyVibeSyncWatermark(subDoc)
-                        subDoc.save(splitFile)
-                        subDoc.close()
                         outputFiles.add(splitFile)
+                        try {
+                            for (i in start..end) {
+                                subDoc.importPage(document.getPage(i))
+                            }
+                            applyVibeSyncWatermark(subDoc)
+                            subDoc.save(splitFile)
+                        } finally {
+                            subDoc.close()
+                        }
                     }
                 }
             }
-            sourceFile.delete()
             Result.success(outputFiles)
+        } catch (cancelled: CancellationException) {
+            outputFiles.forEach { it.delete() }
+            throw cancelled
         } catch (e: Exception) {
+            outputFiles.forEach { it.delete() }
             Log.e(TAG, "Failed to split PDF", e)
             Result.failure(e)
+        } finally {
+            sourceFileToDelete?.delete()
         }
     }
 
@@ -96,8 +109,8 @@ class PdfBoxToolkitEngine(private val context: Context) {
         val mergedDocument = PDDocument()
         try {
             if (sourceUris.isEmpty()) {
-                mergedDocument.close()
-                return@withContext Result.failure(IllegalArgumentException("Select at least one PDF"))
+                outputFile.delete()
+                return@withContext Result.failure(IllegalArgumentException(context.getString(R.string.error_select_at_least_one_pdf)))
             }
 
             for (uri in sourceUris) {
@@ -121,7 +134,11 @@ class PdfBoxToolkitEngine(private val context: Context) {
             applyVibeSyncWatermark(mergedDocument)
             mergedDocument.save(outputFile)
             Result.success(outputFile)
+        } catch (cancelled: CancellationException) {
+            outputFile.delete()
+            throw cancelled
         } catch (e: Exception) {
+            outputFile.delete()
             Log.e(TAG, "Failed to merge PDFs", e)
             Result.failure(e)
         } finally {
@@ -136,10 +153,15 @@ class PdfBoxToolkitEngine(private val context: Context) {
     suspend fun extractEmbeddedImages(
         sourceUri: Uri
     ): Result<List<File>> = withContext(Dispatchers.IO) {
+        val extractedFiles = mutableListOf<File>()
+        var sourceFileToDelete: File? = null
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "extract_src_")
-            val extractedFiles = mutableListOf<File>()
-            val cacheDir = File(context.cacheDir, "pdf_cache/extracted_images").apply { if (!exists()) mkdirs() }
+            sourceFileToDelete = sourceFile
+            val cacheDir = File(context.cacheDir, "pdf_cache/extracted_images").apply {
+                if (!exists() && !mkdirs()) throw java.io.IOException("Unable to prepare the image export directory.")
+                if (!isDirectory) throw java.io.IOException("The image export path is not a directory.")
+            }
 
             PDDocument.load(sourceFile).use { document ->
                 var imageIndex = 1
@@ -151,22 +173,32 @@ class PdfBoxToolkitEngine(private val context: Context) {
                         val xObject = resources.getXObject(xName)
                         if (xObject is PDImageXObject) {
                             val bitmap = xObject.image
-                            val imageFile = File(cacheDir, "img_p${pageIndex + 1}_${imageIndex++}.png")
-                            writeVibeSyncWatermarkedPng(bitmap, imageFile)
+                            val imageFile = File.createTempFile(
+                                "img_p${pageIndex + 1}_${imageIndex++}_",
+                                ".png",
+                                cacheDir
+                            )
+                            // Track immediately so the operation-level finally/catch cleans a partial file too.
                             extractedFiles.add(imageFile)
+                            writeVibeSyncWatermarkedPng(bitmap, imageFile)
                         }
                     }
                 }
             }
-            sourceFile.delete()
             if (extractedFiles.isEmpty()) {
-                Result.failure(IllegalArgumentException("No embedded raster images were found in this PDF"))
+                Result.failure(IllegalArgumentException(context.getString(R.string.error_no_embedded_raster_images)))
             } else {
                 Result.success(extractedFiles)
             }
+        } catch (cancelled: CancellationException) {
+            extractedFiles.forEach { it.delete() }
+            throw cancelled
         } catch (e: Exception) {
+            extractedFiles.forEach { it.delete() }
             Log.e(TAG, "Failed to extract embedded images", e)
             Result.failure(e)
+        } finally {
+            sourceFileToDelete?.delete()
         }
     }
 
@@ -177,21 +209,27 @@ class PdfBoxToolkitEngine(private val context: Context) {
         imageUris: List<Uri>,
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
+        var documentToClose: PDDocument? = null
         try {
             if (imageUris.isEmpty()) {
-                return@withContext Result.failure(IllegalArgumentException("Select at least one image"))
+                outputFile.delete()
+                return@withContext Result.failure(IllegalArgumentException(context.getString(R.string.error_select_at_least_one_image)))
             }
 
-            val document = PDDocument()
+            val document = PDDocument().also { documentToClose = it }
             var decodedImageCount = 0
 
             for (imageUri in imageUris) {
                 val sourceFile = UriUtils.copyUriToCacheFile(context, imageUri, "image_src_")
-                val bitmap = BitmapFactory.decodeFile(sourceFile.absolutePath)
-                sourceFile.delete()
+                val bitmap = try {
+                    BitmapFactory.decodeFile(sourceFile.absolutePath)
+                } finally {
+                    sourceFile.delete()
+                }
 
                 if (bitmap != null) {
                     decodedImageCount++
+                    try {
                     // Standard A4 dimensions in PDF Points (72 DPI)
                     val pageWidthPt = PDRectangle.A4.width
                     val pageHeightPt = PDRectangle.A4.height
@@ -220,21 +258,29 @@ class PdfBoxToolkitEngine(private val context: Context) {
                     PDPageContentStream(document, page).use { contentStream ->
                         contentStream.drawImage(pdImage, xOffset, yOffset, renderWidth, renderHeight)
                     }
+                    } finally {
+                        if (!bitmap.isRecycled) bitmap.recycle()
+                    }
                 }
             }
 
             if (decodedImageCount == 0) {
-                document.close()
-                return@withContext Result.failure(IllegalArgumentException("None of the selected images could be decoded"))
+                outputFile.delete()
+                return@withContext Result.failure(IllegalArgumentException(context.getString(R.string.error_decode_selected_images)))
             }
 
             applyVibeSyncWatermark(document)
             document.save(outputFile)
-            document.close()
             Result.success(outputFile)
+        } catch (cancelled: CancellationException) {
+            outputFile.delete()
+            throw cancelled
         } catch (e: Exception) {
+            outputFile.delete()
             Log.e(TAG, "Failed to convert images to PDF", e)
             Result.failure(e)
+        } finally {
+            runCatching { documentToClose?.close() }
         }
     }
 
@@ -296,6 +342,9 @@ class PdfBoxToolkitEngine(private val context: Context) {
             }
 
             Result.success(outputFile)
+        } catch (cancelled: CancellationException) {
+            outputFile.delete()
+            throw cancelled
         } catch (e: Exception) {
             Log.e(TAG, "Failed to encrypt PDF", e)
             outputFile.delete()
@@ -313,19 +362,26 @@ class PdfBoxToolkitEngine(private val context: Context) {
         password: String,
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
+        var sourceFileToDelete: File? = null
         try {
             ensureBouncyCastleProvider()
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "decrypt_src_")
+            sourceFileToDelete = sourceFile
             PDDocument.load(sourceFile, password).use { document ->
                 document.isAllSecurityToBeRemoved = true
                 applyVibeSyncWatermark(document)
                 document.save(outputFile)
             }
-            sourceFile.delete()
             Result.success(outputFile)
+        } catch (cancelled: CancellationException) {
+            outputFile.delete()
+            throw cancelled
         } catch (e: Exception) {
+            outputFile.delete()
             Log.e(TAG, "Failed to decrypt PDF with provided credentials", e)
             Result.failure(e)
+        } finally {
+            sourceFileToDelete?.delete()
         }
     }
 
@@ -337,17 +393,24 @@ class PdfBoxToolkitEngine(private val context: Context) {
         watermarkText: String,
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
+        var sourceFileToDelete: File? = null
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "watermark_src_")
+            sourceFileToDelete = sourceFile
             PDDocument.load(sourceFile).use { document ->
                 applyVibeSyncWatermark(document)
                 document.save(outputFile)
             }
-            sourceFile.delete()
             Result.success(outputFile)
+        } catch (cancelled: CancellationException) {
+            outputFile.delete()
+            throw cancelled
         } catch (e: Exception) {
+            outputFile.delete()
             Log.e(TAG, "Failed to watermark PDF", e)
             Result.failure(e)
+        } finally {
+            sourceFileToDelete?.delete()
         }
     }
     /**
@@ -360,8 +423,10 @@ class PdfBoxToolkitEngine(private val context: Context) {
         screenWidthPx: Float,
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
+        var sourceFileToDelete: File? = null
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "flatten_src_")
+            sourceFileToDelete = sourceFile
             PDDocument.load(sourceFile).use { document ->
 
                 pageAnnotationsMap.forEach { (pageIndex, annotations) ->
@@ -463,11 +528,16 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 applyVibeSyncWatermark(document)
                 document.save(outputFile)
             }
-            sourceFile.delete()
             Result.success(outputFile)
+        } catch (cancelled: CancellationException) {
+            outputFile.delete()
+            throw cancelled
         } catch (e: Exception) {
+            outputFile.delete()
             Log.e(TAG, "Failed to flatten annotations onto PDF", e)
             Result.failure(e)
+        } finally {
+            sourceFileToDelete?.delete()
         }
     }
 
@@ -475,8 +545,10 @@ class PdfBoxToolkitEngine(private val context: Context) {
      * Extracts AcroForm fields from an interactive PDF.
      */
     suspend fun getAcroFormFields(sourceUri: Uri): Result<List<FormFieldItem>> = withContext(Dispatchers.IO) {
+        var sourceFileToDelete: File? = null
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "acro_src_")
+            sourceFileToDelete = sourceFile
             val fieldList = mutableListOf<FormFieldItem>()
 
             PDDocument.load(sourceFile).use { document ->
@@ -501,11 +573,14 @@ class PdfBoxToolkitEngine(private val context: Context) {
                     }
                 }
             }
-            sourceFile.delete()
             Result.success(fieldList)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
         } catch (e: Exception) {
             Log.e(TAG, "Failed to extract AcroForm fields", e)
             Result.failure(e)
+        } finally {
+            sourceFileToDelete?.delete()
         }
     }
 
@@ -518,8 +593,10 @@ class PdfBoxToolkitEngine(private val context: Context) {
         flatten: Boolean,
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
+        var sourceFileToDelete: File? = null
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "acro_fill_")
+            sourceFileToDelete = sourceFile
             PDDocument.load(sourceFile).use { document ->
                 val acroForm: PDAcroForm? = document.documentCatalog.acroForm
                 if (acroForm != null) {
@@ -543,11 +620,16 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 applyVibeSyncWatermark(document)
                 document.save(outputFile)
             }
-            sourceFile.delete()
             Result.success(outputFile)
+        } catch (cancelled: CancellationException) {
+            outputFile.delete()
+            throw cancelled
         } catch (e: Exception) {
+            outputFile.delete()
             Log.e(TAG, "Failed to fill AcroForm", e)
             Result.failure(e)
+        } finally {
+            sourceFileToDelete?.delete()
         }
     }
 
@@ -611,27 +693,32 @@ class PdfBoxToolkitEngine(private val context: Context) {
 
     private fun writeVibeSyncWatermarkedPng(sourceBitmap: Bitmap, outputFile: File) {
         val mutableBitmap = sourceBitmap.copy(Bitmap.Config.ARGB_8888, true)
-            ?: throw IllegalStateException("Could not create a mutable bitmap for watermarking")
+            ?: throw IllegalStateException(context.getString(R.string.error_create_mutable_bitmap))
 
-        val canvas = Canvas(mutableBitmap)
-        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(150, 142, 0, 0)
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.035f).coerceIn(10f, 22f)
-        }
-
-        val watermarkText = VIBESYNC_WATERMARK_TEXT
-        val x = mutableBitmap.width / 2f - paint.measureText(watermarkText) / 2f
-        val y = mutableBitmap.height - 10f
-        canvas.drawText(watermarkText, x, y, paint)
-
-        FileOutputStream(outputFile).use { output ->
-            if (!mutableBitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
-                mutableBitmap.recycle()
-                throw IllegalStateException("Could not write watermarked image")
+        try {
+            val canvas = Canvas(mutableBitmap)
+            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.argb(150, 142, 0, 0)
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.035f).coerceIn(10f, 22f)
             }
+
+            val watermarkText = VIBESYNC_WATERMARK_TEXT
+            val x = mutableBitmap.width / 2f - paint.measureText(watermarkText) / 2f
+            val y = mutableBitmap.height - 10f
+            canvas.drawText(watermarkText, x, y, paint)
+
+            FileOutputStream(outputFile).use { output ->
+                if (!mutableBitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                    throw IllegalStateException(context.getString(R.string.error_write_watermarked_image))
+                }
+            }
+        } catch (error: Exception) {
+            outputFile.delete()
+            throw error
+        } finally {
+            if (!mutableBitmap.isRecycled) mutableBitmap.recycle()
         }
-        mutableBitmap.recycle()
     }
 
     companion object {

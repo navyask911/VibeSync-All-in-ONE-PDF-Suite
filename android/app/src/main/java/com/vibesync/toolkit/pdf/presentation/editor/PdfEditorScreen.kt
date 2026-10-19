@@ -27,10 +27,12 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncRubyDeep
 import com.vibesync.toolkit.pdf.data.model.ToolMode
@@ -71,19 +73,19 @@ fun PdfEditorScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text("Annotate & Sign", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.editor_annotate_sign), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 },
                 actions = {
                     IconButton(onClick = { viewModel.undo() }, enabled = uiState.canUndo) {
-                        Icon(Icons.Default.Undo, contentDescription = "Undo")
+                        Icon(Icons.Default.Undo, contentDescription = stringResource(R.string.editor_undo))
                     }
                     IconButton(onClick = { viewModel.redo() }, enabled = uiState.canRedo) {
-                        Icon(Icons.Default.Redo, contentDescription = "Redo")
+                        Icon(Icons.Default.Redo, contentDescription = stringResource(R.string.editor_redo))
                     }
                     Button(
                         onClick = {
@@ -100,7 +102,7 @@ fun PdfEditorScreen(
                         if (uiState.isSaving) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
                         } else {
-                            Text("Flatten & Save")
+                            Text(stringResource(R.string.editor_flatten_save))
                         }
                     }
                 }
@@ -119,25 +121,29 @@ fun PdfEditorScreen(
                     ) {
                         ToolIconButton(
                             icon = Icons.Default.Edit,
-                            label = "Pen",
+                            label = stringResource(R.string.editor_pen),
+                            testTag = "Pen",
                             isSelected = uiState.toolMode == ToolMode.PEN,
                             onClick = { viewModel.selectTool(ToolMode.PEN) }
                         )
                         ToolIconButton(
                             icon = Icons.Default.BorderColor,
-                            label = "Highlighter",
+                            label = stringResource(R.string.editor_highlighter),
+                            testTag = "Highlighter",
                             isSelected = uiState.toolMode == ToolMode.HIGHLIGHTER,
                             onClick = { viewModel.selectTool(ToolMode.HIGHLIGHTER) }
                         )
                         ToolIconButton(
                             icon = Icons.Default.TextFields,
-                            label = "Text",
+                            label = stringResource(R.string.editor_text),
+                            testTag = "Text",
                             isSelected = uiState.toolMode == ToolMode.TEXT,
                             onClick = { viewModel.selectTool(ToolMode.TEXT) }
                         )
                         ToolIconButton(
                             icon = Icons.Default.Draw,
-                            label = "Sign",
+                            label = stringResource(R.string.editor_sign),
+                            testTag = "Sign",
                             isSelected = uiState.toolMode == ToolMode.SIGNATURE,
                             onClick = {
                                 viewModel.selectTool(ToolMode.SIGNATURE)
@@ -210,7 +216,7 @@ fun PdfEditorScreen(
                 if (bitmap != null && !bitmap.isRecycled) {
                     Image(
                         bitmap = bitmap.asImageBitmap(),
-                        contentDescription = "PDF Page Canvas",
+                        contentDescription = stringResource(R.string.editor_page_canvas),
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
                     )
@@ -232,7 +238,7 @@ fun PdfEditorScreen(
                     sig.bitmap?.let { sigBmp ->
                         Image(
                             bitmap = sigBmp.asImageBitmap(),
-                            contentDescription = "Placed Signature",
+                            contentDescription = stringResource(R.string.editor_placed_signature),
                             modifier = Modifier
                                 .offset { IntOffset(sig.x.roundToInt(), sig.y.roundToInt()) }
                                 .size(
@@ -287,12 +293,12 @@ fun PdfEditorScreen(
     if (showTextInputDialog) {
         AlertDialog(
             onDismissRequest = { showTextInputDialog = false },
-            title = { Text("Add Text Note") },
+            title = { Text(stringResource(R.string.editor_add_text_note)) },
             text = {
                 OutlinedTextField(
                     value = textInputState,
                     onValueChange = { textInputState = it },
-                    placeholder = { Text("Enter annotation text...") },
+                    placeholder = { Text(stringResource(R.string.editor_enter_annotation)) },
                     modifier = Modifier.fillMaxWidth()
                 )
             },
@@ -304,12 +310,12 @@ fun PdfEditorScreen(
                     }
                     showTextInputDialog = false
                 }) {
-                    Text("Place Text")
+                    Text(stringResource(R.string.editor_place_text))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showTextInputDialog = false }) {
-                    Text("Cancel")
+                    Text(stringResource(R.string.cancel))
                 }
             }
         )
@@ -320,6 +326,7 @@ fun PdfEditorScreen(
 private fun ToolIconButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
+    testTag: String = label,
     isSelected: Boolean,
     onClick: () -> Unit
 ) {
@@ -329,7 +336,7 @@ private fun ToolIconButton(
             .clip(RoundedCornerShape(8.dp))
             .background(if (isSelected) VibeSyncCrimsonPrimary.copy(alpha = 0.12f) else Color.Transparent)
             .clickable { onClick() }
-            .testTag("editor_tool_$label")
+            .testTag("editor_tool_$testTag")
             .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
         Icon(

@@ -1,10 +1,12 @@
 package com.vibesync.toolkit.pdf.presentation.dashboard
 
+import android.content.ActivityNotFoundException
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -26,10 +28,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.testTag
+import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncRubyAccent
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncRubyDeep
 import com.vibesync.toolkit.pdf.presentation.monetization.BannerAd
+import com.vibesync.toolkit.pdf.core.util.UriUtils
+import kotlinx.coroutines.launch
 
 private const val VIBESYNC_PUBLIC_INFO_URL = "https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite-Read-Me"
 private const val VIBESYNC_PRIVACY_URL = "https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite-Read-Me/blob/main/PRIVACY_POLICY.md"
@@ -52,45 +57,101 @@ fun DashboardScreen(
     onNavigateToEditor: (Uri) -> Unit,
     onNavigateToTool: (String) -> Unit,
     onLaunchScanner: () -> Unit,
-    onRequestStoragePermission: () -> Unit = {}
+    onRequestStoragePermission: () -> Unit = {},
+    onSelectLanguage: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
     var showPrivacyDialog by remember { mutableStateOf(false) }
+    var showLanguageDialog by remember { mutableStateOf(false) }
 
-    // SAF Document Pickers: keep View & Read and Edit & Sign as separate actions.
+    fun launchPickerSafely(action: () -> Unit) {
+        try {
+            action()
+        } catch (_: ActivityNotFoundException) {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(context.getString(R.string.picker_unavailable))
+            }
+        } catch (_: SecurityException) {
+            coroutineScope.launch {
+                snackbarHostState.showSnackbar(context.getString(R.string.folder_access_denied))
+            }
+        }
+    }
+
+    LaunchedEffect(uiState.message) {
+        uiState.message?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.clearMessage()
+        }
+    }
+
+    // SAF document pickers return content URIs; persist read access and do provider work off Main.
     val viewerPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        uri?.let { viewModel.onDocumentSelected(it, onNavigateToViewer) }
+        uri?.let {
+            val persisted = UriUtils.persistReadPermission(context, it)
+            if (!persisted) {
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar(context.getString(R.string.folder_permission_not_persisted))
+                }
+            }
+            viewModel.onDocumentSelected(it, onNavigateToViewer)
+        }
     }
 
     val editorPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        uri?.let { onNavigateToEditor(it) }
+        uri?.let {
+            val persisted = UriUtils.persistReadPermission(context, it)
+            if (!persisted) {
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar(context.getString(R.string.folder_permission_not_persisted))
+                }
+            }
+            onNavigateToEditor(it)
+        }
+    }
+
+    val folderPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocumentTree()
+    ) { treeUri: Uri? ->
+        treeUri?.let {
+            val persisted = UriUtils.persistReadPermission(context, it)
+            if (!persisted) {
+                coroutineScope.launch {
+                    snackbarHostState.showSnackbar(context.getString(R.string.folder_permission_not_persisted))
+                }
+            }
+            viewModel.scanSelectedFolder(it)
+        }
     }
 
     val tools = remember {
         listOf(
-            ToolItem("View & Read", "Continuous scroll & 400% zoom", Icons.Default.MenuBook, "viewer_picker", VibeSyncCrimsonPrimary),
-            ToolItem("Edit & Sign", "Vector pen, highlighter, e-sign", Icons.Default.Draw, "editor_picker", VibeSyncRubyAccent),
-            ToolItem("Document Scanner", "AI perspective warp & auto PDF", Icons.Default.DocumentScanner, "scanner", Color(0xFFD32F2F)),
-            ToolItem("Split Document", "Extract custom page ranges", Icons.Default.CallSplit, "split", Color(0xFFC62828)),
-            ToolItem("Merge Documents", "Drag-and-drop file combine", Icons.Default.MergeType, "merge", Color(0xFF8E0000)),
-            ToolItem("Images to PDF", "Compile gallery photos to A4", Icons.Default.AddPhotoAlternate, "convert", Color(0xFFB71C1C)),
-            ToolItem("Extract Images", "Dump embedded PNG/JPEGs", Icons.Default.Image, "extract", Color(0xFFE53935)),
-            ToolItem("Encrypt & Protect", "AES-256 standard encryption", Icons.Default.Lock, "encrypt", Color(0xFF5F0000))
+            ToolItem(context.getString(R.string.tool_view_read), context.getString(R.string.tool_view_read_subtitle), Icons.Default.MenuBook, "viewer_picker", VibeSyncCrimsonPrimary),
+            ToolItem(context.getString(R.string.tool_edit_sign), context.getString(R.string.tool_edit_sign_subtitle), Icons.Default.Draw, "editor_picker", VibeSyncRubyAccent),
+            ToolItem(context.getString(R.string.tool_document_scanner), context.getString(R.string.tool_document_scanner_subtitle), Icons.Default.DocumentScanner, "scanner", Color(0xFFD32F2F)),
+            ToolItem(context.getString(R.string.tool_split_document), context.getString(R.string.tool_split_document_subtitle), Icons.Default.CallSplit, "split", Color(0xFFC62828)),
+            ToolItem(context.getString(R.string.tool_merge_documents), context.getString(R.string.tool_merge_documents_subtitle), Icons.Default.MergeType, "merge", Color(0xFF8E0000)),
+            ToolItem(context.getString(R.string.tool_images_to_pdf), context.getString(R.string.tool_images_to_pdf_subtitle), Icons.Default.AddPhotoAlternate, "convert", Color(0xFFB71C1C)),
+            ToolItem(context.getString(R.string.tool_extract_images), context.getString(R.string.tool_extract_images_subtitle), Icons.Default.Image, "extract", Color(0xFFE53935)),
+            ToolItem(context.getString(R.string.tool_encrypt_protect), context.getString(R.string.tool_encrypt_protect_subtitle), Icons.Default.Lock, "encrypt", Color(0xFF5F0000))
         )
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = {
                     Column {
-                        Text("VibeSync All in ONE PDF Suite", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text("Professional On-Device PDF Architecture", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.dashboard_subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -98,13 +159,19 @@ fun DashboardScreen(
                 ),
                 actions = {
                     IconButton(onClick = { showPrivacyDialog = true }) {
-                        Icon(Icons.Default.Security, contentDescription = "Privacy & Terms", tint = Color(0xFF10B981))
+                        Icon(Icons.Default.Security, contentDescription = stringResource(R.string.privacy_terms), tint = Color(0xFF10B981))
+                    }
+                    IconButton(onClick = { showLanguageDialog = true }) {
+                        Icon(Icons.Default.Language, contentDescription = stringResource(R.string.language_settings), tint = VibeSyncCrimsonPrimary)
+                    }
+                    IconButton(onClick = { launchPickerSafely { folderPickerLauncher.launch(null) } }) {
+                        Icon(Icons.Default.FolderOpen, contentDescription = stringResource(R.string.choose_pdf_folder), tint = VibeSyncCrimsonPrimary)
                     }
                     IconButton(onClick = { viewModel.triggerScanRequest() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Scan Device PDFs", tint = VibeSyncCrimsonPrimary)
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.scan_device_pdfs), tint = VibeSyncCrimsonPrimary)
                     }
-                    IconButton(onClick = { viewerPickerLauncher.launch(arrayOf("application/pdf")) }) {
-                        Icon(Icons.Default.FileOpen, contentDescription = "Open Document", tint = VibeSyncCrimsonPrimary)
+                    IconButton(onClick = { launchPickerSafely { viewerPickerLauncher.launch(arrayOf("application/pdf")) } }) {
+                        Icon(Icons.Default.FileOpen, contentDescription = stringResource(R.string.open_document), tint = VibeSyncCrimsonPrimary)
                     }
                 }
             )
@@ -114,11 +181,11 @@ fun DashboardScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { viewerPickerLauncher.launch(arrayOf("application/pdf")) },
+                onClick = { launchPickerSafely { viewerPickerLauncher.launch(arrayOf("application/pdf")) } },
                 containerColor = VibeSyncCrimsonPrimary,
                 contentColor = Color.White,
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                text = { Text("Open PDF") }
+                text = { Text(stringResource(R.string.open_pdf)) }
             )
         }
     ) { paddingValues ->
@@ -156,21 +223,21 @@ fun DashboardScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Lock,
-                                contentDescription = "Zero Cloud Upload",
+                                contentDescription = stringResource(R.string.zero_cloud_upload_banner),
                                 tint = Color(0xFF34D399),
                                 modifier = Modifier.size(16.dp)
                             )
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "🛡️ All files are stored strictly on your device only. Zero cloud upload.",
+                                stringResource(R.string.zero_cloud_upload_banner),
                                 color = Color(0xFFECFDF5),
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 12.sp,
                                 lineHeight = 16.sp
                             )
                             Text(
-                                "Hardware-backed offline encryption. Your PDFs never leave this phone.",
+                                stringResource(R.string.zero_cloud_upload_body),
                                 color = Color(0xFFA7F3D0),
                                 fontSize = 11.sp
                             )
@@ -194,14 +261,14 @@ fun DashboardScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "100% On-Device PDF Suite",
+                                stringResource(R.string.hero_title),
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                "Local PDFBox execution, ML Kit document perspective warping, and MasterKey encryption.",
+                                stringResource(R.string.hero_subtitle),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f)
                             )
@@ -213,7 +280,7 @@ fun DashboardScreen(
             // 3. Core Toolkit Section
             item {
                 Text(
-                    "CORE TOOLKIT",
+                    stringResource(R.string.core_toolkit),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold
@@ -234,9 +301,9 @@ fun DashboardScreen(
                                     if (tool.route == "scanner") {
                                         onLaunchScanner()
                                     } else if (tool.route == "viewer_picker") {
-                                        viewerPickerLauncher.launch(arrayOf("application/pdf"))
+                                        launchPickerSafely { viewerPickerLauncher.launch(arrayOf("application/pdf")) }
                                     } else if (tool.route == "editor_picker") {
-                                        editorPickerLauncher.launch(arrayOf("application/pdf"))
+                                        launchPickerSafely { editorPickerLauncher.launch(arrayOf("application/pdf")) }
                                     } else {
                                         onNavigateToTool(tool.route)
                                     }
@@ -283,13 +350,13 @@ fun DashboardScreen(
                 ) {
                     Column {
                         Text(
-                            "ALL PDFS ON DEVICE",
+                            stringResource(if (uiState.isFolderScanResult) R.string.pdfs_in_selected_folder else R.string.all_pdfs_on_device),
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            "${uiState.discoveredPdfs.size} documents indexed via MediaStore",
+                            stringResource(R.string.pdfs_indexed_count, uiState.discoveredPdfs.size),
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -298,8 +365,8 @@ fun DashboardScreen(
                     if (uiState.isScanning) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = VibeSyncCrimsonPrimary)
                     } else {
-                        IconButton(onClick = { viewModel.refreshDevicePdfs() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = "Rescan", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        IconButton(onClick = { viewModel.refreshCurrentSource() }) {
+                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.rescan), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -321,9 +388,9 @@ fun DashboardScreen(
                         ) {
                             Icon(Icons.Default.FindInPage, contentDescription = null, tint = VibeSyncCrimsonPrimary, modifier = Modifier.size(36.dp))
                             Spacer(modifier = Modifier.height(8.dp))
-                            Text("Automatic PDF Discovery", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                            Text(stringResource(R.string.automatic_pdf_discovery), fontWeight = FontWeight.Bold, fontSize = 14.sp)
                             Text(
-                                "Scan device storage to list all your PDFs in one place.",
+                                stringResource(R.string.scan_storage_invitation),
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -332,7 +399,7 @@ fun DashboardScreen(
                                 onClick = { viewModel.triggerScanRequest() },
                                 colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
                             ) {
-                                Text("Scan Device Storage")
+                                Text(stringResource(R.string.scan_device_storage))
                             }
                         }
                     }
@@ -357,7 +424,7 @@ fun DashboardScreen(
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(pdf.name, fontWeight = FontWeight.SemiBold, maxLines = 1, fontSize = 13.sp)
                                 Text(
-                                    "${pdf.sizeFormatted} • Modified ${pdf.formattedDate}",
+                                    stringResource(R.string.modified_date, pdf.sizeFormatted, pdf.formattedDate),
                                     style = MaterialTheme.typography.bodyMedium,
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -374,7 +441,7 @@ fun DashboardScreen(
                 item {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        "RECENTLY OPENED",
+                        stringResource(R.string.recently_opened),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold
@@ -418,6 +485,52 @@ fun DashboardScreen(
         }
     }
 
+    if (showLanguageDialog) {
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = { Text(stringResource(R.string.select_language)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    val languageOptions = listOf(
+                        "" to stringResource(R.string.language_system),
+                        "en" to stringResource(R.string.language_english),
+                        "es" to stringResource(R.string.language_spanish),
+                        "zh-CN" to stringResource(R.string.language_chinese),
+                        "hi" to stringResource(R.string.language_hindi),
+                        "ar" to stringResource(R.string.language_arabic),
+                        "bn" to stringResource(R.string.language_bengali),
+                        "pt" to stringResource(R.string.language_portuguese),
+                        "ru" to stringResource(R.string.language_russian),
+                        "ja" to stringResource(R.string.language_japanese),
+                        "fr" to stringResource(R.string.language_french),
+                        "de" to stringResource(R.string.language_german),
+                        "id" to stringResource(R.string.language_indonesian),
+                        "ur" to stringResource(R.string.language_urdu),
+                        "tr" to stringResource(R.string.language_turkish),
+                        "ko" to stringResource(R.string.language_korean),
+                        "it" to stringResource(R.string.language_italian)
+                    )
+                    languageOptions.forEach { (languageTag, label) ->
+                        TextButton(
+                            onClick = {
+                                onSelectLanguage(languageTag)
+                                showLanguageDialog = false
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(label)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showLanguageDialog = false }) {
+                    Text(stringResource(R.string.close))
+                }
+            }
+        )
+    }
+
     // Transparent Permission Request Explanatory Rationale Dialog
     if (uiState.showPermissionRationale) {
         AlertDialog(
@@ -431,12 +544,12 @@ fun DashboardScreen(
                 )
             },
             title = {
-                Text("Allow Device PDF Access", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.allow_device_pdf_access), fontWeight = FontWeight.Bold)
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "VibeSync scans your local storage solely to index and list your PDF documents for offline viewing and editing. Your files never leave your device.",
+                        stringResource(R.string.device_access_rationale),
                         fontSize = 13.sp,
                         lineHeight = 18.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -446,7 +559,7 @@ fun DashboardScreen(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Icon(Icons.Default.Security, contentDescription = null, tint = Color(0xFF10B981), modifier = Modifier.size(16.dp))
-                        Text("100% on-device local query • Zero network transmit", fontSize = 11.sp, color = Color(0xFF10B981), fontWeight = FontWeight.SemiBold)
+                        Text(stringResource(R.string.local_query_guarantee), fontSize = 11.sp, color = Color(0xFF10B981), fontWeight = FontWeight.SemiBold)
                     }
                 }
             },
@@ -458,17 +571,17 @@ fun DashboardScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
                 ) {
-                    Text("Grant Access")
+                    Text(stringResource(R.string.grant_access))
                 }
             },
             dismissButton = {
                 OutlinedButton(
                     onClick = {
                         viewModel.dismissPermissionRationale()
-                        viewerPickerLauncher.launch(arrayOf("application/pdf"))
+                        launchPickerSafely { viewerPickerLauncher.launch(arrayOf("application/pdf")) }
                     }
                 ) {
-                    Text("Select Files Manually (SAF)")
+                    Text(stringResource(R.string.select_files_manually))
                 }
             }
         )
@@ -487,7 +600,7 @@ fun DashboardScreen(
                 )
             },
             title = {
-                Text("Privacy & Data Safety Guarantee", fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.privacy_data_safety_guarantee), fontWeight = FontWeight.Bold)
             },
             text = {
                 Column(
@@ -507,26 +620,26 @@ fun DashboardScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Icon(Icons.Default.Lock, contentDescription = null, tint = Color(0xFF34D399), modifier = Modifier.size(20.dp))
-                            Text("100% On-Device • Zero Cloud Transit", fontWeight = FontWeight.Bold, color = Color(0xFFECFDF5), fontSize = 12.sp)
+                            Text(stringResource(R.string.device_zero_cloud_transit), fontWeight = FontWeight.Bold, color = Color(0xFFECFDF5), fontSize = 12.sp)
                         }
                     }
 
                     Text(
-                        "• Document Processing: All PDF rendering, splitting, merging, watermarking, and OCR camera scanning execute entirely on your device hardware.",
+                        stringResource(R.string.document_processing_policy),
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Text(
-                        "• Vaulted Signatures: Stored locally in hardware-backed Android Keystore with AES-256-GCM encryption. Never uploaded to remote servers.",
+                        stringResource(R.string.signature_storage_policy),
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
 
                     Text(
-                        "• Advertising (Google AdMob): Integrates Google Mobile Ads SDK (App ID: ca-app-pub-4783826505860771~4377815936). AdMob may collect device advertising IDs (AAID) and diagnostic telemetry subject to Google Play policies.",
+                        stringResource(R.string.ads_collection_policy),
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -548,7 +661,7 @@ fun DashboardScreen(
                             }
                         }
                     ) {
-                        Text("Public VibeSync Information")
+                        Text(stringResource(R.string.public_info))
                     }
                     TextButton(
                         onClick = {
@@ -559,7 +672,7 @@ fun DashboardScreen(
                             }
                         }
                     ) {
-                        Text("Privacy Policy")
+                        Text(stringResource(R.string.privacy_policy))
                     }
                     TextButton(
                         onClick = {
@@ -570,7 +683,7 @@ fun DashboardScreen(
                             }
                         }
                     ) {
-                        Text("License & Copyright")
+                        Text(stringResource(R.string.license_copyright))
                     }
                     TextButton(
                         onClick = {
@@ -581,13 +694,13 @@ fun DashboardScreen(
                             }
                         }
                     ) {
-                        Text("Terms of Use")
+                        Text(stringResource(R.string.terms_of_use))
                     }
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showPrivacyDialog = false }) {
-                    Text("Close")
+                    Text(stringResource(R.string.close))
                 }
             }
         )

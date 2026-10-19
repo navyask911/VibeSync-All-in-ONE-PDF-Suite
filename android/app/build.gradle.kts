@@ -4,6 +4,15 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+val releaseKeystoreFile = rootProject.file("app/release-upload.jks")
+val releaseStorePassword = providers.environmentVariable("RELEASE_STORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("RELEASE_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("RELEASE_KEY_PASSWORD").orNull
+val hasReleaseSigning = releaseKeystoreFile.isFile && releaseKeystoreFile.length() > 0L &&
+    !releaseStorePassword.isNullOrBlank() &&
+    !releaseKeyAlias.isNullOrBlank() &&
+    !releaseKeyPassword.isNullOrBlank()
+
 android {
     namespace = "com.vibesync.toolkit.pdf"
     compileSdk = 36
@@ -12,8 +21,8 @@ android {
         applicationId = "com.vibesync.toolkit.pdf"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 8
+        versionName = "1.0.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -23,12 +32,11 @@ android {
 
     signingConfigs {
         create("release") {
-            val keystoreFile = rootProject.file("app/release-upload.jks")
-            if (keystoreFile.exists() && keystoreFile.length() > 0) {
-                storeFile = keystoreFile
-                storePassword = System.getenv("RELEASE_STORE_PASSWORD") ?: ""
-                keyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: "upload"
-                keyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: ""
+            if (hasReleaseSigning) {
+                storeFile = releaseKeystoreFile
+                storePassword = releaseStorePassword!!
+                keyAlias = releaseKeyAlias!!
+                keyPassword = releaseKeyPassword!!
             }
         }
     }
@@ -44,12 +52,8 @@ android {
             ndk {
                 debugSymbolLevel = "FULL"
             }
-            val keystoreFile = rootProject.file("app/release-upload.jks")
-            signingConfig = if (keystoreFile.exists() && keystoreFile.length() > 0) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            // Never create a Play-looking release artifact signed with the debug key.
+            signingConfig = if (hasReleaseSigning) signingConfigs.getByName("release") else null
         }
         debug {
             applicationIdSuffix = ".debug"
@@ -109,7 +113,11 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
 dependencies {
     // Platform Architecture & Core Android
     implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
+    implementation("com.google.android.play:app-update:2.1.0")
+    implementation("com.google.android.play:review:2.0.2")
     implementation("androidx.activity:activity-compose:1.9.3")
 
     // Jetpack Compose BOM & UI
@@ -162,4 +170,19 @@ dependencies {
     androidTestImplementation("io.mockk:mockk-android:1.13.10")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
+}
+
+
+tasks.configureEach {
+    if (name == "bundleRelease" || name == "assembleRelease") {
+        doFirst {
+            if (!hasReleaseSigning) {
+                throw GradleException(
+                    "Release packaging requires app/release-upload.jks and RELEASE_STORE_PASSWORD, " +
+                        "RELEASE_KEY_ALIAS, and RELEASE_KEY_PASSWORD. Configure your Play upload key; " +
+                        "the debug key is intentionally not used for release artifacts."
+                )
+            }
+        }
+    }
 }

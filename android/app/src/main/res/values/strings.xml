@@ -9,7 +9,199 @@
     <string name="title_encrypt">Encrypt &amp; Protect</string>
     <string name="title_convert">Images to PDF</string>
     
+
+    <!-- Dashboard and file workflows -->
+    <string name="dashboard_subtitle">Professional on-device PDF tools</string>
+    <string name="privacy_terms">Privacy &amp; Terms</string>
+    <string name="scan_device_pdfs">Scan device PDFs</string>
+    <string name="open_document">Open document</string>
+    <string name="open_pdf">Open PDF</string>
+    <string name="choose_pdf_folder">Scan a PDF folder</string>
+    <string name="language_settings">Language</string>
+    <string name="select_language">Choose app language</string>
+    <string name="language_system">System default</string>
+    <string name="language_english">English</string>
+    <string name="language_german">German</string>
+    <string name="language_french">French</string>
+    <string name="language_spanish">Spanish</string>
+    <string name="language_russian">Russian</string>
+    <string name="folder_scan_complete">%1$d PDF files found in the selected folder.</string>
+    <string name="folder_scan_failed">Could not scan this folder. Check access and try again.</string>
+    <string name="folder_access_denied">Access to this folder was denied. Select it again and allow access.</string>
+    <string name="folder_permission_not_persisted">The folder could be opened, but long-term access was not granted by the provider.</string>
+    <string name="picker_unavailable">The system file picker is unavailable on this device.</string>
+    <string name="selected_file">Selected file</string>
+    <string name="zero_cloud_upload_banner">All files stay on your device. No cloud upload.</string>
+    <string name="zero_cloud_upload_body">Your PDFs are processed locally on this phone.</string>
+    <string name="hero_title">100% on-device PDF suite</string>
+    <string name="hero_subtitle">Local PDF processing, document scanning, and encrypted tools.</string>
+    <string name="core_toolkit">Core toolkit</string>
+    <string name="tool_view_read">View &amp; Read</string>
+    <string name="tool_view_read_subtitle">Continuous scroll and 400% zoom</string>
+    <string name="tool_edit_sign">Edit &amp; Sign</string>
+    <string name="tool_edit_sign_subtitle">Pen, highlighter, and e-signature</string>
+    <string name="tool_document_scanner">Document Scanner</string>
+    <string name="tool_document_scanner_subtitle">Scan documents to PDF</string>
+    <string name="tool_split_document">Split Document</string>
+    <string name="tool_split_document_subtitle">Extract custom page ranges</string>
+    <string name="tool_merge_documents">Merge Documents</string>
+    <string name="tool_merge_documents_subtitle">Combine PDF files</string>
+    <string name="tool_images_to_pdf">Images to PDF</string>
+    <string name="tool_images_to_pdf_subtitle">Create a PDF from photos</string>
+    <string name="tool_extract_images">Extract Images</string>
+    <string name="tool_extract_images_subtitle">Save embedded images</string>
+    <string name="tool_encrypt_protect">Encrypt &amp; Protect</string>
+    <string name="tool_encrypt_protect_subtitle">Password-protect a PDF</string>
+    <string name="all_pdfs_on_device">All PDFs on device</string>
+    <string name="pdfs_in_selected_folder">PDFs in selected folder</string>
+    <string name="pdfs_indexed_count">%1$d documents indexed</string>
+    <string name="rescan">Rescan</string>
+    <string name="automatic_pdf_discovery">Automatic PDF discovery</string>
+    <string name="scan_storage_invitation">Scan device storage to list PDFs for offline access.</string>
+    <string name="scan_device_storage">Scan device storage</string>
+    <string name="recently_opened">Recently opened</string>
+    <string name="modified_date">%1$s • Modified %2$s</string>
+    <string name="allow_device_pdf_access">Allow device PDF access</string>
+    <string name="device_access_rationale">VibeSync scans local storage to index PDFs for offline viewing and editing. Your files are not uploaded.</string>
+    <string name="local_query_guarantee">On-device local query • No file uploads</string>
+    <string name="grant_access">Grant access</string>
+    <string name="select_files_manually">Select files manually (SAF)</string>
+    <string name="privacy_data_safety_guarantee">Privacy &amp; Data Safety Guarantee</string>
+    <string name="device_zero_cloud_transit">On-device processing • No cloud transit</string>
+    <string name="document_processing_policy">Document rendering, splitting, merging, watermarking, and scanning run on your device.</string>
+    <string name="signature_storage_policy">Signatures are stored locally using Android Keystore encryption and are not uploaded.</string>
+    <string name="ads_collection_policy">Google Mobile Ads may collect advertising identifiers and diagnostics under Google Play policies.</string>
+    <string name="public_info">Public VibeSync information</string>
+    <string name="privacy_policy">Privacy policy</string>
+    <string name="license_copyright">License &amp; copyright</string>
+    <string name="terms_of_use">Terms of use</string>
+    <string name="close">Close</string>
+
+    <!-- PDF viewer -->
+    <string name="page_position">Page %1$d of %2$d</string>
+    <string name="back">Back</string>
+    <string name="reset_zoom">Reset zoom</string>
+    <string name="share_pdf">Share PDF</string>
+    <string name="edit_sign_action">Edit &amp; Sign</string>
+    <string name="error_opening_pdf">Error opening PDF</string>
+    <string name="password_protected_pdf">Password-protected PDF</string>
+    <string name="password_protected_message">This document is encrypted. Enter the password to view its pages.</string>
+    <string name="password">Password</string>
+    <string name="hide_password">Hide password</string>
+    <string name="show_password">Show password</string>
+    <string name="unlock">Unlock</string>
+    <string name="cancel">Cancel</string>
+    <string name="invalid_password">Invalid password. Please check your credentials.</string>
+    <string name="encrypted_document">This document is encrypted. Enter the password to view it.</string>
+    <string name="failed_to_open_pdf">Failed to open PDF</string>
+    <string name="pdf_page_description">PDF page %1$d</string>
+
     <!-- Google AdMob Configuration -->
     <string name="admob_app_id">ca-app-pub-4783826505860771~4377815936</string>
     <string name="admob_banner_unit_id">ca-app-pub-4783826505860771/3755922842</string>
+
+    <!-- PDF toolkit screens -->
+    <string name="selected_file_name">Selected: %1$s</string>
+    <string name="tool_select_pdf_to_split">Select PDF to Split</string>
+    <string name="tool_choose_pdf_document">Choose PDF Document</string>
+    <string name="tool_page_intervals_hint">Page Intervals (e.g. 1-2, 3, 4-5)</string>
+    <string name="tool_split_and_save_files">Split and Save Files</string>
+    <string name="tool_add_pdf_files_to_merge">Add PDF Files to Merge</string>
+    <string name="tool_document_assembly_order">Document Assembly Order:</string>
+    <string name="tool_move_up">Move up</string>
+    <string name="tool_move_down">Move down</string>
+    <string name="tool_remove">Remove</string>
+    <string name="tool_merge_button">Merge (%1$d) Documents</string>
+    <string name="tool_change_pdf">Change PDF (%1$s)</string>
+    <string name="tool_select_pdf_to_protect">Select PDF to Protect</string>
+    <string name="tool_document_password">Document Password</string>
+    <string name="tool_allow_printing">Allow Printing Document</string>
+    <string name="tool_allow_copying">Allow content copying / extraction</string>
+    <string name="tool_apply_aes128">Apply AES-128 encryption</string>
+    <string name="tool_choose_images">Choose Images</string>
+    <string name="tool_change_images">Change Images (%1$d)</string>
+    <string name="tool_create_pdf">Create PDF</string>
+    <string name="tool_embedded_images_note">Embedded raster images are extracted as PNG files. Vector-only artwork is not extracted as a bitmap.</string>
+    <string name="tool_choose_pdf">Choose PDF</string>
+
+    <!-- PDF editor -->
+    <string name="editor_annotate_sign">Annotate &amp; Sign</string>
+    <string name="editor_undo">Undo</string>
+    <string name="editor_redo">Redo</string>
+    <string name="editor_flatten_save">Flatten &amp; Save</string>
+    <string name="editor_pen">Pen</string>
+    <string name="editor_highlighter">Highlighter</string>
+    <string name="editor_text">Text</string>
+    <string name="editor_sign">Sign</string>
+    <string name="editor_page_canvas">PDF page canvas</string>
+    <string name="editor_placed_signature">Placed signature</string>
+    <string name="editor_add_text_note">Add Text Note</string>
+    <string name="editor_enter_annotation">Enter annotation text...</string>
+    <string name="editor_place_text">Place Text</string>
+
+    <!-- Activity dialogs and status messages -->
+    <string name="storage_permissions_denied">Storage access was not granted.</string>
+    <string name="document_scanned_page_count">Document scanned: %1$d pages</string>
+    <string name="error_watermark_scanned_pdf">Could not apply the VibeSync watermark to the scanned PDF.</string>
+    <string name="error_scanner">Scanner error: %1$s</string>
+    <string name="error_prepare_pdf_sharing">Could not prepare the PDF for sharing.</string>
+    <string name="error_no_output_files">No output files were created.</string>
+    <string name="file_name">File name</string>
+    <string name="output_name_dialog_title">Name your output file</string>
+    <string name="output_name_dialog_message">The VibeSync watermark will be included. The extension is added automatically.</string>
+    <string name="continue_label">Continue</string>
+    <string name="error_rename_output_files">Could not rename output files.</string>
+    <string name="share_vibesync_output">Share VibeSync output</string>
+    <string name="output_extension_message">Extension is added automatically.</string>
+
+
+    <string name="signature_draw_title">Draw your signature</string>
+    <string name="signature_use_action">Use Signature</string>
+    <string name="signature_clear_action">Clear</string>
+
+    <string name="default_pdf_filename">document.pdf</string>
+    <string name="tool_hide_password">Hide password</string>
+    <string name="tool_show_password">Show password</string>
+    <string name="tool_failed_merge">Failed to merge PDFs</string>
+    <string name="tool_failed_encrypt">Failed to encrypt PDF</string>
+    <string name="tool_failed_create_pdf">Failed to create PDF</string>
+    <string name="tool_failed_extract_images">Failed to extract images</string>
+    <string name="editor_failed_flatten">Failed to flatten PDF</string>
+    <string name="error_select_at_least_one_pdf">Select at least one PDF.</string>
+    <string name="error_no_embedded_raster_images">No embedded raster images were found in this PDF.</string>
+    <string name="error_select_at_least_one_image">Select at least one image.</string>
+    <string name="error_decode_selected_images">None of the selected images could be decoded.</string>
+    <string name="error_create_mutable_bitmap">Could not create a mutable bitmap for watermarking.</string>
+    <string name="error_write_watermarked_image">Could not write the watermarked image.</string>
+
+    <!-- Google Play update, review and connectivity prompts -->
+    <string name="update_available_title">App Update Available</string>
+    <string name="update_available_message">A new version of VibeSync is available with improvements and fixes. Please update to enjoy the latest experience.</string>
+    <string name="update_now">Update Now</string>
+    <string name="update_later">Later</string>
+    <string name="update_ready_title">Update Ready to Install</string>
+    <string name="update_ready_message">The update has downloaded. Restart VibeSync to finish installing it.</string>
+    <string name="restart_to_update">Restart and Install</string>
+    <string name="offline_support_title">Stay Connected and Support VibeSync</string>
+    <string name="offline_support_message">You are currently offline. Connecting to the internet helps us load ads that support VibeSync development and help us buy a coffee while we continue improving the app.\n\nYour privacy matters: your PDF files remain on your device, and connecting to the internet does not mean your documents will be uploaded.</string>
+    <string name="connect_to_internet">Connect to Internet</string>
+    <string name="not_now">Not Now</string>
+    <string name="update_store_unavailable">Could not open the Google Play listing. Please try again when the internet is available.</string>
+    <string name="internet_settings_unavailable">Could not open network settings. Please open Wi-Fi settings manually.</string>
+
+    <string name="document_load_error">Could not open this PDF. Check that the file is accessible, then retry.</string>
+    <string name="page_render_failed">Could not render this page.</string>
+    <string name="retry">Retry</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_portuguese">Português</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_urdu">اردو</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_italian">Italiano</string>
+    <string name="pdf_brand_watermark">VibeSync All in ONE PDF Suite</string>
 </resources>
