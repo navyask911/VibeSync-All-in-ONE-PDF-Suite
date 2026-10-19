@@ -4,7 +4,6 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
 import android.net.Uri
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
@@ -22,6 +21,7 @@ import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.core.util.UriUtils
+import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
@@ -143,7 +143,10 @@ class PdfViewerLoadingIntegrationTest {
                     .fetchSemanticsNodes().isNotEmpty()
             }
             composeTestRule.onNodeWithContentDescription("PDF page 1").assertIsDisplayed()
-            composeTestRule.onNodeWithTag("pdf_document_loading").assertDoesNotExist()
+            assertTrue(
+                composeTestRule.onAllNodesWithTag("pdf_document_loading")
+                    .fetchSemanticsNodes().isEmpty()
+            )
         } finally {
             composeTestRule.runOnIdle { store.clear() }
             source.delete()
@@ -177,7 +180,10 @@ class PdfViewerLoadingIntegrationTest {
             }
             composeTestRule.onNodeWithText("Error opening PDF").assertIsDisplayed()
             composeTestRule.onNodeWithText("Retry").assertIsDisplayed()
-            composeTestRule.onNodeWithTag("pdf_document_loading").assertDoesNotExist()
+            assertTrue(
+                composeTestRule.onAllNodesWithTag("pdf_document_loading")
+                    .fetchSemanticsNodes().isEmpty()
+            )
         } finally {
             composeTestRule.runOnIdle { store.clear() }
             source.delete()
@@ -213,3 +219,4 @@ class PdfViewerLoadingIntegrationTest {
         }
         return false
     }
+}
