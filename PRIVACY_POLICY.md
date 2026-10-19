@@ -1,7 +1,7 @@
 # Privacy Policy for VibeSync All in ONE PDF Suite
 
 **Effective Date:** October 5, 2026  
-**Last Updated:** October 5, 2026  
+**Last Updated:** October 19, 2026  
 **Application Name:** VibeSync All in ONE PDF Suite  
 **Developer Contact:** vibesyncrotechnologies@gmail.com  
 
