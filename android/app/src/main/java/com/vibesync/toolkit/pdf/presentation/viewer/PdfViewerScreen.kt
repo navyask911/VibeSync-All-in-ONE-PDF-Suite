@@ -57,10 +57,18 @@ fun PdfViewerScreen(
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
 
+    // Start loading without waiting for the LazyColumn to be attached. During initial
+    // loading the list is not composed, so scrollToItem() here can suspend forever and prevent
+    // loadDocument() from ever running.
     LaunchedEffect(documentUri) {
-        // Do not retain the previous document's scroll position when the URI changes.
-        listState.scrollToItem(0)
         viewModel.loadDocument(documentUri)
+    }
+
+    // Reset scroll only after the loaded document has caused the LazyColumn to be composed.
+    LaunchedEffect(documentUri, uiState.isLoading, uiState.pageCount) {
+        if (!uiState.isLoading && uiState.pageCount > 0) {
+            listState.scrollToItem(0)
+        }
     }
 
     // The renderer's openDocument() serializes and closes previous native renderer state itself.
