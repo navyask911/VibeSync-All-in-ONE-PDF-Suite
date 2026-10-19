@@ -97,10 +97,10 @@ jobs:
           echo "version_code=$expected_code" >> "$GITHUB_OUTPUT"
           {
             echo "## Verified Android release bundle"
-            echo "- Application ID: `$expected_app_id`"
-            echo "- versionName: `$expected_name`"
-            echo "- versionCode: `$expected_code`"
-            echo "- Artifact: `$aab`"
+            echo "- Application ID: $expected_app_id"
+            echo "- versionName: $expected_name"
+            echo "- versionCode: $expected_code"
+            echo "- Artifact: $aab"
             echo "- Validation: bundletool metadata checks and bundle validation passed"
           } >> "$GITHUB_STEP_SUMMARY"
 
