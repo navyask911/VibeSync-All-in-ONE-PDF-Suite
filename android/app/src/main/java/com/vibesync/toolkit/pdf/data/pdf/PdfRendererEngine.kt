@@ -91,7 +91,7 @@ class PdfRendererEngine(private val context: Context) {
                         "open.copy_progress request=$requestId bytes=$bytes " +
                             "elapsedMs=${SystemClock.elapsedRealtime() - copyStartedAt}"
                     )
-                }
+                },
                 onActivity = onActivity
             )
             operationContext.ensureActive()
