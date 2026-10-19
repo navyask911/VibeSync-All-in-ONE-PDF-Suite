@@ -63,100 +63,137 @@ class PdfRendererEngine(private val context: Context) {
      * Opens a PDF document from a content or file Uri.
      */
     suspend fun openDocument(uri: Uri): Result<Int> = withContext(Dispatchers.IO) {
-        mutex.withLock {
-            val startedAt = SystemClock.elapsedRealtime()
-            val requestId = UUID.randomUUID().toString()
-            val operationContext = currentCoroutineContext()
-            var stage = "close_previous_document"
-            Log.i(TAG, "open.start request=$requestId scheme=${uri.scheme ?: "unknown"}")
-            try {
+        val startedAt = SystemClock.elapsedRealtime()
+        val requestId = UUID.randomUUID().toString()
+        val operationContext = currentCoroutineContext()
+        var stage = "copy_source"
+        var preparedFile: File? = null
+        var transferredToRenderer = false
+        Log.i(TAG, "open.start request=$requestId scheme=${uri.scheme ?: "unknown"}")
+
+        try {
+            // Stage each source independently before taking the native-renderer mutex. A blocked
+            // provider read must not hold the shared renderer lock or prevent a different request
+            // from preparing its source. The staged file is adopted only after this request wins.
+            val copyStartedAt = SystemClock.elapsedRealtime()
+            Log.i(TAG, "open.stage request=$requestId stage=copy_source status=start")
+            preparedFile = UriUtils.copyUriToCacheFile(
+                context = context,
+                uri = uri,
+                prefix = "render_",
+                cancellationCheck = { operationContext.ensureActive() },
+                onProgress = { bytes ->
+                    Log.d(
+                        TAG,
+                        "open.copy_progress request=$requestId bytes=$bytes " +
+                            "elapsedMs=${SystemClock.elapsedRealtime() - copyStartedAt}"
+                    )
+                }
+            )
+            operationContext.ensureActive()
+            val stagedFile = requireNotNull(preparedFile)
+            Log.i(
+                TAG,
+                "open.stage request=$requestId stage=copy_source status=success " +
+                    "bytes=${stagedFile.length()} " +
+                    "elapsedMs=${SystemClock.elapsedRealtime() - copyStartedAt}"
+            )
+
+            mutex.withLock {
+                operationContext.ensureActive()
+                stage = "close_previous_document"
                 closeDocument()
                 synchronized(renderLock) { currentDocumentId = requestId }
 
-                stage = "copy_source"
-                val copyStartedAt = SystemClock.elapsedRealtime()
-                Log.i(TAG, "open.stage request=$requestId stage=copy_source status=start")
-                val preparedFile = UriUtils.copyUriToCacheFile(
-                    context = context,
-                    uri = uri,
-                    prefix = "render_",
-                    cancellationCheck = { operationContext.ensureActive() },
-                    onProgress = { bytes ->
-                        Log.d(
-                            TAG,
-                            "open.copy_progress request=$requestId bytes=$bytes " +
-                                "elapsedMs=${SystemClock.elapsedRealtime() - copyStartedAt}"
-                        )
+                try {
+                    stage = "validate_cache"
+                    if (!stagedFile.isFile || !stagedFile.canRead() || stagedFile.length() <= 0L) {
+                        throw IOException("The selected PDF is empty or unreadable.")
                     }
-                )
-                cachedTempFile = preparedFile
-                operationContext.ensureActive()
-                Log.i(
-                    TAG,
-                    "open.stage request=$requestId stage=copy_source status=success " +
-                        "bytes=${preparedFile.length()} " +
-                        "elapsedMs=${SystemClock.elapsedRealtime() - copyStartedAt}"
-                )
 
-                stage = "validate_cache"
-                if (!preparedFile.isFile || !preparedFile.canRead() || preparedFile.length() <= 0L) {
-                    throw IOException("The selected PDF is empty or unreadable.")
+                    cachedTempFile = stagedFile
+                    transferredToRenderer = true
+
+                    stage = "open_descriptor"
+                    val descriptorStartedAt = SystemClock.elapsedRealtime()
+                    Log.i(TAG, "open.stage request=$requestId stage=open_descriptor status=start")
+                    parcelFileDescriptor = ParcelFileDescriptor.open(
+                        stagedFile,
+                        ParcelFileDescriptor.MODE_READ_ONLY
+                    )
+                    Log.i(
+                        TAG,
+                        "open.stage request=$requestId stage=open_descriptor status=success " +
+                            "elapsedMs=${SystemClock.elapsedRealtime() - descriptorStartedAt}"
+                    )
+
+                    stage = "initialize_renderer"
+                    val rendererStartedAt = SystemClock.elapsedRealtime()
+                    Log.i(TAG, "open.stage request=$requestId stage=initialize_renderer status=start")
+                    synchronized(renderLock) {
+                        operationContext.ensureActive()
+                        pdfRenderer = PdfRenderer(requireNotNull(parcelFileDescriptor))
+                    }
+                    Log.i(
+                        TAG,
+                        "open.stage request=$requestId stage=initialize_renderer status=success " +
+                            "elapsedMs=${SystemClock.elapsedRealtime() - rendererStartedAt}"
+                    )
+
+                    stage = "read_page_count"
+                    Log.i(TAG, "open.stage request=$requestId stage=read_page_count status=start")
+                    val count = pageCount
+                    if (count <= 0) throw IOException("The selected PDF contains no readable pages.")
+                    Log.i(
+                        TAG,
+                        "open.success request=$requestId pages=$count bytes=${stagedFile.length()} " +
+                            "elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
+                    )
+                    Result.success(count)
+                } catch (cancelled: CancellationException) {
+                    if (currentDocumentId == requestId) closeDocument()
+                    throw cancelled
+                } catch (error: OutOfMemoryError) {
+                    Log.e(
+                        TAG,
+                        "open.failed request=$requestId stage=$stage category=OutOfMemoryError",
+                        error
+                    )
+                    if (currentDocumentId == requestId) closeDocument()
+                    throw error
+                } catch (error: Exception) {
+                    Log.e(
+                        TAG,
+                        "open.failed request=$requestId stage=$stage " +
+                            "category=${error.javaClass.simpleName} " +
+                            "elapsedMs=${SystemClock.elapsedRealtime() - startedAt}",
+                        error
+                    )
+                    if (currentDocumentId == requestId) closeDocument()
+                    Result.failure(error)
                 }
-
-                stage = "open_descriptor"
-                val descriptorStartedAt = SystemClock.elapsedRealtime()
-                parcelFileDescriptor = ParcelFileDescriptor.open(
-                    preparedFile,
-                    ParcelFileDescriptor.MODE_READ_ONLY
-                )
-                Log.i(
-                    TAG,
-                    "open.stage request=$requestId stage=open_descriptor status=success " +
-                        "elapsedMs=${SystemClock.elapsedRealtime() - descriptorStartedAt}"
-                )
-
-                stage = "initialize_renderer"
-                val rendererStartedAt = SystemClock.elapsedRealtime()
-                synchronized(renderLock) {
-                    operationContext.ensureActive()
-                    pdfRenderer = PdfRenderer(requireNotNull(parcelFileDescriptor))
-                }
-                Log.i(
-                    TAG,
-                    "open.stage request=$requestId stage=initialize_renderer status=success " +
-                        "elapsedMs=${SystemClock.elapsedRealtime() - rendererStartedAt}"
-                )
-
-                stage = "read_page_count"
-                val count = pageCount
-                if (count <= 0) throw IOException("The selected PDF contains no readable pages.")
-                Log.i(
-                    TAG,
-                    "open.success request=$requestId pages=$count bytes=${preparedFile.length()} " +
-                        "elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
-                )
-                Result.success(count)
-            } catch (e: CancellationException) {
-                Log.i(
-                    TAG,
-                    "open.cancelled request=$requestId stage=$stage " +
-                        "elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
-                )
-                closeDocument()
-                throw e
-            } catch (e: OutOfMemoryError) {
-                Log.e(TAG, "open.failed request=$requestId stage=$stage category=OutOfMemoryError", e)
-                closeDocument()
-                throw e
-            } catch (e: Exception) {
-                Log.e(
-                    TAG,
-                    "open.failed request=$requestId stage=$stage category=${e.javaClass.simpleName} " +
-                        "elapsedMs=${SystemClock.elapsedRealtime() - startedAt}",
-                    e
-                )
-                closeDocument()
-                Result.failure(e)
+            }
+        } catch (cancelled: CancellationException) {
+            Log.i(
+                TAG,
+                "open.cancelled request=$requestId stage=$stage " +
+                    "elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
+            )
+            throw cancelled
+        } catch (error: OutOfMemoryError) {
+            Log.e(TAG, "open.failed request=$requestId stage=$stage category=OutOfMemoryError", error)
+            throw error
+        } catch (error: Exception) {
+            Log.e(
+                TAG,
+                "open.failed request=$requestId stage=$stage category=${error.javaClass.simpleName} " +
+                    "elapsedMs=${SystemClock.elapsedRealtime() - startedAt}",
+                error
+            )
+            Result.failure(error)
+        } finally {
+            if (!transferredToRenderer) {
+                preparedFile?.let { if (it.exists()) it.delete() }
             }
         }
     }

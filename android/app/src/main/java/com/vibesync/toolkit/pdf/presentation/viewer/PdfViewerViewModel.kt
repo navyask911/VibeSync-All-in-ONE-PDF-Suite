@@ -19,6 +19,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,6 +29,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 private const val PAGE_METADATA_BATCH_SIZE = 16
+private const val DOCUMENT_LOAD_WATCHDOG_MS = 30_000L
 private const val FIRST_PAGE_VALIDATION_SCALE = 1.5f
 
 data class ViewerUiState(
@@ -51,6 +53,8 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
     private var activeUri: Uri? = null
     private var loadJob: Job? = null
     private var pageMetadataJob: Job? = null
+    private var loadWatchdogJob: Job? = null
+    private var timedOutRequestId: Long? = null
     private var closeJob: Job? = null
     private var loadSequence: Long = 0L
     private var unlockedDocumentFile: File? = null
@@ -64,6 +68,9 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
         val previousLoad = loadJob
         pageMetadataJob?.cancel()
         pageMetadataJob = null
+        loadWatchdogJob?.cancel()
+        loadWatchdogJob = null
+        timedOutRequestId = null
         previousLoad?.cancel()
         val previousClose = closeJob
         activeUri = uri
@@ -84,20 +91,38 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
             zoomScale = 1.0f
         )
 
+        loadWatchdogJob = viewModelScope.launch {
+            delay(DOCUMENT_LOAD_WATCHDOG_MS)
+            if (requestId == loadSequence && _uiState.value.isLoading) {
+                timedOutRequestId = requestId
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    isPasswordRequired = false,
+                    errorMessage = app.getString(R.string.document_load_error)
+                )
+                Log.e(
+                    TAG,
+                    "load.watchdog_timeout request=$requestId timeoutMs=$DOCUMENT_LOAD_WATCHDOG_MS"
+                )
+                // This is cooperative; the terminal UI above is independent of a provider/native
+                // call that might not return promptly when its coroutine is cancelled.
+                loadJob?.cancel()
+            }
+        }
+
         loadJob = viewModelScope.launch {
             val startedAt = SystemClock.elapsedRealtime()
             var pendingUnlockedFile: File? = null
             Log.i(TAG, "load.start request=" + requestId + " scheme=" + (uri.scheme ?: "unknown"))
             try {
-                // A canceled operation is joined before a replacement touches renderer resources.
-                previousLoad?.join()
+                // Do not join a previous provider operation: a provider read can ignore coroutine
+                // cancellation. Source staging now happens outside the shared renderer mutex.
                 previousClose?.join()
                 currentCoroutineContext().ensureActive()
-                if (requestId != loadSequence) return@launch
+                if (requestId != loadSequence || requestId == timedOutRequestId) return@launch
 
                 unlockedDocumentFile?.delete()
                 unlockedDocumentFile = null
-                rendererEngine.closeDocumentSafely()
 
                 // Never block the document-opening path on an optional provider display-name query.
                 val fileName = fallbackName
@@ -118,6 +143,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                                 " category=" + (decryptError?.javaClass?.simpleName ?: "Unknown")
                         )
                         if (requestId == loadSequence) {
+                            closeRendererNonCancellable()
                             _uiState.value = _uiState.value.copy(
                                 isLoading = false,
                                 isPasswordRequired = passwordFailure,
@@ -138,6 +164,11 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 Log.d(TAG, "load.renderer_open_start request=" + requestId)
                 val openResult = rendererEngine.openDocument(targetUri)
                 currentCoroutineContext().ensureActive()
+                if (requestId != loadSequence) return@launch
+                if (requestId == timedOutRequestId) {
+                    closeRendererNonCancellable()
+                    return@launch
+                }
                 val count = openResult.getOrElse { throw it }
                 if (count <= 0) {
                     throw IllegalStateException(app.getString(R.string.document_load_error))
@@ -148,6 +179,10 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                     ?: throw IllegalStateException(app.getString(R.string.document_load_error))
                 currentCoroutineContext().ensureActive()
                 if (requestId != loadSequence) return@launch
+                if (requestId == timedOutRequestId) {
+                    closeRendererNonCancellable()
+                    return@launch
+                }
 
                 Log.i(TAG, "load.stage request=$requestId stage=first_page_metadata status=success")
                 val firstPageRenderStartedAt = SystemClock.elapsedRealtime()
@@ -170,6 +205,10 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                         "elapsedMs=${SystemClock.elapsedRealtime() - firstPageRenderStartedAt}"
                 )
                 if (requestId != loadSequence) return@launch
+                if (requestId == timedOutRequestId) {
+                    closeRendererNonCancellable()
+                    return@launch
+                }
 
                 pendingUnlockedFile?.let { decryptedFile ->
                     unlockedDocumentFile?.delete()
@@ -195,11 +234,11 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 resolveDisplayNameAsync(requestId, uri, fallbackName)
             } catch (cancelled: CancellationException) {
                 Log.d(TAG, "load.cancelled request=" + requestId)
-                closeRendererNonCancellable()
+                if (requestId == loadSequence) closeRendererNonCancellable()
                 throw cancelled
             } catch (error: OutOfMemoryError) {
                 Log.e(TAG, "load.failed request=" + requestId + " category=OutOfMemoryError", error)
-                closeRendererNonCancellable()
+                if (requestId == loadSequence) closeRendererNonCancellable()
                 if (requestId == loadSequence) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -215,7 +254,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                         " category=" + error.javaClass.simpleName,
                     error
                 )
-                closeRendererNonCancellable()
+                if (requestId == loadSequence) closeRendererNonCancellable()
                 if (requestId == loadSequence) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
@@ -229,6 +268,10 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 }
             } finally {
                 pendingUnlockedFile?.delete()
+                if (requestId == loadSequence) {
+                    loadWatchdogJob?.cancel()
+                    loadWatchdogJob = null
+                }
                 // Safety net: any active request that exits without publishing success or failure
                 // must become terminal. A stale request is never allowed to touch current UI state.
                 if (requestId == loadSequence && _uiState.value.isLoading) {
@@ -360,10 +403,12 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
         pageMetadataJob?.cancel()
         pageMetadataJob = null
         loadJob = null
+        loadWatchdogJob?.cancel()
+        loadWatchdogJob = null
+        timedOutRequestId = null
         val previousClose = closeJob
         closeJob = viewModelScope.launch {
             previousClose?.join()
-            previousLoad?.join()
             rendererEngine.closeDocumentSafely()
             unlockedDocumentFile?.delete()
             unlockedDocumentFile = null
@@ -428,6 +473,9 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
         loadJob?.cancel()
         pageMetadataJob?.cancel()
         pageMetadataJob = null
+        loadWatchdogJob?.cancel()
+        loadWatchdogJob = null
+        timedOutRequestId = null
         val fileToDelete = unlockedDocumentFile
         unlockedDocumentFile = null
         super.onCleared()

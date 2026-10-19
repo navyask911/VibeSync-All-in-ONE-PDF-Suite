@@ -1,6 +1,7 @@
 package com.vibesync.toolkit.pdf.presentation.viewer
 
 import android.net.Uri
+import android.util.Log
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -36,6 +37,7 @@ import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
 import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.R
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -352,16 +354,24 @@ fun PdfPageItem(
         mutableStateOf<PageRenderState>(PageRenderState.Loading)
     }
     val leaseHolder = remember(documentKey, pageIndex) { PageBitmapLeaseHolder() }
+    var renderTimedOut by remember(documentKey, pageIndex) { mutableStateOf(false) }
 
     DisposableEffect(leaseHolder) {
         onDispose { leaseHolder.close() }
     }
 
     LaunchedEffect(documentKey, pageIndex, retryAttempt) {
+        renderTimedOut = false
         leaseHolder.replace(null)
         pageState = PageRenderState.Loading
         try {
             val lease = viewModel.acquirePageBitmap(pageIndex, scale = PAGE_RENDER_SCALE)
+            // A watchdog may have already published a terminal error while native rendering was
+            // blocked. Never let a late completion overwrite that state or leak its bitmap lease.
+            if (renderTimedOut || pageState !is PageRenderState.Loading) {
+                lease?.close()
+                return@LaunchedEffect
+            }
             if (lease == null) {
                 pageState = PageRenderState.Error()
             } else if (lease.bitmap.isRecycled) {
@@ -375,9 +385,24 @@ fun PdfPageItem(
         } catch (cancelled: CancellationException) {
             throw cancelled
         } catch (error: OutOfMemoryError) {
-            pageState = PageRenderState.Error(error)
+            if (pageState is PageRenderState.Loading) pageState = PageRenderState.Error(error)
         } catch (error: Exception) {
-            pageState = PageRenderState.Error(error)
+            if (pageState is PageRenderState.Loading) pageState = PageRenderState.Error(error)
+        }
+    }
+
+    LaunchedEffect(documentKey, pageIndex, retryAttempt, pageState is PageRenderState.Loading) {
+        if (pageState !is PageRenderState.Loading) return@LaunchedEffect
+        delay(PAGE_RENDER_WATCHDOG_MS)
+        if (pageState is PageRenderState.Loading) {
+            renderTimedOut = true
+            leaseHolder.replace(null)
+            pageState = PageRenderState.Error()
+            Log.e(
+                "PdfViewerScreen",
+                "page.render_watchdog_timeout documentKeyHash=${documentKey.hashCode()} " +
+                    "page=$pageIndex timeoutMs=$PAGE_RENDER_WATCHDOG_MS"
+            )
         }
     }
 
@@ -462,3 +487,4 @@ fun PdfPageItem(
 }
 
 private const val PAGE_RENDER_SCALE = 1.5f
+private const val PAGE_RENDER_WATCHDOG_MS = 30_000L
