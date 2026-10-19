@@ -32,7 +32,7 @@ import java.util.concurrent.atomic.AtomicLong
 
 private const val PAGE_METADATA_BATCH_SIZE = 16
 private const val FIRST_PAGE_VALIDATION_SCALE = 1.5f
-private const val DOCUMENT_LOAD_STAGING_TIMEOUT_MS = 15_000L
+private const val DOCUMENT_LOAD_STAGING_STALL_TIMEOUT_MS = 15_000L
 private const val DOCUMENT_LOAD_STALL_TIMEOUT_MS = 60_000L
 private const val DOCUMENT_LOAD_WATCHDOG_POLL_MS = 500L
 
@@ -107,8 +107,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 val idleMs = now - lastActivityAt.get()
                 val activeStageStartedAt = stagingStartedAt.get()
                 val stagingTimedOut = stagingInProgress.get() &&
-                    activeStageStartedAt > 0L &&
-                    now - activeStageStartedAt >= DOCUMENT_LOAD_STAGING_TIMEOUT_MS
+                    idleMs >= DOCUMENT_LOAD_STAGING_STALL_TIMEOUT_MS
                 if (stagingTimedOut || idleMs >= DOCUMENT_LOAD_STALL_TIMEOUT_MS) {
                     timedOutRequestId = requestId
                     _uiState.value = _uiState.value.copy(
@@ -121,7 +120,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                             TAG,
                             "load.staging_timeout request=$requestId " +
                                 "elapsedMs=${now - activeStageStartedAt} " +
-                                "timeoutMs=$DOCUMENT_LOAD_STAGING_TIMEOUT_MS"
+                                "idleTimeoutMs=$DOCUMENT_LOAD_STAGING_STALL_TIMEOUT_MS"
                         )
                     } else {
                         Log.e(
