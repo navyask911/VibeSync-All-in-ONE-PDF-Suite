@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Matrix
-import android.graphics.Rect
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.ParcelFileDescriptor
@@ -12,6 +11,8 @@ import android.util.Log
 import android.os.SystemClock
 import java.io.IOException
 import java.util.UUID
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.sqrt
 import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.PageMetadata
@@ -105,74 +106,212 @@ class PdfRendererEngine(private val context: Context) {
     }
 
     /**
-     * Renders a specific page at the requested display scale factor.
+     * Returns a leased bitmap for a page. Cache lookup/pinning happens before native rendering,
+     * and the reservation remains held through cache insertion and delivery back to the caller.
      */
-    suspend fun renderPage(pageIndex: Int, scale: Float = 1.0f): Bitmap? = withContext(Dispatchers.IO) {
-        if (!scale.isFinite() || scale <= 0f) return@withContext null
+    suspend fun renderPage(
+        pageIndex: Int,
+        scale: Float = 1.0f
+    ): BitmapCache.BitmapLease? {
+        if (!scale.isFinite() || scale <= 0f) return null
+
         val renderScale = scale.coerceIn(0.1f, 4.0f)
-        val bitmapCache = BitmapCache.getInstance()
+        val cache = BitmapCache.getInstance()
+        val parentJob = currentCoroutineContext()[kotlinx.coroutines.Job]
+        val pendingLease = AtomicReference<BitmapCache.BitmapLease?>(null)
+        // If cancellation lands during native rendering or on the dispatcher hop back to Compose,
+        // this callback closes any lease that the canceled caller never received.
+        val cancellationHandle = parentJob?.invokeOnCompletion { cause ->
+            if (cause != null) pendingLease.getAndSet(null)?.close()
+        }
 
-        // Native renderer state and cache identity must be read under the same lock to avoid
-        // mixing a previous document's cache key with a newly opened document.
-        synchronized(renderLock) {
-            val renderer = pdfRenderer ?: return@withContext null
-            if (pageIndex < 0 || pageIndex >= renderer.pageCount) return@withContext null
+        try {
+            val lease = withContext(Dispatchers.IO) {
+                val coroutineContext = currentCoroutineContext()
+                coroutineContext.ensureActive()
 
-            val cacheKey = BitmapCache.generateKey(currentDocumentId, pageIndex, renderScale)
-            bitmapCache.get(cacheKey)?.let { return@withContext it }
+                synchronized(renderLock) {
+                    val renderer = pdfRenderer ?: return@synchronized null
+                    if (pageIndex < 0 || pageIndex >= renderer.pageCount) {
+                        return@synchronized null
+                    }
 
-            var page: PdfRenderer.Page? = null
-            var allocatedBitmap: Bitmap? = null
+                    val cacheKey = BitmapCache.generateKey(currentDocumentId, pageIndex, renderScale)
+                    cache.acquire(cacheKey)?.let { cachedLease ->
+                        pendingLease.set(cachedLease)
+                        return@synchronized cachedLease
+                    }
+
+                    var reservation: BitmapCache.BitmapLease? = cache.reserve(cacheKey)
+                    var renderedBitmap: Bitmap? = null
+                    try {
+                        renderedBitmap = try {
+                            renderPageBitmap(renderer, pageIndex, renderScale, Bitmap.Config.ARGB_8888)
+                        } catch (firstOom: OutOfMemoryError) {
+                            Log.w(
+                                TAG,
+                                "Page render exceeded the memory budget; retrying at reduced scale."
+                            )
+                            cache.clear()
+                            try {
+                                renderPageBitmap(
+                                    renderer,
+                                    pageIndex,
+                                    minOf(renderScale, LOW_MEMORY_RETRY_SCALE),
+                                    Bitmap.Config.RGB_565
+                                )
+                            } catch (retryOom: OutOfMemoryError) {
+                                Log.e(TAG, "Reduced-memory page render also exhausted memory.", retryOom)
+                                return@synchronized null
+                            } catch (retryError: Exception) {
+                                if (retryError is CancellationException) throw retryError
+                                Log.e(
+                                    TAG,
+                                    "Reduced-memory page render failed: " +
+                                        retryError.javaClass.simpleName
+                                )
+                                return@synchronized null
+                            }
+                        }
+
+                        coroutineContext.ensureActive()
+                        if (renderedBitmap.isRecycled) {
+                            return@synchronized null
+                        }
+
+                        val completedLease = checkNotNull(reservation)
+                        completedLease.attach(renderedBitmap)
+                        cache.put(cacheKey, renderedBitmap)
+                        pendingLease.set(completedLease)
+                        reservation = null
+                        completedLease
+                    } catch (cancelled: CancellationException) {
+                        renderedBitmap?.let { if (!it.isRecycled) it.recycle() }
+                        throw cancelled
+                    } catch (error: OutOfMemoryError) {
+                        renderedBitmap?.let { if (!it.isRecycled) it.recycle() }
+                        Log.e(TAG, "Page render failed after memory recovery.", error)
+                        null
+                    } catch (error: Exception) {
+                        renderedBitmap?.let { if (!it.isRecycled) it.recycle() }
+                        Log.e(
+                            TAG,
+                            "Page render failed: " + error.javaClass.simpleName
+                        )
+                        null
+                    } finally {
+                        reservation?.close()
+                    }
+                }
+            }
+
+            currentCoroutineContext().ensureActive()
+            if (lease != null) pendingLease.compareAndSet(lease, null)
+            return lease
+        } catch (cancelled: CancellationException) {
+            pendingLease.getAndSet(null)?.close()
+            throw cancelled
+        } finally {
+            cancellationHandle?.dispose()
+        }
+    }
+
+    private data class RenderDimensions(
+        val width: Int,
+        val height: Int,
+        val effectiveScale: Float
+    )
+
+    /**
+     * Render dimensions are capped before allocation. Very large scanned pages are downscaled
+     * rather than overflowing Int dimensions or repeatedly requesting impossible allocations.
+     */
+    private fun calculateRenderDimensions(
+        pageWidth: Int,
+        pageHeight: Int,
+        requestedScale: Float,
+        config: Bitmap.Config
+    ): RenderDimensions {
+        if (pageWidth <= 0 || pageHeight <= 0) {
+            throw IOException("PDF page dimensions must be positive.")
+        }
+
+        val bytesPerPixel = if (config == Bitmap.Config.RGB_565) 2L else 4L
+        val heapBudget = (Runtime.getRuntime().maxMemory() / 8L)
+            .coerceAtLeast(MIN_BITMAP_BUDGET_BYTES)
+            .coerceAtMost(MAX_BITMAP_BUDGET_BYTES)
+        val maxPixels = (heapBudget / bytesPerPixel)
+            .coerceAtLeast(1L)
+            .coerceAtMost(MAX_BITMAP_PIXELS)
+        val requestedPixels = pageWidth.toDouble() * pageHeight.toDouble() *
+            requestedScale.toDouble() * requestedScale.toDouble()
+        val safeScale = (
+            if (requestedPixels.isFinite() && requestedPixels > maxPixels.toDouble()) {
+                requestedScale.toDouble() * sqrt(maxPixels.toDouble() / requestedPixels)
+            } else {
+                requestedScale.toDouble()
+            }
+        ).coerceAtMost(requestedScale.toDouble()).coerceAtLeast(0.000001)
+
+        var width = (pageWidth.toDouble() * safeScale)
+            .toLong().coerceIn(1L, Int.MAX_VALUE.toLong())
+        var height = (pageHeight.toDouble() * safeScale)
+            .toLong().coerceIn(1L, Int.MAX_VALUE.toLong())
+
+        // At most a handful of proportional adjustments are needed for integer rounding.
+        // Avoid pixel-by-pixel decrements, which could stall on pathological page dimensions.
+        repeat(3) {
+            val pixels = width * height
+            if (pixels > maxPixels) {
+                val correction = sqrt(maxPixels.toDouble() / pixels.toDouble())
+                width = (width.toDouble() * correction).toLong().coerceAtLeast(1L)
+                height = (height.toDouble() * correction).toLong().coerceAtLeast(1L)
+            }
+        }
+        if (width * height > maxPixels) {
+            if (width >= height) width = (maxPixels / height).coerceAtLeast(1L)
+            else height = (maxPixels / width).coerceAtLeast(1L)
+        }
+
+        // Use the effective allocated scale, not the requested scale, in PdfRenderer.Page.render.
+        val effectiveScale = minOf(
+            width.toDouble() / pageWidth.toDouble(),
+            height.toDouble() / pageHeight.toDouble()
+        ).toFloat().coerceAtLeast(0.000001f)
+        return RenderDimensions(width.toInt(), height.toInt(), effectiveScale)
+    }
+
+    /** One native page is opened for one render attempt and closed immediately in finally. */
+    private fun renderPageBitmap(
+        renderer: PdfRenderer,
+        pageIndex: Int,
+        requestedScale: Float,
+        config: Bitmap.Config
+    ): Bitmap {
+        val page = renderer.openPage(pageIndex)
+        var bitmap: Bitmap? = null
+        try {
+            val dimensions = calculateRenderDimensions(
+                page.width,
+                page.height,
+                requestedScale,
+                config
+            )
+            bitmap = Bitmap.createBitmap(dimensions.width, dimensions.height, config)
+            bitmap.eraseColor(Color.WHITE)
+            val matrix = Matrix().apply {
+                setScale(dimensions.effectiveScale, dimensions.effectiveScale)
+            }
+            page.render(bitmap, null, matrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+            return bitmap
+        } catch (error: Throwable) {
+            bitmap?.let { if (!it.isRecycled) it.recycle() }
+            throw error
+        } finally {
             try {
-                page = renderer.openPage(pageIndex)
-                val targetWidth = (page.width * renderScale).toInt().coerceAtLeast(1)
-                val targetHeight = (page.height * renderScale).toInt().coerceAtLeast(1)
-                val bitmap = Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888)
-                allocatedBitmap = bitmap
-                bitmap.eraseColor(Color.WHITE)
-                val matrix = Matrix().apply { postScale(renderScale, renderScale) }
-                page.render(bitmap, null, matrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                bitmapCache.put(cacheKey, bitmap)
-                return@withContext bitmap
-            } catch (e: OutOfMemoryError) {
-                Log.e(TAG, "OOM rendering page $pageIndex; clearing cache and retrying at lower resolution.", e)
-                allocatedBitmap?.let { if (!it.isRecycled) it.recycle() }
-                bitmapCache.clear()
-                System.gc()
-
-                // Retry at reduced resolution and RGB_565 (half the bitmap memory per pixel).
-                val openPage = page ?: return@withContext null
-                var fallbackBitmap: Bitmap? = null
-                try {
-                    val fallbackScale = minOf(renderScale, 0.5f)
-                    val width = (openPage.width * fallbackScale).toInt().coerceAtLeast(1)
-                    val height = (openPage.height * fallbackScale).toInt().coerceAtLeast(1)
-                    val retryBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.RGB_565)
-                    fallbackBitmap = retryBitmap
-                    retryBitmap.eraseColor(Color.WHITE)
-                    val retryMatrix = Matrix().apply { postScale(fallbackScale, fallbackScale) }
-                    openPage.render(retryBitmap, null, retryMatrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                    bitmapCache.put(cacheKey, retryBitmap)
-                    return@withContext retryBitmap
-                } catch (retryError: OutOfMemoryError) {
-                    fallbackBitmap?.let { if (!it.isRecycled) it.recycle() }
-                    Log.e(TAG, "OOM during reduced-memory retry for page $pageIndex.", retryError)
-                    return@withContext null
-                } catch (retryError: Exception) {
-                    fallbackBitmap?.let { if (!it.isRecycled) it.recycle() }
-                    Log.e(TAG, "Reduced-memory retry failed for page $pageIndex.", retryError)
-                    return@withContext null
-                }
-            } catch (e: Exception) {
-                allocatedBitmap?.let { if (!it.isRecycled) it.recycle() }
-                Log.e(TAG, "Error rendering page $pageIndex", e)
-                return@withContext null
-            } finally {
-                try {
-                    page?.close()
-                } catch (e: Exception) {
-                    Log.w(TAG, "Error closing PdfRenderer.Page", e)
-                }
+                page.close()
+            } catch (closeError: Exception) {
+                Log.w(TAG, "Unable to close rendered PDF page.", closeError)
             }
         }
     }
@@ -246,10 +385,16 @@ class PdfRendererEngine(private val context: Context) {
 
             cachedTempFile?.delete()
             cachedTempFile = null
+            currentDocumentId = ""
+            BitmapCache.getInstance().clear()
         }
     }
 
     companion object {
         private const val TAG = "PdfRendererEngine"
+        private const val LOW_MEMORY_RETRY_SCALE = 0.5f
+        private const val MIN_BITMAP_BUDGET_BYTES = 512L * 1024L
+        private const val MAX_BITMAP_BUDGET_BYTES = 32L * 1024L * 1024L
+        private const val MAX_BITMAP_PIXELS = 16_000_000L
     }
 }

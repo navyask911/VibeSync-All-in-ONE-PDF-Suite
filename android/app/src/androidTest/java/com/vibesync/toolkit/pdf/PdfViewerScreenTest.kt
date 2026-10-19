@@ -7,6 +7,7 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.data.model.PageMetadata
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfPageItem
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
@@ -47,8 +48,9 @@ class PdfViewerScreenTest {
             )
         )
         every { mockViewModel.uiState } returns stateFlow
-        coEvery { mockViewModel.getPageBitmap(any(), any()) } returns
-            Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        coEvery { mockViewModel.acquirePageBitmap(any(), any()) } answers {
+            fakeLease(Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888))
+        }
 
         composeTestRule.setContent {
             PdfViewerScreen(
@@ -137,7 +139,7 @@ class PdfViewerScreenTest {
     @Test
     fun nullPageBitmapShowsTerminalErrorAndRetryCanRecover() {
         val recoveredBitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
-        coEvery { mockViewModel.getPageBitmap(0, 1.5f) } returnsMany listOf(null, recoveredBitmap)
+        coEvery { mockViewModel.acquirePageBitmap(0, 1.5f) } returnsMany listOf(null, fakeLease(recoveredBitmap))
 
         composeTestRule.setContent {
             PdfPageItem(
@@ -154,7 +156,7 @@ class PdfViewerScreenTest {
             composeTestRule.onAllNodesWithContentDescription("PDF page 1")
                 .fetchSemanticsNodes().isNotEmpty()
         }
-        coVerify(exactly = 2) { mockViewModel.getPageBitmap(0, 1.5f) }
+        coVerify(exactly = 2) { mockViewModel.acquirePageBitmap(0, 1.5f) }
     }
 
     @Test
@@ -180,6 +182,13 @@ class PdfViewerScreenTest {
 
         composeTestRule.onNodeWithText("Retry").assertIsDisplayed().performClick()
         verify(exactly = 1) { mockViewModel.retryLastDocument() }
+    }
+
+    private fun fakeLease(bitmap: Bitmap): BitmapCache.BitmapLease {
+        val lease = mockk<BitmapCache.BitmapLease>(relaxed = true)
+        every { lease.key } returns "ui-test-${System.identityHashCode(bitmap)}"
+        every { lease.bitmap } returns bitmap
+        return lease
     }
 
 }

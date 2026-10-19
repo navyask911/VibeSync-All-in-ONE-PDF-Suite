@@ -54,10 +54,21 @@ jobs:
           root = pathlib.Path("android/app/src/main/res")
           buckets = {
               "default": root / "values/strings.xml",
-              "de": root / "values-de/strings.xml",
-              "fr": root / "values-fr/strings.xml",
               "es": root / "values-es/strings.xml",
+              "zh-CN": root / "values-zh-rCN/strings.xml",
+              "hi": root / "values-hi/strings.xml",
+              "ar": root / "values-ar/strings.xml",
+              "bn": root / "values-bn/strings.xml",
+              "pt": root / "values-pt/strings.xml",
               "ru": root / "values-ru/strings.xml",
+              "ja": root / "values-ja/strings.xml",
+              "fr": root / "values-fr/strings.xml",
+              "de": root / "values-de/strings.xml",
+              "id": root / "values-id/strings.xml",
+              "ur": root / "values-ur/strings.xml",
+              "tr": root / "values-tr/strings.xml",
+              "ko": root / "values-ko/strings.xml",
+              "it": root / "values-it/strings.xml",
           }
           parsed = {}
           for locale, path in buckets.items():

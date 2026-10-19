@@ -1,21 +1,23 @@
 package com.vibesync.toolkit.pdf.presentation.viewer
 
 import android.app.Application
-import android.graphics.Bitmap
 import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vibesync.toolkit.pdf.R
+import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.PageMetadata
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.data.pdf.PdfRendererEngine
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -249,8 +251,14 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    suspend fun getPageBitmap(pageIndex: Int, scale: Float = 1.0f): Bitmap? =
-        rendererEngine.renderPage(pageIndex, scale)
+    /**
+     * Returns a cache lease for a page. The caller closes it when that page leaves composition,
+     * keeping its bitmap alive across cache eviction and low-memory cache clears.
+     */
+    suspend fun acquirePageBitmap(
+        pageIndex: Int,
+        scale: Float = 1.0f
+    ): BitmapCache.BitmapLease? = rendererEngine.renderPage(pageIndex, scale)
 
     fun cacheKeyForPage(pageIndex: Int, scale: Float): String? =
         rendererEngine.cacheKeyForPage(pageIndex, scale)
@@ -299,10 +307,22 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
     override fun onCleared() {
         loadSequence += 1
         loadJob?.cancel()
-        super.onCleared()
-        rendererEngine.closeDocument()
-        unlockedDocumentFile?.delete()
+        val fileToDelete = unlockedDocumentFile
         unlockedDocumentFile = null
+        super.onCleared()
+
+        // Never wait for PdfRenderer's native lock on the main thread during lifecycle teardown.
+        // This short-lived, standalone scope survives ViewModel scope cancellation and exits after
+        // renderer/page descriptors are closed and the decrypted cache source is deleted.
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                rendererEngine.closeDocumentSafely()
+            } catch (error: Exception) {
+                Log.w(TAG, "renderer.final_cleanup_failed category=" + error.javaClass.simpleName)
+            } finally {
+                fileToDelete?.delete()
+            }
+        }
     }
 
     companion object {

@@ -491,30 +491,36 @@ fun DashboardScreen(
             title = { Text(stringResource(R.string.select_language)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    TextButton(
-                        onClick = { onSelectLanguage(""); showLanguageDialog = false },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text(stringResource(R.string.language_system)) }
-                    TextButton(
-                        onClick = { onSelectLanguage("en"); showLanguageDialog = false },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text(stringResource(R.string.language_english)) }
-                    TextButton(
-                        onClick = { onSelectLanguage("de"); showLanguageDialog = false },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text(stringResource(R.string.language_german)) }
-                    TextButton(
-                        onClick = { onSelectLanguage("fr"); showLanguageDialog = false },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text(stringResource(R.string.language_french)) }
-                    TextButton(
-                        onClick = { onSelectLanguage("es"); showLanguageDialog = false },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text(stringResource(R.string.language_spanish)) }
-                    TextButton(
-                        onClick = { onSelectLanguage("ru"); showLanguageDialog = false },
-                        modifier = Modifier.fillMaxWidth()
-                    ) { Text(stringResource(R.string.language_russian)) }
+                    val languageOptions = listOf(
+                        "" to stringResource(R.string.language_system),
+                        "en" to stringResource(R.string.language_english),
+                        "es" to stringResource(R.string.language_spanish),
+                        "zh-CN" to stringResource(R.string.language_chinese),
+                        "hi" to stringResource(R.string.language_hindi),
+                        "ar" to stringResource(R.string.language_arabic),
+                        "bn" to stringResource(R.string.language_bengali),
+                        "pt" to stringResource(R.string.language_portuguese),
+                        "ru" to stringResource(R.string.language_russian),
+                        "ja" to stringResource(R.string.language_japanese),
+                        "fr" to stringResource(R.string.language_french),
+                        "de" to stringResource(R.string.language_german),
+                        "id" to stringResource(R.string.language_indonesian),
+                        "ur" to stringResource(R.string.language_urdu),
+                        "tr" to stringResource(R.string.language_turkish),
+                        "ko" to stringResource(R.string.language_korean),
+                        "it" to stringResource(R.string.language_italian)
+                    )
+                    languageOptions.forEach { (languageTag, label) ->
+                        TextButton(
+                            onClick = {
+                                onSelectLanguage(languageTag)
+                                showLanguageDialog = false
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(label)
+                        }
+                    }
                 }
             },
             confirmButton = {

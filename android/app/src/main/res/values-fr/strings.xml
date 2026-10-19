@@ -184,4 +184,16 @@
     <string name="document_load_error">Impossible d’ouvrir ce PDF. Vérifiez que le fichier est accessible, puis réessayez.</string>
     <string name="page_render_failed">Impossible d’afficher cette page.</string>
     <string name="retry">Réessayer</string>
+    <string name="language_chinese">简体中文</string>
+    <string name="language_hindi">हिन्दी</string>
+    <string name="language_arabic">العربية</string>
+    <string name="language_bengali">বাংলা</string>
+    <string name="language_portuguese">Português</string>
+    <string name="language_japanese">日本語</string>
+    <string name="language_indonesian">Bahasa Indonesia</string>
+    <string name="language_urdu">اردو</string>
+    <string name="language_turkish">Türkçe</string>
+    <string name="language_korean">한국어</string>
+    <string name="language_italian">Italiano</string>
+    <string name="pdf_brand_watermark">VibeSync All in ONE PDF Suite</string>
 </resources>

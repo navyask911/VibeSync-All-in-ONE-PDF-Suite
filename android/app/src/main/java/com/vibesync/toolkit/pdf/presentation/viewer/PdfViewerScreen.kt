@@ -1,6 +1,5 @@
 package com.vibesync.toolkit.pdf.presentation.viewer
 
-import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -34,7 +33,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
-import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -303,6 +301,42 @@ fun PdfViewerScreen(
     }
 }
 
+/**
+ * Explicit rendering states ensure a cache miss is a single loading attempt, not an implicit loop.
+ * The lease is retained independently of recompositions and released only when the item is disposed
+ * or a deliberate retry replaces the previous attempt.
+ */
+sealed interface PageRenderState {
+    data object Loading : PageRenderState
+    data class Success(val lease: BitmapCache.BitmapLease) : PageRenderState
+    data class Error(val cause: Throwable? = null) : PageRenderState
+}
+
+private class PageBitmapLeaseHolder {
+    private var lease: BitmapCache.BitmapLease? = null
+    private var disposed = false
+
+    @Synchronized
+    fun replace(next: BitmapCache.BitmapLease?): Boolean {
+        if (disposed) {
+            next?.close()
+            return false
+        }
+        val previous = lease
+        lease = next
+        if (previous !== next) previous?.close()
+        return true
+    }
+
+    @Synchronized
+    fun close() {
+        if (disposed) return
+        disposed = true
+        lease?.close()
+        lease = null
+    }
+}
+
 @Composable
 fun PdfPageItem(
     pageIndex: Int,
@@ -310,55 +344,63 @@ fun PdfPageItem(
     viewModel: PdfViewerViewModel,
     documentKey: String
 ) {
+    // LazyColumn item identity + explicit effect keys make scrolling/recomposition alone unable
+    // to restart a render. The retry counter changes only after a user presses Retry.
     var retryAttempt by remember(documentKey, pageIndex) { mutableIntStateOf(0) }
-    var bitmap by remember(documentKey, pageIndex) { mutableStateOf<Bitmap?>(null) }
-    var renderFailed by remember(documentKey, pageIndex) { mutableStateOf(false) }
+    var pageState by remember(documentKey, pageIndex) {
+        mutableStateOf<PageRenderState>(PageRenderState.Loading)
+    }
+    val leaseHolder = remember(documentKey, pageIndex) { PageBitmapLeaseHolder() }
+
+    DisposableEffect(leaseHolder) {
+        onDispose { leaseHolder.close() }
+    }
 
     LaunchedEffect(documentKey, pageIndex, retryAttempt) {
-        bitmap = null
-        renderFailed = false
+        leaseHolder.replace(null)
+        pageState = PageRenderState.Loading
         try {
-            val rendered = viewModel.getPageBitmap(pageIndex, scale = 1.5f)
-            if (rendered != null && !rendered.isRecycled) {
-                bitmap = rendered
+            val lease = viewModel.acquirePageBitmap(pageIndex, scale = PAGE_RENDER_SCALE)
+            if (lease == null) {
+                pageState = PageRenderState.Error()
+            } else if (lease.bitmap.isRecycled) {
+                lease.close()
+                pageState = PageRenderState.Error()
+            } else if (leaseHolder.replace(lease)) {
+                pageState = PageRenderState.Success(lease)
             } else {
-                // Null is terminal for this attempt, not an implicit request to keep spinning.
-                renderFailed = true
+                pageState = PageRenderState.Error()
             }
         } catch (cancelled: CancellationException) {
             throw cancelled
-        } catch (_: OutOfMemoryError) {
-            renderFailed = true
-        } catch (_: Exception) {
-            renderFailed = true
+        } catch (error: OutOfMemoryError) {
+            pageState = PageRenderState.Error(error)
+        } catch (error: Exception) {
+            pageState = PageRenderState.Error(error)
         }
     }
 
-    val validBitmap = bitmap?.takeUnless { it.isRecycled }
-    val cacheKey = if (validBitmap != null) {
-        viewModel.cacheKeyForPage(pageIndex, scale = 1.5f)
-    } else null
-
-    // Prevent LruCache eviction from recycling an image while Compose is displaying it.
-    DisposableEffect(cacheKey) {
-        cacheKey?.let { BitmapCache.getInstance().markActive(it) }
-        onDispose {
-            cacheKey?.let { BitmapCache.getInstance().markInactive(it) }
-        }
-    }
+    val bitmap = (pageState as? PageRenderState.Success)?.lease?.bitmap
+    val bitmapReady = bitmap != null && !bitmap.isRecycled
+    val renderFailed = pageState is PageRenderState.Error ||
+        (pageState is PageRenderState.Success && !bitmapReady)
+    val safeAspectRatio = aspectRatio
+        .takeIf { it.isFinite() && it > 0f }
+        ?.coerceIn(0.1f, 10f)
+        ?: (595f / 842f)
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .aspectRatio(aspectRatio)
+            .aspectRatio(safeAspectRatio)
             .shadow(4.dp, RoundedCornerShape(4.dp)),
         shape = RoundedCornerShape(4.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
         when {
-            validBitmap != null -> {
+            bitmapReady -> {
                 Image(
-                    bitmap = validBitmap.asImageBitmap(),
+                    bitmap = checkNotNull(bitmap).asImageBitmap(),
                     contentDescription = stringResource(R.string.pdf_page_description, pageIndex + 1),
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit
@@ -370,7 +412,7 @@ fun PdfPageItem(
                     contentAlignment = Alignment.BottomCenter
                 ) {
                     Text(
-                        text = "VibeSync All in ONE PDF Suite",
+                        text = stringResource(R.string.pdf_brand_watermark),
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
                         color = Color(0xFF8E0000).copy(alpha = 0.55f),
                         fontSize = 8.sp,
@@ -410,10 +452,12 @@ fun PdfPageItem(
                     CircularProgressIndicator(
                         modifier = Modifier.size(24.dp),
                         strokeWidth = 2.dp,
-                        color = Color.LightGray
+                        color = VibeSyncCrimsonPrimary
                     )
                 }
             }
         }
     }
 }
+
+private const val PAGE_RENDER_SCALE = 1.5f
