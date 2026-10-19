@@ -62,7 +62,10 @@ class PdfRendererEngine(private val context: Context) {
     /**
      * Opens a PDF document from a content or file Uri.
      */
-    suspend fun openDocument(uri: Uri): Result<Int> = withContext(Dispatchers.IO) {
+    suspend fun openDocument(
+        uri: Uri,
+        onActivity: (() -> Unit)? = null
+    ): Result<Int> = withContext(Dispatchers.IO) {
         val startedAt = SystemClock.elapsedRealtime()
         val requestId = UUID.randomUUID().toString()
         val operationContext = currentCoroutineContext()
@@ -89,6 +92,7 @@ class PdfRendererEngine(private val context: Context) {
                             "elapsedMs=${SystemClock.elapsedRealtime() - copyStartedAt}"
                     )
                 }
+                onActivity = onActivity
             )
             operationContext.ensureActive()
             val stagedFile = requireNotNull(preparedFile)
@@ -115,6 +119,7 @@ class PdfRendererEngine(private val context: Context) {
                     transferredToRenderer = true
 
                     stage = "open_descriptor"
+                    onActivity?.invoke()
                     val descriptorStartedAt = SystemClock.elapsedRealtime()
                     Log.i(TAG, "open.stage request=$requestId stage=open_descriptor status=start")
                     parcelFileDescriptor = ParcelFileDescriptor.open(
@@ -128,6 +133,7 @@ class PdfRendererEngine(private val context: Context) {
                     )
 
                     stage = "initialize_renderer"
+                    onActivity?.invoke()
                     val rendererStartedAt = SystemClock.elapsedRealtime()
                     Log.i(TAG, "open.stage request=$requestId stage=initialize_renderer status=start")
                     synchronized(renderLock) {
@@ -141,6 +147,7 @@ class PdfRendererEngine(private val context: Context) {
                     )
 
                     stage = "read_page_count"
+                    onActivity?.invoke()
                     Log.i(TAG, "open.stage request=$requestId stage=read_page_count status=start")
                     val count = pageCount
                     if (count <= 0) throw IOException("The selected PDF contains no readable pages.")
@@ -237,7 +244,8 @@ class PdfRendererEngine(private val context: Context) {
      */
     suspend fun renderPageLease(
         pageIndex: Int,
-        scale: Float = 1.0f
+        scale: Float = 1.0f,
+        onActivity: (() -> Unit)? = null
     ): BitmapCache.BitmapLease? {
         if (!scale.isFinite() || scale <= 0f) return null
 
@@ -272,7 +280,13 @@ class PdfRendererEngine(private val context: Context) {
                     var renderedBitmap: Bitmap? = null
                     try {
                         renderedBitmap = try {
-                            renderPageBitmap(renderer, pageIndex, renderScale, Bitmap.Config.ARGB_8888)
+                            renderPageBitmap(
+                                renderer,
+                                pageIndex,
+                                renderScale,
+                                Bitmap.Config.ARGB_8888,
+                                onActivity
+                            )
                         } catch (firstOom: OutOfMemoryError) {
                             Log.w(
                                 TAG,
@@ -284,7 +298,8 @@ class PdfRendererEngine(private val context: Context) {
                                     renderer,
                                     pageIndex,
                                     minOf(renderScale, LOW_MEMORY_RETRY_SCALE),
-                                    Bitmap.Config.RGB_565
+                                    Bitmap.Config.RGB_565,
+                                    onActivity
                                 )
                             } catch (retryOom: OutOfMemoryError) {
                                 Log.e(TAG, "Reduced-memory page render also exhausted memory.", retryOom)
@@ -412,7 +427,8 @@ class PdfRendererEngine(private val context: Context) {
         renderer: PdfRenderer,
         pageIndex: Int,
         requestedScale: Float,
-        config: Bitmap.Config
+        config: Bitmap.Config,
+        onActivity: (() -> Unit)? = null
     ): Bitmap {
         val startedAt = SystemClock.elapsedRealtime()
         var stage = "open_page"
@@ -421,6 +437,7 @@ class PdfRendererEngine(private val context: Context) {
             TAG,
             "render.start document=$currentDocumentId page=$pageIndex scale=$requestedScale"
         )
+        onActivity?.invoke()
         val page = try {
             Log.d(TAG, "render.stage document=$currentDocumentId page=$pageIndex stage=open_page status=start")
             renderer.openPage(pageIndex)
@@ -450,6 +467,7 @@ class PdfRendererEngine(private val context: Context) {
 
             stage = "allocate_bitmap"
             Log.d(TAG, "render.stage document=$currentDocumentId page=$pageIndex stage=$stage status=start")
+            onActivity?.invoke()
             bitmap = Bitmap.createBitmap(dimensions.width, dimensions.height, config)
             bitmap.eraseColor(Color.WHITE)
 
@@ -458,6 +476,7 @@ class PdfRendererEngine(private val context: Context) {
             }
             stage = "native_page_render"
             Log.d(TAG, "render.stage document=$currentDocumentId page=$pageIndex stage=$stage status=start")
+            onActivity?.invoke()
             page.render(bitmap, null, matrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
             Log.i(
                 TAG,
@@ -505,7 +524,8 @@ class PdfRendererEngine(private val context: Context) {
      */
     suspend fun getPagesMetadata(
         startIndex: Int,
-        endExclusive: Int
+        endExclusive: Int,
+        onActivity: (() -> Unit)? = null
     ): List<PageMetadata> = withContext(Dispatchers.IO) {
         val coroutineContext = currentCoroutineContext()
         val expectedDocumentId = synchronized(renderLock) { currentDocumentId }
@@ -516,6 +536,7 @@ class PdfRendererEngine(private val context: Context) {
         val result = ArrayList<PageMetadata>((end - start).coerceAtMost(256))
         for (pageIndex in start until end) {
             coroutineContext.ensureActive()
+            onActivity?.invoke()
             val metadata = synchronized(renderLock) {
                 if (currentDocumentId != expectedDocumentId) return@synchronized null
                 val renderer = pdfRenderer ?: return@synchronized null
@@ -563,6 +584,7 @@ class PdfRendererEngine(private val context: Context) {
                 }
             }
             if (metadata == null) break
+            onActivity?.invoke()
             result.add(metadata)
         }
 

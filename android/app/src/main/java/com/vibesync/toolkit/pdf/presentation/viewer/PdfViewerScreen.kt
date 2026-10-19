@@ -491,4 +491,4 @@ fun PdfPageItem(
 }
 
 private const val PAGE_RENDER_SCALE = 1.5f
-private const val PAGE_RENDER_WATCHDOG_MS = 30_000L
+private const val PAGE_RENDER_WATCHDOG_MS = 90_000L

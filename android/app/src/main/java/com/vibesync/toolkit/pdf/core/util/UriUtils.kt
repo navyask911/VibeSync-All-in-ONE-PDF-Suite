@@ -75,7 +75,8 @@ object UriUtils {
         uri: Uri,
         prefix: String = "doc_",
         cancellationCheck: (() -> Unit)? = null,
-        onProgress: ((Long) -> Unit)? = null
+        onProgress: ((Long) -> Unit)? = null,
+        onActivity: (() -> Unit)? = null
     ): File {
         val cacheDir = File(context.cacheDir, "pdf_cache").apply {
             if (!exists() && !mkdirs()) {
@@ -94,6 +95,7 @@ object UriUtils {
 
         try {
             cancellationCheck?.invoke()
+            onActivity?.invoke()
             val inputStream: InputStream = when (uri.scheme?.lowercase(Locale.US)) {
                 "file" -> FileInputStream(
                     requireNotNull(uri.path) { "File Uri has no path." }
@@ -119,6 +121,7 @@ object UriUtils {
                         output.write(buffer, 0, bytesRead)
                         totalBytes += bytesRead
                         cancellationCheck?.invoke()
+                        onActivity?.invoke()
 
                         if (totalBytes - lastProgressBytes >= 1024L * 1024L) {
                             onProgress?.invoke(totalBytes)
@@ -133,8 +136,8 @@ object UriUtils {
             if (totalBytes <= 0L || tempFile.length() <= 0L) {
                 throw java.io.IOException("The selected PDF is empty.")
             }
-            copiedSuccessfully = true
             onProgress?.invoke(totalBytes)
+            copiedSuccessfully = true
             return tempFile
         } finally {
             if (!copiedSuccessfully && tempFile.exists() && !tempFile.delete()) {

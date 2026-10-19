@@ -27,10 +27,12 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.atomic.AtomicLong
 
 private const val PAGE_METADATA_BATCH_SIZE = 16
-private const val DOCUMENT_LOAD_WATCHDOG_MS = 30_000L
 private const val FIRST_PAGE_VALIDATION_SCALE = 1.5f
+private const val DOCUMENT_LOAD_STALL_TIMEOUT_MS = 60_000L
+private const val DOCUMENT_LOAD_WATCHDOG_POLL_MS = 5_000L
 
 data class ViewerUiState(
     val fileName: String = "",
@@ -75,6 +77,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
         val previousClose = closeJob
         activeUri = uri
         val app = getApplication<Application>()
+        val lastActivityAt = AtomicLong(SystemClock.elapsedRealtime())
         val fallbackName = uri.lastPathSegment
             ?.substringAfterLast('/')
             ?.takeIf { it.isNotBlank() }
@@ -92,26 +95,37 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
         )
 
         loadWatchdogJob = viewModelScope.launch {
-            delay(DOCUMENT_LOAD_WATCHDOG_MS)
-            if (requestId == loadSequence && _uiState.value.isLoading) {
-                timedOutRequestId = requestId
-                _uiState.value = _uiState.value.copy(
-                    isLoading = false,
-                    isPasswordRequired = false,
-                    errorMessage = app.getString(R.string.document_load_error)
-                )
-                Log.e(
-                    TAG,
-                    "load.watchdog_timeout request=$requestId timeoutMs=$DOCUMENT_LOAD_WATCHDOG_MS"
-                )
-                // This is cooperative; the terminal UI above is independent of a provider/native
-                // call that might not return promptly when its coroutine is cancelled.
-                loadJob?.cancel()
+            while (requestId == loadSequence && _uiState.value.isLoading) {
+                delay(DOCUMENT_LOAD_WATCHDOG_POLL_MS)
+                if (requestId != loadSequence || !_uiState.value.isLoading) return@launch
+
+                val idleMs = SystemClock.elapsedRealtime() - lastActivityAt.get()
+                if (idleMs >= DOCUMENT_LOAD_STALL_TIMEOUT_MS) {
+                    timedOutRequestId = requestId
+                    _uiState.value = _uiState.value.copy(
+                        isLoading = false,
+                        isPasswordRequired = false,
+                        errorMessage = app.getString(R.string.document_load_error)
+                    )
+                    Log.e(
+                        TAG,
+                        "load.watchdog_timeout request=$requestId " +
+                            "idleMs=$idleMs idleTimeoutMs=$DOCUMENT_LOAD_STALL_TIMEOUT_MS"
+                    )
+                    // The UI timeout is independent of a provider/native call that ignores
+                    // cooperative cancellation.
+                    loadJob?.cancel()
+                    return@launch
+                }
             }
         }
 
         loadJob = viewModelScope.launch {
             val startedAt = SystemClock.elapsedRealtime()
+            val markActivity: () -> Unit = {
+                lastActivityAt.set(SystemClock.elapsedRealtime())
+            }
+            markActivity()
             var pendingUnlockedFile: File? = null
             Log.i(TAG, "load.start request=" + requestId + " scheme=" + (uri.scheme ?: "unknown"))
             try {
@@ -128,11 +142,14 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 val fileName = fallbackName
                 Log.d(TAG, "load.stage request=$requestId stage=filename_fallback status=success")
 
+                markActivity()
                 var targetUri = uri
                 if (!password.isNullOrBlank()) {
                     val outputFile = UriUtils.createExportCacheFile(app, "unlocked_doc")
                     pendingUnlockedFile = outputFile
+                    markActivity()
                     val decryptResult = toolkitEngine.decryptPdf(uri, password, outputFile)
+                    markActivity()
                     currentCoroutineContext().ensureActive()
                     if (decryptResult.isFailure) {
                         val decryptError = decryptResult.exceptionOrNull()
@@ -162,7 +179,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 }
 
                 Log.d(TAG, "load.renderer_open_start request=" + requestId)
-                val openResult = rendererEngine.openDocument(targetUri)
+                val openResult = rendererEngine.openDocument(targetUri, onActivity = markActivity)
                 currentCoroutineContext().ensureActive()
                 if (requestId != loadSequence) return@launch
                 if (requestId == timedOutRequestId) {
@@ -175,7 +192,11 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 }
 
                 Log.i(TAG, "load.stage request=$requestId stage=renderer_open status=success pages=$count")
-                val firstPageMetadata = rendererEngine.getPagesMetadata(0, 1).firstOrNull()
+                val firstPageMetadata = rendererEngine.getPagesMetadata(
+                    0,
+                    1,
+                    onActivity = markActivity
+                ).firstOrNull()
                     ?: throw IllegalStateException(app.getString(R.string.document_load_error))
                 currentCoroutineContext().ensureActive()
                 if (requestId != loadSequence) return@launch
@@ -188,7 +209,8 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 val firstPageRenderStartedAt = SystemClock.elapsedRealtime()
                 val firstPageLease = rendererEngine.renderPageLease(
                     pageIndex = 0,
-                    scale = FIRST_PAGE_VALIDATION_SCALE
+                    scale = FIRST_PAGE_VALIDATION_SCALE,
+                    onActivity = markActivity
                 ) ?: throw IllegalStateException("The first PDF page could not be rendered.")
                 try {
                     val firstBitmap = firstPageLease.bitmap
