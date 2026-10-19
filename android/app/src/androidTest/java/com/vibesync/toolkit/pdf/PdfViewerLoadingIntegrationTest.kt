@@ -4,6 +4,15 @@ import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Color as AndroidColor
 import android.net.Uri
+import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.waitUntil
 import androidx.lifecycle.ViewModelStore
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -23,12 +32,16 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class PdfViewerLoadingIntegrationTest {
+
+    @get:Rule
+    val composeTestRule = createComposeRule()
 
     @Test
     fun realProviderPdfLoadsFirstPageAndRendersKnownContent() = runBlocking {
@@ -98,6 +111,76 @@ class PdfViewerLoadingIntegrationTest {
             assertNotNull("Corrupt input must show an actionable error.", failed.errorMessage)
         } finally {
             store.clear()
+            source.delete()
+        }
+    }
+
+
+    @Test
+    fun composeViewerDisplaysRealFirstPageAndRemovesDocumentSpinner() {
+        val application = ApplicationProvider.getApplicationContext<Application>()
+        PDFBoxResourceLoader.init(application)
+        val cacheDir = File(application.cacheDir, "pdf_cache").apply { mkdirs() }
+        val source = File(cacheDir, "viewer_ui_${System.nanoTime()}.pdf")
+        val store = ViewModelStore()
+        val viewModel = PdfViewerViewModel(application)
+        store.put("pdf-viewer-compose-success", viewModel)
+
+        try {
+            createKnownPdf(source, pageCount = 2)
+            val uri = UriUtils.getShareableUri(application, source)
+            composeTestRule.setContent {
+                PdfViewerScreen(
+                    documentUri = uri,
+                    viewModel = viewModel,
+                    onNavigateBack = {},
+                    onNavigateToEditor = {},
+                    onShareDocument = {}
+                )
+            }
+
+            composeTestRule.waitUntil(timeoutMillis = 20_000L) {
+                composeTestRule.onAllNodesWithContentDescription("PDF page 1")
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+            composeTestRule.onNodeWithContentDescription("PDF page 1").assertIsDisplayed()
+            composeTestRule.onNodeWithTag("pdf_document_loading").assertDoesNotExist()
+        } finally {
+            composeTestRule.runOnIdle { store.clear() }
+            source.delete()
+        }
+    }
+
+    @Test
+    fun composeViewerShowsActionableErrorForCorruptPdfInsteadOfGlobalSpinner() {
+        val application = ApplicationProvider.getApplicationContext<Application>()
+        val source = File(application.cacheDir, "viewer_ui_corrupt_${System.nanoTime()}.pdf")
+        val store = ViewModelStore()
+        val viewModel = PdfViewerViewModel(application)
+        store.put("pdf-viewer-compose-corrupt", viewModel)
+
+        try {
+            source.writeBytes(byteArrayOf(0x01, 0x02, 0x03, 0x04))
+            val uri = Uri.fromFile(source)
+            composeTestRule.setContent {
+                PdfViewerScreen(
+                    documentUri = uri,
+                    viewModel = viewModel,
+                    onNavigateBack = {},
+                    onNavigateToEditor = {},
+                    onShareDocument = {}
+                )
+            }
+
+            composeTestRule.waitUntil(timeoutMillis = 20_000L) {
+                composeTestRule.onAllNodesWithText("Error opening PDF")
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+            composeTestRule.onNodeWithText("Error opening PDF").assertIsDisplayed()
+            composeTestRule.onNodeWithText("Retry").assertIsDisplayed()
+            composeTestRule.onNodeWithTag("pdf_document_loading").assertDoesNotExist()
+        } finally {
+            composeTestRule.runOnIdle { store.clear() }
             source.delete()
         }
     }

@@ -179,7 +179,9 @@ fun PdfViewerScreen(
         ) {
             if (uiState.isLoading) {
                 CircularProgressIndicator(
-                    modifier = Modifier.align(Alignment.Center),
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .testTag("pdf_document_loading"),
                     color = VibeSyncCrimsonPrimary
                 )
             } else if (uiState.errorMessage != null) {
@@ -476,7 +478,9 @@ fun PdfPageItem(
                     contentAlignment = Alignment.Center
                 ) {
                     CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
+                        modifier = Modifier
+                            .size(24.dp)
+                            .testTag("pdf_page_loading"),
                         strokeWidth = 2.dp,
                         color = VibeSyncCrimsonPrimary
                     )
