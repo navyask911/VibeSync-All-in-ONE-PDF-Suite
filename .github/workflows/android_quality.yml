@@ -105,6 +105,7 @@ jobs:
           gradle wrapper --gradle-version 8.13 --distribution-type bin
           chmod +x gradlew
           ./gradlew testDebugUnitTest --no-daemon --stacktrace
+          ./gradlew lintDebug --no-daemon --stacktrace
 
   ui-tests:
     name: Instrumented Compose UI Tests

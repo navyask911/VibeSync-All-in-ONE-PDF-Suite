@@ -63,6 +63,7 @@ jobs:
           chmod +x gradlew
           ./gradlew --version
           ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
+          ./gradlew :app:lintDebug --no-daemon --stacktrace
           ./gradlew :app:assembleDebug --no-daemon --stacktrace
           ./gradlew :app:bundleRelease --no-daemon --stacktrace
           ./gradlew :app:assembleRelease --no-daemon --stacktrace
