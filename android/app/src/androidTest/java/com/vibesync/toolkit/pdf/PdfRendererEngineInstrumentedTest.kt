@@ -11,6 +11,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
@@ -28,6 +29,7 @@ class PdfRendererEngineInstrumentedTest {
     fun concurrentRequestsReuseLeasedBitmapAndCloseSafelyDuringContinuousScrolling() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val file = File(context.cacheDir, "renderer_concurrency_${System.nanoTime()}.pdf")
+        PDFBoxResourceLoader.init(context)
         val engine = PdfRendererEngine(context)
         val leases = mutableListOf<BitmapCache.BitmapLease>()
 

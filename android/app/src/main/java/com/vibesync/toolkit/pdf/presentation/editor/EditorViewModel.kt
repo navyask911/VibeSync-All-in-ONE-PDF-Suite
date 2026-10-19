@@ -2,6 +2,7 @@ package com.vibesync.toolkit.pdf.presentation.editor
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.util.Log
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -13,6 +14,9 @@ import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.*
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.data.pdf.PdfRendererEngine
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -233,6 +237,17 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     override fun onCleared() {
         super.onCleared()
-        rendererEngine.closeDocument()
+        // Rendering and native close share the renderer lock. Never block the main thread
+        // waiting for an in-flight PDF page render during lifecycle teardown.
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                rendererEngine.closeDocumentSafely()
+            } catch (error: Exception) {
+                Log.w(
+                    "EditorViewModel",
+                    "renderer.cleanup_failed category=" + error.javaClass.simpleName
+                )
+            }
+        }
     }
 }
