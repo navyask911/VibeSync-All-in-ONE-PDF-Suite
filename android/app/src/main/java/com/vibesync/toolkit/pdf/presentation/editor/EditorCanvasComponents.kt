@@ -72,6 +72,7 @@ fun VectorCanvasOverlay(
     existingStrokes: List<VectorStroke>,
     onStrokeAdded: (VectorStroke) -> Unit,
     onTap: (Offset) -> Unit,
+    onEraseAt: (Offset) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var activePoints by remember { mutableStateOf<List<Point2D>>(emptyList()) }
@@ -79,6 +80,28 @@ fun VectorCanvasOverlay(
     val inputModifier = when (toolMode) {
         ToolMode.TEXT -> modifier.pointerInput(Unit) {
             detectTapGestures { offset -> onTap(offset) }
+        }
+        ToolMode.ERASER -> modifier.pointerInput(toolMode) {
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                down.consume()
+                var lastPosition = down.position
+                onEraseAt(lastPosition)
+
+                var isPressed = true
+                while (isPressed) {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                    val position = change.position
+                    // Dense eraser sampling removes only overlay annotations along the path.
+                    if ((position - lastPosition).getDistance() >= 2f) {
+                        onEraseAt(position)
+                        lastPosition = position
+                    }
+                    change.consume()
+                    isPressed = change.pressed
+                }
+            }
         }
         ToolMode.PEN, ToolMode.HIGHLIGHTER -> modifier.pointerInput(toolMode, strokeColor, strokeWidth) {
             awaitEachGesture {
@@ -125,9 +148,10 @@ fun VectorCanvasOverlay(
     }
 
     Canvas(modifier = inputModifier.fillMaxSize()) {
-        // Non-destructive sibling overlay above the PDF bitmap. Multiply blends pastel color
-        // with page pixels while preserving dark glyphs; neither the source bitmap nor its text
-        // layer is ever erased or mutated by the highlighter.
+        // This is a sibling annotation overlay drawn above the read-only PDF bitmap. The eraser
+        // removes only VectorStroke entries from the annotation model; it never uses BlendMode.Clear
+        // and can therefore never clear the underlying PDF pixels or source text.
+        // Multiply blends pastel highlighter color with page pixels while preserving glyph edges.
         existingStrokes.forEach { stroke ->
             if (stroke.points.size >= 2) {
                 val highlighter = stroke.isHighlighter

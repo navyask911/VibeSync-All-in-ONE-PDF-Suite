@@ -40,6 +40,32 @@ class EditorViewModelTest {
     }
 
     @Test
+    fun eraserRemovesOnlyAnnotationStrokesAndUndoRestoresThemWithoutRemovingText() {
+        viewModel.addTextAnnotation("Keep source text", 12f, 24f)
+        viewModel.addStroke(
+            VectorStroke(
+                points = listOf(
+                    com.vibesync.toolkit.pdf.data.model.Point2D(0f, 20f),
+                    com.vibesync.toolkit.pdf.data.model.Point2D(80f, 20f)
+                ),
+                colorArgb = Color.Yellow.toArgb(),
+                strokeWidth = 8f,
+                isHighlighter = true,
+                alpha = 0.35f
+            )
+        )
+
+        viewModel.eraseStrokeAt(x = 40f, y = 21f, radius = 8f)
+
+        assertTrue(viewModel.uiState.value.currentStrokes.isEmpty())
+        assertEquals("Keep source text", viewModel.uiState.value.currentTextAnnotations.single().text)
+
+        viewModel.undo()
+        assertEquals(1, viewModel.uiState.value.currentStrokes.size)
+        assertEquals("Keep source text", viewModel.uiState.value.currentTextAnnotations.single().text)
+    }
+
+    @Test
     fun signatureAndStrokeCanBothBeRevertedIndependently() {
         val stroke = VectorStroke(
             points = listOf(

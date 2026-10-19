@@ -234,6 +234,71 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         persistCurrentPageAnnotations()
     }
 
+    /**
+     * Erases only user-created overlay strokes near the finger. The PDF bitmap/source is read-only,
+     * and original text, images, form content, text annotations, and signatures are not touched.
+     * Erasing is recorded in undo history like any other annotation edit.
+     */
+    fun eraseStrokeAt(x: Float, y: Float, radius: Float = 24f) {
+        val current = _uiState.value
+        if (!x.isFinite() || !y.isFinite() || !radius.isFinite()) return
+        val safeRadius = radius.coerceAtLeast(0f)
+        val strokesToRemove = current.currentStrokes.filter { stroke ->
+            val points = stroke.points
+            if (points.isEmpty()) {
+                false
+            } else {
+                val hitRadius = safeRadius + stroke.strokeWidth.coerceAtLeast(0f) / 2f
+                val hitRadiusSquared = hitRadius * hitRadius
+                if (points.size == 1) {
+                    distanceSquaredToPoint(x, y, points.first().x, points.first().y) <= hitRadiusSquared
+                } else {
+                    points.zipWithNext().any { (start, end) ->
+                        distanceSquaredToSegmentSquared(x, y, start.x, start.y, end.x, end.y) <= hitRadiusSquared
+                    }
+                }
+            }
+        }
+        if (strokesToRemove.isEmpty()) return
+
+        undoStack.add(currentPageAnnotations())
+        redoStack.clear()
+        val updatedStrokes = current.currentStrokes.filterNot { stroke -> stroke in strokesToRemove }
+        _uiState.value = current.copy(
+            currentStrokes = updatedStrokes,
+            canUndo = undoStack.isNotEmpty(),
+            canRedo = redoStack.isNotEmpty()
+        )
+        persistCurrentPageAnnotations()
+    }
+
+    private fun distanceSquaredToPoint(x: Float, y: Float, pointX: Float, pointY: Float): Float {
+        val dx = x - pointX
+        val dy = y - pointY
+        return dx * dx + dy * dy
+    }
+
+    private fun distanceSquaredToSegmentSquared(
+        x: Float,
+        y: Float,
+        startX: Float,
+        startY: Float,
+        endX: Float,
+        endY: Float
+    ): Float {
+        val dx = endX - startX
+        val dy = endY - startY
+        val lengthSquared = dx * dx + dy * dy
+        val t = if (lengthSquared <= 0f) {
+            0f
+        } else {
+            (((x - startX) * dx + (y - startY) * dy) / lengthSquared).coerceIn(0f, 1f)
+        }
+        val nearestX = startX + t * dx
+        val nearestY = startY + t * dy
+        return distanceSquaredToPoint(x, y, nearestX, nearestY)
+    }
+
     fun addTextAnnotation(text: String, x: Float, y: Float) {
         val annotation = TextAnnotation(
             x = x,

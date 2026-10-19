@@ -23,7 +23,6 @@ import com.vibesync.toolkit.pdf.presentation.editor.HighlighterPalette
 import com.vibesync.toolkit.pdf.presentation.editor.PdfEditorScreen
 import io.mockk.coEvery
 import io.mockk.every
-import io.mockk.firstArg
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -103,10 +102,10 @@ class PdfEditorScreenTest {
         val state = MutableStateFlow(EditorUiState(isDocumentLoading = false, isDocumentLoaded = true))
         every { viewModel.uiState } returns state
         every { viewModel.selectTool(any()) } answers {
-            state.value = state.value.copy(toolMode = firstArg())
+            state.value = state.value.copy(toolMode = ToolMode.HIGHLIGHTER)
         }
         every { viewModel.selectColor(any()) } answers {
-            state.value = state.value.copy(selectedColor = firstArg())
+            state.value = state.value.copy(selectedColor = HighlighterPalette.colors.first().color)
         }
         val bitmap = Bitmap.createBitmap(12, 12, Bitmap.Config.ARGB_8888)
         coEvery { viewModel.getPageBitmap(any()) } returns bitmap

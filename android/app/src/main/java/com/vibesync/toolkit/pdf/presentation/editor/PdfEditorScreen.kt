@@ -121,8 +121,11 @@ fun PdfEditorScreen(
                 Column(
                     modifier = Modifier
                         .testTag("editor_bottom_toolbar")
-                        .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
-                        .padding(12.dp)
+                        .windowInsetsPadding(
+                            WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom)
+                                .union(WindowInsets.ime)
+                        )
+                        .padding(start = 12.dp, top = 12.dp, end = 12.dp, bottom = 16.dp)
                 ) {
                     // Tool Palette Selector
                     Row(
@@ -147,6 +150,13 @@ fun PdfEditorScreen(
                                 }
                                 viewModel.selectTool(ToolMode.HIGHLIGHTER)
                             }
+                        )
+                        ToolIconButton(
+                            icon = Icons.Default.Delete,
+                            label = stringResource(R.string.tool_remove),
+                            testTag = "Eraser",
+                            isSelected = uiState.toolMode == ToolMode.ERASER,
+                            onClick = { viewModel.selectTool(ToolMode.ERASER) }
                         )
                         ToolIconButton(
                             icon = Icons.Default.TextFields,
@@ -352,6 +362,13 @@ fun PdfEditorScreen(
                     strokeWidth = uiState.strokeWidth,
                     existingStrokes = uiState.currentStrokes,
                     onStrokeAdded = { stroke -> viewModel.addStroke(stroke) },
+                    onEraseAt = { offset ->
+                        viewModel.eraseStrokeAt(
+                            x = offset.x,
+                            y = offset.y,
+                            radius = with(density) { 18.dp.toPx() }
+                        )
+                    },
                     onTap = { offset ->
                         if (uiState.toolMode == ToolMode.TEXT) {
                             pendingTapOffset = offset
