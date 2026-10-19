@@ -13,6 +13,7 @@ import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.FormFieldItem
 import com.vibesync.toolkit.pdf.data.model.FormFieldType
 import com.vibesync.toolkit.pdf.data.model.PageAnnotations
+import com.vibesync.toolkit.pdf.data.model.VectorStroke
 import com.tom_roush.pdfbox.cos.COSName
 import com.tom_roush.pdfbox.io.MemoryUsageSetting
 import com.tom_roush.pdfbox.multipdf.PDFMergerUtility
@@ -25,6 +26,7 @@ import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.encryption.AccessPermission
 import com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy
 import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
+import com.tom_roush.pdfbox.pdmodel.graphics.blend.BlendMode
 import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
 import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
 import com.tom_roush.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState
@@ -441,11 +443,13 @@ class PdfBoxToolkitEngine(private val context: Context) {
 
                         PDPageContentStream(document, page, PDPageContentStream.AppendMode.APPEND, true, true).use { cs ->
 
-                            // 1. Highlighters (semi-transparent stroke with graphics state)
+                            // Highlighters are a separate translucent appended content stream.
+                            // The underlying source text/vector objects are never rewritten.
                             annotations.strokes.filter { it.isHighlighter }.forEach { stroke ->
                                 if (stroke.points.size >= 2) {
                                     val gs = PDExtendedGraphicsState().apply {
-                                        strokingAlphaConstant = 0.35f
+                                        strokingAlphaConstant = stroke.alpha.coerceIn(0.30f, 0.40f)
+                                        blendMode = BlendMode.MULTIPLY
                                     }
                                     cs.setGraphicsStateParameters(gs)
                                     val r = Color.red(stroke.colorArgb) / 255f
@@ -453,16 +457,9 @@ class PdfBoxToolkitEngine(private val context: Context) {
                                     val b = Color.blue(stroke.colorArgb) / 255f
                                     cs.setStrokingColor(r, g, b)
                                     cs.setLineWidth(stroke.strokeWidth * scaleFactor)
-
-                                    val first = stroke.points.first()
-                                    val startPdfX = first.x * scaleFactor
-                                    val startPdfY = pageHeightPt - (first.y * scaleFactor)
-                                    cs.moveTo(startPdfX, startPdfY)
-
-                                    for (i in 1 until stroke.points.size) {
-                                        val pt = stroke.points[i]
-                                        cs.lineTo(pt.x * scaleFactor, pageHeightPt - (pt.y * scaleFactor))
-                                    }
+                                    cs.setLineCapStyle(1)
+                                    cs.setLineJoinStyle(1)
+                                    appendSmoothedStrokePath(cs, stroke, scaleFactor, pageHeightPt)
                                     cs.stroke()
                                 }
                             }
@@ -479,16 +476,9 @@ class PdfBoxToolkitEngine(private val context: Context) {
                                     val b = Color.blue(stroke.colorArgb) / 255f
                                     cs.setStrokingColor(r, g, b)
                                     cs.setLineWidth(stroke.strokeWidth * scaleFactor)
-
-                                    val first = stroke.points.first()
-                                    val startPdfX = first.x * scaleFactor
-                                    val startPdfY = pageHeightPt - (first.y * scaleFactor)
-                                    cs.moveTo(startPdfX, startPdfY)
-
-                                    for (i in 1 until stroke.points.size) {
-                                        val pt = stroke.points[i]
-                                        cs.lineTo(pt.x * scaleFactor, pageHeightPt - (pt.y * scaleFactor))
-                                    }
+                                    cs.setLineCapStyle(1)
+                                    cs.setLineJoinStyle(1)
+                                    appendSmoothedStrokePath(cs, stroke, scaleFactor, pageHeightPt)
                                     cs.stroke()
                                 }
                             }
@@ -582,6 +572,50 @@ class PdfBoxToolkitEngine(private val context: Context) {
         } finally {
             sourceFileToDelete?.delete()
         }
+    }
+
+    /**
+     * Writes the same quadratic midpoint interpolation as the on-screen canvas. PDF content
+     * streams use cubic Beziers, so each quadratic segment is converted to cubic control points.
+     */
+    private fun appendSmoothedStrokePath(
+        contentStream: PDPageContentStream,
+        stroke: VectorStroke,
+        scaleFactor: Float,
+        pageHeightPt: Float
+    ) {
+        val points = stroke.points
+        if (points.size < 2) return
+
+        fun pdfX(x: Float) = x * scaleFactor
+        fun pdfY(y: Float) = pageHeightPt - (y * scaleFactor)
+        contentStream.moveTo(pdfX(points.first().x), pdfY(points.first().y))
+
+        if (points.size == 2) {
+            contentStream.lineTo(pdfX(points.last().x), pdfY(points.last().y))
+            return
+        }
+
+        var pathX = points.first().x
+        var pathY = points.first().y
+        for (index in 1 until points.lastIndex) {
+            val current = points[index]
+            val next = points[index + 1]
+            val endX = (current.x + next.x) / 2f
+            val endY = (current.y + next.y) / 2f
+            val control1X = pathX + (2f / 3f) * (current.x - pathX)
+            val control1Y = pathY + (2f / 3f) * (current.y - pathY)
+            val control2X = endX + (2f / 3f) * (current.x - endX)
+            val control2Y = endY + (2f / 3f) * (current.y - endY)
+            contentStream.curveTo(
+                pdfX(control1X), pdfY(control1Y),
+                pdfX(control2X), pdfY(control2Y),
+                pdfX(endX), pdfY(endY)
+            )
+            pathX = endX
+            pathY = endY
+        }
+        contentStream.lineTo(pdfX(points.last().x), pdfY(points.last().y))
     }
 
     /**

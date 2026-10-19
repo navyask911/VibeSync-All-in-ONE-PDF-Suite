@@ -31,6 +31,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.vibesync.toolkit.pdf.R
@@ -115,7 +117,13 @@ fun PdfEditorScreen(
                 modifier = Modifier.fillMaxWidth().shadow(8.dp),
                 color = MaterialTheme.colorScheme.surface
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
+                // Custom Scaffold bottom bars need their own system-bar/IME inset handling.
+                Column(
+                    modifier = Modifier
+                        .testTag("editor_bottom_toolbar")
+                        .windowInsetsPadding(WindowInsets.navigationBars.union(WindowInsets.ime))
+                        .padding(12.dp)
+                ) {
                     // Tool Palette Selector
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -133,7 +141,12 @@ fun PdfEditorScreen(
                             label = stringResource(R.string.editor_highlighter),
                             testTag = "Highlighter",
                             isSelected = uiState.toolMode == ToolMode.HIGHLIGHTER,
-                            onClick = { viewModel.selectTool(ToolMode.HIGHLIGHTER) }
+                            onClick = {
+                                if (uiState.toolMode != ToolMode.HIGHLIGHTER) {
+                                    viewModel.selectColor(HighlighterPalette.defaultColor)
+                                }
+                                viewModel.selectTool(ToolMode.HIGHLIGHTER)
+                            }
                         )
                         ToolIconButton(
                             icon = Icons.Default.TextFields,
@@ -156,35 +169,55 @@ fun PdfEditorScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    // Color Palette Selector
+                    // VIBGYOR Light for highlighter mode; normal ink colors for other tools.
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().testTag("editor_color_palette"),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        val palette = listOf(
-                            Color(0xFFD32F2F), // Crimson Primary
-                            Color(0xFF8E0000), // Deep Ruby
-                            Color(0xFFC62828), // Crimson Dark
-                            Color(0xFFEF5350), // Coral Crimson
-                            Color(0xFF120808), // Dark Onyx
-                            Color(0xFFFFFFFF)  // Clean White
-                        )
-
-                        palette.forEach { color ->
-                            Box(
-                                modifier = Modifier
-                                    .padding(horizontal = 6.dp)
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .background(color)
-                                    .border(
-                                        width = if (uiState.selectedColor == color) 3.dp else 0.dp,
-                                        color = if (uiState.selectedColor == color) Color.White else Color.Transparent,
-                                        shape = CircleShape
-                                    )
-                                    .clickable { viewModel.selectColor(color) }
+                        if (uiState.toolMode == ToolMode.HIGHLIGHTER) {
+                            HighlighterPalette.colors.forEach { swatch ->
+                                Box(
+                                    modifier = Modifier
+                                        .padding(horizontal = 4.dp)
+                                        .size(30.dp)
+                                        .clip(CircleShape)
+                                        .background(swatch.color)
+                                        .border(
+                                            width = if (uiState.selectedColor == swatch.color) 3.dp else 1.dp,
+                                            color = if (uiState.selectedColor == swatch.color) VibeSyncRubyDeep else Color.White,
+                                            shape = CircleShape
+                                        )
+                                        .semantics { contentDescription = "${swatch.name} highlighter color" }
+                                        .testTag("editor_highlighter_color_${swatch.name.lowercase()}")
+                                        .clickable { viewModel.selectColor(swatch.color) }
+                                )
+                            }
+                        } else {
+                            val palette = listOf(
+                                Color(0xFFD32F2F),
+                                Color(0xFF8E0000),
+                                Color(0xFFC62828),
+                                Color(0xFFEF5350),
+                                Color(0xFF120808),
+                                Color(0xFFFFFFFF)
                             )
+                            palette.forEachIndexed { index, color ->
+                                Box(
+                                    modifier = Modifier
+                                        .padding(horizontal = 6.dp)
+                                        .size(28.dp)
+                                        .clip(CircleShape)
+                                        .background(color)
+                                        .border(
+                                            width = if (uiState.selectedColor == color) 3.dp else 0.dp,
+                                            color = if (uiState.selectedColor == color) Color.White else Color.Transparent,
+                                            shape = CircleShape
+                                        )
+                                        .testTag("editor_ink_color_$index")
+                                        .clickable { viewModel.selectColor(color) }
+                                )
+                            }
                         }
                     }
                 }
