@@ -64,7 +64,9 @@ class PdfRendererEngine(private val context: Context) {
      */
     suspend fun openDocument(
         uri: Uri,
-        onActivity: (() -> Unit)? = null
+        onActivity: (() -> Unit)? = null,
+        onStagingStarted: (() -> Unit)? = null,
+        onStagingComplete: (() -> Unit)? = null
     ): Result<Int> = withContext(Dispatchers.IO) {
         val startedAt = SystemClock.elapsedRealtime()
         val requestId = UUID.randomUUID().toString()
@@ -80,20 +82,25 @@ class PdfRendererEngine(private val context: Context) {
             // from preparing its source. The staged file is adopted only after this request wins.
             val copyStartedAt = SystemClock.elapsedRealtime()
             Log.i(TAG, "open.stage request=$requestId stage=copy_source status=start")
-            preparedFile = UriUtils.copyUriToCacheFile(
-                context = context,
-                uri = uri,
-                prefix = "render_",
-                cancellationCheck = { operationContext.ensureActive() },
-                onProgress = { bytes ->
-                    Log.d(
-                        TAG,
-                        "open.copy_progress request=$requestId bytes=$bytes " +
-                            "elapsedMs=${SystemClock.elapsedRealtime() - copyStartedAt}"
-                    )
-                },
-                onActivity = onActivity
-            )
+            onStagingStarted?.invoke()
+            try {
+                preparedFile = UriUtils.copyUriToCacheFile(
+                    context = context,
+                    uri = uri,
+                    prefix = "render_",
+                    cancellationCheck = { operationContext.ensureActive() },
+                    onProgress = { bytes ->
+                        Log.d(
+                            TAG,
+                            "open.copy_progress request=$requestId bytes=$bytes " +
+                                "elapsedMs=${SystemClock.elapsedRealtime() - copyStartedAt}"
+                        )
+                    },
+                    onActivity = onActivity
+                )
+            } finally {
+                onStagingComplete?.invoke()
+            }
             operationContext.ensureActive()
             val stagedFile = requireNotNull(preparedFile)
             Log.i(
