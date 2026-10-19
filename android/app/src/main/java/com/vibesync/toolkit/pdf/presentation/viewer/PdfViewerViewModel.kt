@@ -27,12 +27,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
 private const val PAGE_METADATA_BATCH_SIZE = 16
 private const val FIRST_PAGE_VALIDATION_SCALE = 1.5f
+private const val DOCUMENT_LOAD_STAGING_TIMEOUT_MS = 15_000L
 private const val DOCUMENT_LOAD_STALL_TIMEOUT_MS = 60_000L
-private const val DOCUMENT_LOAD_WATCHDOG_POLL_MS = 5_000L
+private const val DOCUMENT_LOAD_WATCHDOG_POLL_MS = 500L
 
 data class ViewerUiState(
     val fileName: String = "",
@@ -78,6 +80,8 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
         activeUri = uri
         val app = getApplication<Application>()
         val lastActivityAt = AtomicLong(SystemClock.elapsedRealtime())
+        val stagingStartedAt = AtomicLong(0L)
+        val stagingInProgress = AtomicBoolean(false)
         val fallbackName = uri.lastPathSegment
             ?.substringAfterLast('/')
             ?.takeIf { it.isNotBlank() }
@@ -99,21 +103,35 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 delay(DOCUMENT_LOAD_WATCHDOG_POLL_MS)
                 if (requestId != loadSequence || !_uiState.value.isLoading) return@launch
 
-                val idleMs = SystemClock.elapsedRealtime() - lastActivityAt.get()
-                if (idleMs >= DOCUMENT_LOAD_STALL_TIMEOUT_MS) {
+                val now = SystemClock.elapsedRealtime()
+                val idleMs = now - lastActivityAt.get()
+                val activeStageStartedAt = stagingStartedAt.get()
+                val stagingTimedOut = stagingInProgress.get() &&
+                    activeStageStartedAt > 0L &&
+                    now - activeStageStartedAt >= DOCUMENT_LOAD_STAGING_TIMEOUT_MS
+                if (stagingTimedOut || idleMs >= DOCUMENT_LOAD_STALL_TIMEOUT_MS) {
                     timedOutRequestId = requestId
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isPasswordRequired = false,
                         errorMessage = app.getString(R.string.document_load_error)
                     )
-                    Log.e(
-                        TAG,
-                        "load.watchdog_timeout request=$requestId " +
-                            "idleMs=$idleMs idleTimeoutMs=$DOCUMENT_LOAD_STALL_TIMEOUT_MS"
-                    )
-                    // The UI timeout is independent of a provider/native call that ignores
-                    // cooperative cancellation.
+                    if (stagingTimedOut) {
+                        Log.e(
+                            TAG,
+                            "load.staging_timeout request=$requestId " +
+                                "elapsedMs=${now - activeStageStartedAt} " +
+                                "timeoutMs=$DOCUMENT_LOAD_STAGING_TIMEOUT_MS"
+                        )
+                    } else {
+                        Log.e(
+                            TAG,
+                            "load.watchdog_timeout request=$requestId " +
+                                "idleMs=$idleMs idleTimeoutMs=$DOCUMENT_LOAD_STALL_TIMEOUT_MS"
+                        )
+                    }
+                    // Publish a terminal UI state even when a provider/native call ignores
+                    // cooperative cancellation. The blocked I/O runs away from the main thread.
                     loadJob?.cancel()
                     return@launch
                 }
@@ -124,6 +142,15 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
             val startedAt = SystemClock.elapsedRealtime()
             val markActivity: () -> Unit = {
                 lastActivityAt.set(SystemClock.elapsedRealtime())
+            }
+            val beginStaging: () -> Unit = {
+                stagingStartedAt.set(SystemClock.elapsedRealtime())
+                stagingInProgress.set(true)
+                markActivity()
+            }
+            val finishStaging: () -> Unit = {
+                stagingInProgress.set(false)
+                markActivity()
             }
             markActivity()
             var pendingUnlockedFile: File? = null
@@ -147,8 +174,12 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 if (!password.isNullOrBlank()) {
                     val outputFile = UriUtils.createExportCacheFile(app, "unlocked_doc")
                     pendingUnlockedFile = outputFile
-                    markActivity()
-                    val decryptResult = toolkitEngine.decryptPdf(uri, password, outputFile)
+                    beginStaging()
+                    val decryptResult = try {
+                        toolkitEngine.decryptPdf(uri, password, outputFile)
+                    } finally {
+                        finishStaging()
+                    }
                     markActivity()
                     currentCoroutineContext().ensureActive()
                     if (decryptResult.isFailure) {
@@ -179,7 +210,12 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 }
 
                 Log.d(TAG, "load.renderer_open_start request=" + requestId)
-                val openResult = rendererEngine.openDocument(targetUri, onActivity = markActivity)
+                val openResult = rendererEngine.openDocument(
+                    uri = targetUri,
+                    onActivity = markActivity,
+                    onStagingStarted = beginStaging,
+                    onStagingComplete = finishStaging
+                )
                 currentCoroutineContext().ensureActive()
                 if (requestId != loadSequence) return@launch
                 if (requestId == timedOutRequestId) {
