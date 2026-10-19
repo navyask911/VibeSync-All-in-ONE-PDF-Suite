@@ -414,30 +414,77 @@ class PdfRendererEngine(private val context: Context) {
         requestedScale: Float,
         config: Bitmap.Config
     ): Bitmap {
-        val page = renderer.openPage(pageIndex)
+        val startedAt = SystemClock.elapsedRealtime()
+        var stage = "open_page"
         var bitmap: Bitmap? = null
+        Log.d(
+            TAG,
+            "render.start document=$currentDocumentId page=$pageIndex scale=$requestedScale"
+        )
+        val page = try {
+            Log.d(TAG, "render.stage document=$currentDocumentId page=$pageIndex stage=open_page status=start")
+            renderer.openPage(pageIndex)
+        } catch (error: Throwable) {
+            Log.e(
+                TAG,
+                "render.failed document=$currentDocumentId page=$pageIndex stage=$stage " +
+                    "category=${error.javaClass.simpleName}",
+                error
+            )
+            throw error
+        }
+
         try {
+            stage = "calculate_dimensions"
             val dimensions = calculateRenderDimensions(
                 page.width,
                 page.height,
                 requestedScale,
                 config
             )
+            Log.d(
+                TAG,
+                "render.stage document=$currentDocumentId page=$pageIndex stage=$stage " +
+                    "width=${dimensions.width} height=${dimensions.height} config=$config"
+            )
+
+            stage = "allocate_bitmap"
+            Log.d(TAG, "render.stage document=$currentDocumentId page=$pageIndex stage=$stage status=start")
             bitmap = Bitmap.createBitmap(dimensions.width, dimensions.height, config)
             bitmap.eraseColor(Color.WHITE)
+
             val matrix = Matrix().apply {
                 setScale(dimensions.effectiveScale, dimensions.effectiveScale)
             }
+            stage = "native_page_render"
+            Log.d(TAG, "render.stage document=$currentDocumentId page=$pageIndex stage=$stage status=start")
             page.render(bitmap, null, matrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+            Log.i(
+                TAG,
+                "render.success document=$currentDocumentId page=$pageIndex " +
+                    "width=${bitmap.width} height=${bitmap.height} " +
+                    "elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
+            )
             return bitmap
         } catch (error: Throwable) {
             bitmap?.let { if (!it.isRecycled) it.recycle() }
+            Log.e(
+                TAG,
+                "render.failed document=$currentDocumentId page=$pageIndex stage=$stage " +
+                    "category=${error.javaClass.simpleName} " +
+                    "elapsedMs=${SystemClock.elapsedRealtime() - startedAt}",
+                error
+            )
             throw error
         } finally {
             try {
                 page.close()
             } catch (closeError: Exception) {
-                Log.w(TAG, "Unable to close rendered PDF page.", closeError)
+                Log.w(
+                    TAG,
+                    "render.page_close_failed document=$currentDocumentId page=$pageIndex",
+                    closeError
+                )
             }
         }
     }
@@ -475,13 +522,24 @@ class PdfRendererEngine(private val context: Context) {
                 if (pageIndex >= renderer.pageCount) return@synchronized null
 
                 var page: PdfRenderer.Page? = null
+                val pageStartedAt = SystemClock.elapsedRealtime()
+                Log.d(
+                    TAG,
+                    "metadata.page_start document=$expectedDocumentId page=$pageIndex"
+                )
                 try {
                     page = renderer.openPage(pageIndex)
-                    PageMetadata(
+                    val metadata = PageMetadata(
                         pageIndex = pageIndex,
                         widthPt = page.width.toFloat(),
                         heightPt = page.height.toFloat()
                     )
+                    Log.d(
+                        TAG,
+                        "metadata.page_success document=$expectedDocumentId page=$pageIndex " +
+                            "elapsedMs=${SystemClock.elapsedRealtime() - pageStartedAt}"
+                    )
+                    metadata
                 } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (error: Exception) {
