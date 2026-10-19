@@ -102,8 +102,8 @@ class PdfViewerScreenTest {
         }
 
         // 1. Verify Password Dialog is displayed with accessibility metadata
-        composeTestRule.onNodeWithText("Password Protected PDF").assertIsDisplayed()
-        composeTestRule.onNodeWithText("This document is secured with encryption. Please enter the password to view pages.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Password-protected PDF").assertIsDisplayed()
+        composeTestRule.onNodeWithText("This document is encrypted. Enter the password to view its pages.").assertIsDisplayed()
 
         // 2. Find Password Input and enter text
         val passwordField = composeTestRule.onNode(hasSetTextAction())
