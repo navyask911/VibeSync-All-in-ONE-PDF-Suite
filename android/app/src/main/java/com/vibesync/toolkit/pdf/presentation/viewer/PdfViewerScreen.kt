@@ -61,6 +61,11 @@ fun PdfViewerScreen(
     // loading the list is not composed, so scrollToItem() here can suspend forever and prevent
     // loadDocument() from ever running.
     LaunchedEffect(documentUri) {
+        Log.i(
+            "PdfDebug",
+            "Viewer load effect reached: scheme=${documentUri.scheme ?: "unknown"}, " +
+                "authorityPresent=${documentUri.authority != null}"
+        )
         viewModel.loadDocument(documentUri)
     }
 
