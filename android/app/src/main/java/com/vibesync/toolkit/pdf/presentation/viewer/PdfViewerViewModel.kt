@@ -27,6 +27,9 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
+private const val PAGE_METADATA_BATCH_SIZE = 16
+private const val FIRST_PAGE_VALIDATION_SCALE = 1.5f
+
 data class ViewerUiState(
     val fileName: String = "",
     val pageCount: Int = 0,
@@ -47,6 +50,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
 
     private var activeUri: Uri? = null
     private var loadJob: Job? = null
+    private var pageMetadataJob: Job? = null
     private var closeJob: Job? = null
     private var loadSequence: Long = 0L
     private var unlockedDocumentFile: File? = null
@@ -58,6 +62,8 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
     fun loadDocument(uri: Uri, password: String? = null) {
         val requestId = ++loadSequence
         val previousLoad = loadJob
+        pageMetadataJob?.cancel()
+        pageMetadataJob = null
         previousLoad?.cancel()
         val previousClose = closeJob
         activeUri = uri
@@ -93,19 +99,9 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 unlockedDocumentFile = null
                 rendererEngine.closeDocumentSafely()
 
-                // ContentResolver metadata queries can block on provider I/O, so keep them off Main.
-                val fileName = withContext(Dispatchers.IO) {
-                    try {
-                        UriUtils.getFileName(app, uri).takeIf { it.isNotBlank() } ?: fallbackName
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (_: Exception) {
-                        fallbackName
-                    }
-                }
-                currentCoroutineContext().ensureActive()
-                if (requestId != loadSequence) return@launch
-                _uiState.value = _uiState.value.copy(fileName = fileName)
+                // Never block the document-opening path on an optional provider display-name query.
+                val fileName = fallbackName
+                Log.d(TAG, "load.stage request=$requestId stage=filename_fallback status=success")
 
                 var targetUri = uri
                 if (!password.isNullOrBlank()) {
@@ -147,12 +143,33 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                     throw IllegalStateException(app.getString(R.string.document_load_error))
                 }
 
-                val metadata = rendererEngine.getPagesMetadata()
+                Log.i(TAG, "load.stage request=$requestId stage=renderer_open status=success pages=$count")
+                val firstPageMetadata = rendererEngine.getPagesMetadata(0, 1).firstOrNull()
+                    ?: throw IllegalStateException(app.getString(R.string.document_load_error))
                 currentCoroutineContext().ensureActive()
                 if (requestId != loadSequence) return@launch
-                if (metadata.isEmpty()) {
-                    throw IllegalStateException(app.getString(R.string.document_load_error))
+
+                Log.i(TAG, "load.stage request=$requestId stage=first_page_metadata status=success")
+                val firstPageRenderStartedAt = SystemClock.elapsedRealtime()
+                val firstPageLease = rendererEngine.renderPageLease(
+                    pageIndex = 0,
+                    scale = FIRST_PAGE_VALIDATION_SCALE
+                ) ?: throw IllegalStateException("The first PDF page could not be rendered.")
+                try {
+                    val firstBitmap = firstPageLease.bitmap
+                    if (firstBitmap.isRecycled || firstBitmap.width <= 0 || firstBitmap.height <= 0) {
+                        throw IllegalStateException("The first PDF page produced an invalid bitmap.")
+                    }
+                    currentCoroutineContext().ensureActive()
+                } finally {
+                    firstPageLease.close()
                 }
+                Log.i(
+                    TAG,
+                    "load.stage request=$requestId stage=first_page_render status=success " +
+                        "elapsedMs=${SystemClock.elapsedRealtime() - firstPageRenderStartedAt}"
+                )
+                if (requestId != loadSequence) return@launch
 
                 pendingUnlockedFile?.let { decryptedFile ->
                     unlockedDocumentFile?.delete()
@@ -162,7 +179,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 _uiState.value = _uiState.value.copy(
                     fileName = fileName,
                     pageCount = count,
-                    pagesMetadata = metadata,
+                    pagesMetadata = listOf(firstPageMetadata),
                     isLoading = false,
                     isPasswordRequired = false,
                     errorMessage = null,
@@ -174,12 +191,14 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                         " pages=" + count +
                         " elapsedMs=" + (SystemClock.elapsedRealtime() - startedAt)
                 )
+                startRemainingPageMetadataLoad(requestId, count)
+                resolveDisplayNameAsync(requestId, uri, fallbackName)
             } catch (cancelled: CancellationException) {
                 Log.d(TAG, "load.cancelled request=" + requestId)
                 closeRendererNonCancellable()
                 throw cancelled
             } catch (error: OutOfMemoryError) {
-                Log.e(TAG, "load.failed request=" + requestId + " category=OutOfMemoryError")
+                Log.e(TAG, "load.failed request=" + requestId + " category=OutOfMemoryError", error)
                 closeRendererNonCancellable()
                 if (requestId == loadSequence) {
                     _uiState.value = _uiState.value.copy(
@@ -193,7 +212,8 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 Log.e(
                     TAG,
                     "load.failed request=" + requestId +
-                        " category=" + error.javaClass.simpleName
+                        " category=" + error.javaClass.simpleName,
+                    error
                 )
                 closeRendererNonCancellable()
                 if (requestId == loadSequence) {
@@ -235,11 +255,110 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
         _uiState.value = _uiState.value.copy(isPasswordRequired = false)
     }
 
+    /**
+     * Loads page dimensions in small batches after the first page is already displayable.
+     * Request IDs and renderer document identity prevent stale metadata from updating a new PDF.
+     */
+    private fun startRemainingPageMetadataLoad(requestId: Long, pageCount: Int) {
+        pageMetadataJob?.cancel()
+        if (pageCount <= 1) {
+            pageMetadataJob = null
+            return
+        }
+
+        pageMetadataJob = viewModelScope.launch {
+            val startedAt = SystemClock.elapsedRealtime()
+            var start = 1
+            try {
+                while (start < pageCount) {
+                    currentCoroutineContext().ensureActive()
+                    if (requestId != loadSequence) return@launch
+
+                    val end = minOf(start + PAGE_METADATA_BATCH_SIZE, pageCount)
+                    val batch = rendererEngine.getPagesMetadata(start, end)
+                    currentCoroutineContext().ensureActive()
+                    if (requestId != loadSequence) return@launch
+                    if (batch.isEmpty()) {
+                        Log.w(TAG, "metadata.batch_empty request=$requestId start=$start end=$end")
+                        break
+                    }
+
+                    val current = _uiState.value
+                    if (current.pageCount != pageCount || current.errorMessage != null) return@launch
+                    val updated = current.pagesMetadata.toMutableList()
+                    while (updated.size < end) updated.add(defaultPageMetadata(updated.size))
+                    batch.forEach { metadata ->
+                        if (metadata.pageIndex in updated.indices) {
+                            updated[metadata.pageIndex] = metadata
+                        }
+                    }
+                    _uiState.value = current.copy(pagesMetadata = updated)
+                    start = end
+                }
+                Log.i(
+                    TAG,
+                    "metadata.background_complete request=$requestId pagesPrepared=$start/$pageCount " +
+                        "elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
+                )
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.w(TAG, "metadata.background_failed request=$requestId", error)
+            } finally {
+                if (requestId == loadSequence) pageMetadataJob = null
+            }
+        }
+    }
+
+    /**
+     * Provider display-name lookup is best-effort and deliberately runs after first-page rendering.
+     * A slow metadata provider must not prevent the PDF reader from becoming usable.
+     */
+    private fun resolveDisplayNameAsync(requestId: Long, uri: Uri, fallbackName: String) {
+        if (uri.scheme != "content") return
+        viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val nameStartedAt = SystemClock.elapsedRealtime()
+                Log.d(TAG, "load.stage request=$requestId stage=display_name_query status=start")
+                val resolvedName = UriUtils.getFileName(
+                    getApplication<Application>(),
+                    uri
+                ).takeIf { it.isNotBlank() && it != fallbackName }
+                Log.d(
+                    TAG,
+                    "load.stage request=$requestId stage=display_name_query status=" +
+                        (if (resolvedName != null) "success" else "fallback") +
+                        " elapsedMs=${SystemClock.elapsedRealtime() - nameStartedAt}"
+                )
+                if (resolvedName != null) {
+                    withContext(Dispatchers.Main.immediate) {
+                        if (
+                            requestId == loadSequence &&
+                            !_uiState.value.isLoading &&
+                            _uiState.value.pageCount > 0
+                        ) {
+                            _uiState.value = _uiState.value.copy(fileName = resolvedName)
+                        }
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.w(TAG, "load.stage request=$requestId stage=display_name_query status=fallback", error)
+            }
+        }
+    }
+
+    private fun defaultPageMetadata(pageIndex: Int): PageMetadata =
+        PageMetadata(pageIndex = pageIndex, widthPt = 595f, heightPt = 842f)
+
     /** Called when the viewer leaves composition; cleanup runs off the main thread. */
     fun closeDocument() {
         loadSequence += 1
         val previousLoad = loadJob
         previousLoad?.cancel()
+        pageMetadataJob?.cancel()
+        pageMetadataJob = null
         loadJob = null
         val previousClose = closeJob
         closeJob = viewModelScope.launch {
@@ -307,6 +426,8 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
     override fun onCleared() {
         loadSequence += 1
         loadJob?.cancel()
+        pageMetadataJob?.cancel()
+        pageMetadataJob = null
         val fileToDelete = unlockedDocumentFile
         unlockedDocumentFile = null
         super.onCleared()

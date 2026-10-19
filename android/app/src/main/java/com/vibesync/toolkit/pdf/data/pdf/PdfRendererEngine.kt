@@ -65,44 +65,96 @@ class PdfRendererEngine(private val context: Context) {
     suspend fun openDocument(uri: Uri): Result<Int> = withContext(Dispatchers.IO) {
         mutex.withLock {
             val startedAt = SystemClock.elapsedRealtime()
-            Log.i(TAG, "open.start scheme=" + (uri.scheme ?: "unknown"))
+            val requestId = UUID.randomUUID().toString()
+            val operationContext = currentCoroutineContext()
+            var stage = "close_previous_document"
+            Log.i(TAG, "open.start request=$requestId scheme=${uri.scheme ?: "unknown"}")
             try {
                 closeDocument()
-                currentDocumentId = UUID.randomUUID().toString()
+                synchronized(renderLock) { currentDocumentId = requestId }
 
-                // Stage every provider type into private, seekable storage before native rendering.
-                val preparedFile = UriUtils.copyUriToCacheFile(context, uri, "render_")
+                stage = "copy_source"
+                val copyStartedAt = SystemClock.elapsedRealtime()
+                Log.i(TAG, "open.stage request=$requestId stage=copy_source status=start")
+                val preparedFile = UriUtils.copyUriToCacheFile(
+                    context = context,
+                    uri = uri,
+                    prefix = "render_",
+                    cancellationCheck = { operationContext.ensureActive() },
+                    onProgress = { bytes ->
+                        Log.d(
+                            TAG,
+                            "open.copy_progress request=$requestId bytes=$bytes " +
+                                "elapsedMs=${SystemClock.elapsedRealtime() - copyStartedAt}"
+                        )
+                    }
+                )
                 cachedTempFile = preparedFile
-                currentCoroutineContext().ensureActive()
+                operationContext.ensureActive()
+                Log.i(
+                    TAG,
+                    "open.stage request=$requestId stage=copy_source status=success " +
+                        "bytes=${preparedFile.length()} " +
+                        "elapsedMs=${SystemClock.elapsedRealtime() - copyStartedAt}"
+                )
+
+                stage = "validate_cache"
                 if (!preparedFile.isFile || !preparedFile.canRead() || preparedFile.length() <= 0L) {
                     throw IOException("The selected PDF is empty or unreadable.")
                 }
 
+                stage = "open_descriptor"
+                val descriptorStartedAt = SystemClock.elapsedRealtime()
                 parcelFileDescriptor = ParcelFileDescriptor.open(
                     preparedFile,
                     ParcelFileDescriptor.MODE_READ_ONLY
                 )
-                synchronized(renderLock) {
-                    pdfRenderer = PdfRenderer(requireNotNull(parcelFileDescriptor))
-                }
+                Log.i(
+                    TAG,
+                    "open.stage request=$requestId stage=open_descriptor status=success " +
+                        "elapsedMs=${SystemClock.elapsedRealtime() - descriptorStartedAt}"
+                )
 
-                val count = pageCount
-                if (count <= 0) {
-                    throw IOException("The selected PDF contains no readable pages.")
+                stage = "initialize_renderer"
+                val rendererStartedAt = SystemClock.elapsedRealtime()
+                synchronized(renderLock) {
+                    operationContext.ensureActive()
+                    pdfRenderer = PdfRenderer(requireNotNull(parcelFileDescriptor))
                 }
                 Log.i(
                     TAG,
-                    "open.success pages=" + count +
-                        " bytes=" + preparedFile.length() +
-                        " elapsedMs=" + (SystemClock.elapsedRealtime() - startedAt)
+                    "open.stage request=$requestId stage=initialize_renderer status=success " +
+                        "elapsedMs=${SystemClock.elapsedRealtime() - rendererStartedAt}"
+                )
+
+                stage = "read_page_count"
+                val count = pageCount
+                if (count <= 0) throw IOException("The selected PDF contains no readable pages.")
+                Log.i(
+                    TAG,
+                    "open.success request=$requestId pages=$count bytes=${preparedFile.length()} " +
+                        "elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
                 )
                 Result.success(count)
             } catch (e: CancellationException) {
-                Log.d(TAG, "open.cancelled")
+                Log.i(
+                    TAG,
+                    "open.cancelled request=$requestId stage=$stage " +
+                        "elapsedMs=${SystemClock.elapsedRealtime() - startedAt}"
+                )
+                closeDocument()
+                throw e
+            } catch (e: OutOfMemoryError) {
+                Log.e(TAG, "open.failed request=$requestId stage=$stage category=OutOfMemoryError", e)
                 closeDocument()
                 throw e
             } catch (e: Exception) {
-                Log.e(TAG, "open.failed category=" + e.javaClass.simpleName)
+                Log.e(
+                    TAG,
+                    "open.failed request=$requestId stage=$stage category=${e.javaClass.simpleName} " +
+                        "elapsedMs=${SystemClock.elapsedRealtime() - startedAt}",
+                    e
+                )
                 closeDocument()
                 Result.failure(e)
             }
@@ -354,39 +406,77 @@ class PdfRendererEngine(private val context: Context) {
     }
 
     /**
-     * Reads metadata (dimensions) of all pages.
+     * Reads metadata for all pages. Each page is handled in a separate renderer-lock section so a
+     * large PDF's metadata scan does not monopolize the renderer and delay the first visible page.
      */
-    suspend fun getPagesMetadata(): List<PageMetadata> = withContext(Dispatchers.IO) {
+    suspend fun getPagesMetadata(): List<PageMetadata> {
+        val count = pageCount
+        if (count <= 0) return emptyList()
+        return getPagesMetadata(0, count)
+    }
+
+    /**
+     * Reads the half-open page range [startIndex, endExclusive). The document identity is captured
+     * once; if the document is replaced while a batch is running, the stale batch stops.
+     */
+    suspend fun getPagesMetadata(
+        startIndex: Int,
+        endExclusive: Int
+    ): List<PageMetadata> = withContext(Dispatchers.IO) {
         val coroutineContext = currentCoroutineContext()
-        synchronized(renderLock) {
-            val renderer = pdfRenderer ?: return@withContext emptyList()
-            val list = mutableListOf<PageMetadata>()
-            for (i in 0 until renderer.pageCount) {
-                coroutineContext.ensureActive()
+        val expectedDocumentId = synchronized(renderLock) { currentDocumentId }
+        if (expectedDocumentId.isBlank()) return@withContext emptyList()
+
+        val start = startIndex.coerceAtLeast(0)
+        val end = endExclusive.coerceAtLeast(start)
+        val result = ArrayList<PageMetadata>((end - start).coerceAtMost(256))
+        for (pageIndex in start until end) {
+            coroutineContext.ensureActive()
+            val metadata = synchronized(renderLock) {
+                if (currentDocumentId != expectedDocumentId) return@synchronized null
+                val renderer = pdfRenderer ?: return@synchronized null
+                if (pageIndex >= renderer.pageCount) return@synchronized null
+
                 var page: PdfRenderer.Page? = null
                 try {
-                    page = renderer.openPage(i)
-                    list.add(
-                        PageMetadata(
-                            pageIndex = i,
-                            widthPt = page.width.toFloat(),
-                            heightPt = page.height.toFloat()
-                        )
+                    page = renderer.openPage(pageIndex)
+                    PageMetadata(
+                        pageIndex = pageIndex,
+                        widthPt = page.width.toFloat(),
+                        heightPt = page.height.toFloat()
                     )
                 } catch (cancelled: CancellationException) {
                     throw cancelled
-                } catch (e: Exception) {
-                    list.add(PageMetadata(pageIndex = i, widthPt = 595f, heightPt = 842f))
+                } catch (error: Exception) {
+                    Log.w(
+                        TAG,
+                        "metadata.page_failed document=$expectedDocumentId page=$pageIndex " +
+                            "category=${error.javaClass.simpleName}",
+                        error
+                    )
+                    PageMetadata(pageIndex = pageIndex, widthPt = 595f, heightPt = 842f)
                 } finally {
                     try {
                         page?.close()
                     } catch (closeError: Exception) {
-                        Log.w(TAG, "Error closing metadata page $i", closeError)
+                        Log.w(
+                            TAG,
+                            "metadata.page_close_failed document=$expectedDocumentId page=$pageIndex",
+                            closeError
+                        )
                     }
                 }
             }
-            list
+            if (metadata == null) break
+            result.add(metadata)
         }
+
+        Log.d(
+            TAG,
+            "metadata.batch_complete document=$expectedDocumentId start=$start " +
+                "requested=${end - start} completed=${result.size}"
+        )
+        result
     }
 
     /**

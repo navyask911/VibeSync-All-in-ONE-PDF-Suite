@@ -65,13 +65,24 @@ object UriUtils {
     }
 
     /**
-     * Safely copies an external Content Uri stream into app-internal cache directory
-     * so that native tools (PdfBox / PdfRenderer) have immediate, seekable random access.
+     * Stages a local document into private, seekable storage for native PDF processing.
+     *
+     * Cancellation is checked between bounded reads/writes. The caller must invoke this on an
+     * I/O dispatcher because a provider's open/read operation itself may block.
      */
-    fun copyUriToCacheFile(context: Context, uri: Uri, prefix: String = "doc_"): File {
+    fun copyUriToCacheFile(
+        context: Context,
+        uri: Uri,
+        prefix: String = "doc_",
+        cancellationCheck: (() -> Unit)? = null,
+        onProgress: ((Long) -> Unit)? = null
+    ): File {
         val cacheDir = File(context.cacheDir, "pdf_cache").apply {
             if (!exists() && !mkdirs()) {
                 throw java.io.IOException("Unable to prepare the PDF cache directory.")
+            }
+            if (!isDirectory) {
+                throw java.io.IOException("The PDF cache path is not a directory.")
             }
         }
         val safePrefix = prefix
@@ -82,22 +93,53 @@ object UriUtils {
         var copiedSuccessfully = false
 
         try {
+            cancellationCheck?.invoke()
             val inputStream: InputStream = when (uri.scheme?.lowercase(Locale.US)) {
-                "file" -> FileInputStream(requireNotNull(uri.path) { "File Uri has no path." })
-                else -> context.contentResolver.openInputStream(uri)
-                    ?: throw IllegalArgumentException("Cannot open input stream for the selected document.")
+                "file" -> FileInputStream(
+                    requireNotNull(uri.path) { "File Uri has no path." }
+                )
+                "content" -> context.contentResolver.openInputStream(uri)
+                    ?: throw java.io.IOException("The selected document provider returned no input stream.")
+                else -> throw IllegalArgumentException(
+                    "Unsupported document URI scheme: ${uri.scheme ?: "missing"}."
+                )
             }
 
+            var totalBytes = 0L
+            var lastProgressBytes = 0L
             inputStream.use { input ->
                 FileOutputStream(tempFile).use { output ->
-                    input.copyTo(output)
+                    val buffer = ByteArray(32 * 1024)
+                    while (true) {
+                        cancellationCheck?.invoke()
+                        val bytesRead = input.read(buffer)
+                        if (bytesRead < 0) break
+                        if (bytesRead == 0) continue
+
+                        output.write(buffer, 0, bytesRead)
+                        totalBytes += bytesRead
+                        cancellationCheck?.invoke()
+
+                        if (totalBytes - lastProgressBytes >= 1024L * 1024L) {
+                            onProgress?.invoke(totalBytes)
+                            lastProgressBytes = totalBytes
+                        }
+                    }
+                    output.flush()
                 }
             }
+
+            cancellationCheck?.invoke()
+            if (totalBytes <= 0L || tempFile.length() <= 0L) {
+                throw java.io.IOException("The selected PDF is empty.")
+            }
             copiedSuccessfully = true
+            onProgress?.invoke(totalBytes)
             return tempFile
         } finally {
-            // A failed or cancelled stream copy must not leave partial PDFs in the cache.
-            if (!copiedSuccessfully) tempFile.delete()
+            if (!copiedSuccessfully && tempFile.exists() && !tempFile.delete()) {
+                android.util.Log.w("UriUtils", "Could not delete a partial PDF cache file.")
+            }
         }
     }
 
