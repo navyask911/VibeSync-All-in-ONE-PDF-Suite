@@ -254,7 +254,7 @@ class MainActivity : AppCompatActivity() {
                         pendingPdfUri?.let { uri ->
                             Log.i(
                                 "PdfDebug",
-                                "Incoming PDF route: scheme=${uri.scheme ?: "unknown"}, " +
+                                "com.vibesync.toolkit.pdf incoming PDF route: scheme=${uri.scheme ?: "unknown"}, " +
                                     "authorityPresent=${uri.authority != null}"
                             )
                             val encoded = encodeUriRoute(uri)
@@ -273,7 +273,7 @@ class MainActivity : AppCompatActivity() {
                                 onNavigateToViewer = { uri ->
                                     Log.i(
                                         "PdfDebug",
-                                        "PDF picker callback received URI: scheme=${uri.scheme ?: "unknown"}, " +
+                                        "com.vibesync.toolkit.pdf PDF picker callback received URI: scheme=${uri.scheme ?: "unknown"}, " +
                                             "authorityPresent=${uri.authority != null}"
                                     )
                                     val encoded = encodeUriRoute(uri)
