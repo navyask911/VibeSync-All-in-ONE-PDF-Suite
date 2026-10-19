@@ -63,7 +63,7 @@ fun PdfViewerScreen(
     LaunchedEffect(documentUri) {
         Log.i(
             "PdfDebug",
-            "Viewer load effect reached: scheme=${documentUri.scheme ?: "unknown"}, " +
+            "com.vibesync.toolkit.pdf viewer load effect reached: scheme=${documentUri.scheme ?: "unknown"}, " +
                 "authorityPresent=${documentUri.authority != null}"
         )
         viewModel.loadDocument(documentUri)
