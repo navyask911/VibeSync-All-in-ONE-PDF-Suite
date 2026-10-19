@@ -252,6 +252,11 @@ class MainActivity : AppCompatActivity() {
                     // Automatically forward ACTION_VIEW, ACTION_SEND, and scanner results to Viewer.
                     LaunchedEffect(pendingPdfUri) {
                         pendingPdfUri?.let { uri ->
+                            Log.i(
+                                "PdfDebug",
+                                "Incoming PDF route: scheme=${uri.scheme ?: "unknown"}, " +
+                                    "authorityPresent=${uri.authority != null}"
+                            )
                             val encoded = encodeUriRoute(uri)
                             navController.navigate("viewer/$encoded") {
                                 launchSingleTop = true
@@ -266,6 +271,11 @@ class MainActivity : AppCompatActivity() {
                             DashboardScreen(
                                 viewModel = dashboardViewModel,
                                 onNavigateToViewer = { uri ->
+                                    Log.i(
+                                        "PdfDebug",
+                                        "PDF picker callback received URI: scheme=${uri.scheme ?: "unknown"}, " +
+                                            "authorityPresent=${uri.authority != null}"
+                                    )
                                     val encoded = encodeUriRoute(uri)
                                     navController.navigate("viewer/$encoded")
                                 },
