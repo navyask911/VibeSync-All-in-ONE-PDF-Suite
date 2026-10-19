@@ -41,7 +41,7 @@ class PdfRendererEngineInstrumentedTest {
 
             val rendered = withTimeout(15_000L) {
                 (1..8).map {
-                    async(Dispatchers.IO) { engine.renderPage(pageIndex = 0, scale = 1.25f) }
+                    async(Dispatchers.IO) { engine.renderPageLease(pageIndex = 0, scale = 1.25f) }
                 }.awaitAll()
             }
             assertTrue("Every page request should produce a lease.", rendered.all { it != null })

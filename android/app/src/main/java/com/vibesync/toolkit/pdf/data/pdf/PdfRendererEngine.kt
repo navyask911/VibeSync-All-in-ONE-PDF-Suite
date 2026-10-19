@@ -11,6 +11,7 @@ import android.util.Log
 import android.os.SystemClock
 import java.io.IOException
 import java.util.UUID
+import java.util.LinkedHashMap
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.sqrt
 import com.vibesync.toolkit.pdf.core.util.BitmapCache
@@ -37,6 +38,9 @@ class PdfRendererEngine(private val context: Context) {
     private var currentDocumentId: String = ""
     private val renderLock = Any()
     private val mutex = Mutex()
+    // Compatibility API callers receive a Bitmap, not a lease. Pin only a small rolling window
+    // so those older callers cannot observe a bitmap recycled between render and draw.
+    private val legacyPageLeases = LinkedHashMap<String, BitmapCache.BitmapLease>()
 
     val pageCount: Int
         get() = synchronized(renderLock) {
@@ -110,6 +114,39 @@ class PdfRendererEngine(private val context: Context) {
      * and the reservation remains held through cache insertion and delivery back to the caller.
      */
     suspend fun renderPage(
+        pageIndex: Int,
+        scale: Float = 1.0f
+    ): Bitmap? {
+        val lease = renderPageLease(pageIndex, scale) ?: return null
+        return synchronized(renderLock) {
+            // A document may have closed/replaced while the render coroutine was returning.
+            if (
+                pdfRenderer == null ||
+                currentDocumentId.isBlank() ||
+                !lease.key.startsWith("${currentDocumentId}_")
+            ) {
+                lease.close()
+                return@synchronized null
+            }
+
+            legacyPageLeases.remove(lease.key)?.let { previous ->
+                if (previous !== lease) previous.close()
+            }
+            legacyPageLeases[lease.key] = lease
+            while (legacyPageLeases.size > MAX_LEGACY_PAGE_LEASES) {
+                val iterator = legacyPageLeases.entries.iterator()
+                val eldest = iterator.next()
+                iterator.remove()
+                eldest.value.close()
+            }
+            lease.bitmap
+        }
+    }
+
+    /**
+     * Leased rendering path for UI owners that can release their bitmap deterministically.
+     */
+    suspend fun renderPageLease(
         pageIndex: Int,
         scale: Float = 1.0f
     ): BitmapCache.BitmapLease? {
@@ -385,6 +422,8 @@ class PdfRendererEngine(private val context: Context) {
 
             cachedTempFile?.delete()
             cachedTempFile = null
+            legacyPageLeases.values.toList().forEach { it.close() }
+            legacyPageLeases.clear()
             currentDocumentId = ""
             BitmapCache.getInstance().clear()
         }
@@ -396,5 +435,6 @@ class PdfRendererEngine(private val context: Context) {
         private const val MIN_BITMAP_BUDGET_BYTES = 512L * 1024L
         private const val MAX_BITMAP_BUDGET_BYTES = 32L * 1024L * 1024L
         private const val MAX_BITMAP_PIXELS = 16_000_000L
+        private const val MAX_LEGACY_PAGE_LEASES = 3
     }
 }

@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
+import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch

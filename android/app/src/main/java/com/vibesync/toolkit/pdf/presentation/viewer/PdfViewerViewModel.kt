@@ -258,7 +258,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
     suspend fun acquirePageBitmap(
         pageIndex: Int,
         scale: Float = 1.0f
-    ): BitmapCache.BitmapLease? = rendererEngine.renderPage(pageIndex, scale)
+    ): BitmapCache.BitmapLease? = rendererEngine.renderPageLease(pageIndex, scale)
 
     fun cacheKeyForPage(pageIndex: Int, scale: Float): String? =
         rendererEngine.cacheKeyForPage(pageIndex, scale)
