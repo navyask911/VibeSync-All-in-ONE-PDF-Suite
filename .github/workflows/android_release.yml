@@ -68,6 +68,7 @@ jobs:
           ./gradlew :app:assembleRelease --no-daemon --stacktrace
 
       - name: Verify Android App Bundle metadata
+        id: verify_aab
         working-directory: android
         run: |
           set -euo pipefail
@@ -92,6 +93,16 @@ jobs:
           echo "Verified AAB package: $expected_app_id"
           echo "Verified AAB versionCode: $expected_code"
           echo "Verified AAB versionName: $expected_name"
+          echo "version_name=$expected_name" >> "$GITHUB_OUTPUT"
+          echo "version_code=$expected_code" >> "$GITHUB_OUTPUT"
+          {
+            echo "## Verified Android release bundle"
+            echo "- Application ID: `$expected_app_id`"
+            echo "- versionName: `$expected_name`"
+            echo "- versionCode: `$expected_code`"
+            echo "- Artifact: `$aab`"
+            echo "- Validation: bundletool metadata checks and bundle validation passed"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify and stage Google Play symbols
         working-directory: android
@@ -132,7 +143,7 @@ jobs:
       - name: Upload Google Play mapping and native symbols
         uses: actions/upload-artifact@v4
         with:
-          name: VibeSync-GooglePlay-Symbols
+          name: VibeSync-GooglePlay-Symbols-v${{ steps.verify_aab.outputs.version_name }}-code${{ steps.verify_aab.outputs.version_code }}
           path: android/play-symbols/*
           if-no-files-found: error
           retention-days: 90
@@ -158,7 +169,7 @@ jobs:
       - name: Upload Signed APK
         uses: actions/upload-artifact@v4
         with:
-          name: VibeSync-Installable-APK
+          name: VibeSync-Installable-APK-v${{ steps.verify_aab.outputs.version_name }}-code${{ steps.verify_aab.outputs.version_code }}
           path: android/app/build/outputs/apk/release/*.apk
           if-no-files-found: error
           retention-days: 90
@@ -166,7 +177,7 @@ jobs:
       - name: Upload Signed AAB
         uses: actions/upload-artifact@v4
         with:
-          name: VibeSync-GooglePlay-AAB
+          name: VibeSync-GooglePlay-AAB-v${{ steps.verify_aab.outputs.version_name }}-code${{ steps.verify_aab.outputs.version_code }}
           path: android/app/build/outputs/bundle/release/*.aab
           if-no-files-found: error
           retention-days: 90

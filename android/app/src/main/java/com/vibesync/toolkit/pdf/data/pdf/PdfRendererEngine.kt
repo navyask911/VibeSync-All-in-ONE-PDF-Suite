@@ -9,6 +9,9 @@ import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.util.Log
+import android.os.SystemClock
+import java.io.IOException
+import java.util.UUID
 import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.PageMetadata
@@ -56,29 +59,45 @@ class PdfRendererEngine(private val context: Context) {
      */
     suspend fun openDocument(uri: Uri): Result<Int> = withContext(Dispatchers.IO) {
         mutex.withLock {
+            val startedAt = SystemClock.elapsedRealtime()
+            Log.i(TAG, "open.start scheme=" + (uri.scheme ?: "unknown"))
             try {
                 closeDocument()
+                currentDocumentId = UUID.randomUUID().toString()
 
-                currentDocumentId = uri.toString().hashCode().toString()
-                
-                // Copy to cache file first to guarantee seekable file descriptor even with virtual cloud SAF providers
-                cachedTempFile = UriUtils.copyUriToCacheFile(context, uri, "render_")
-                parcelFileDescriptor = ParcelFileDescriptor.open(cachedTempFile, ParcelFileDescriptor.MODE_READ_ONLY)
-                
+                // Stage every provider type into private, seekable storage before native rendering.
+                val preparedFile = UriUtils.copyUriToCacheFile(context, uri, "render_")
+                cachedTempFile = preparedFile
+                currentCoroutineContext().ensureActive()
+                if (!preparedFile.isFile || !preparedFile.canRead() || preparedFile.length() <= 0L) {
+                    throw IOException("The selected PDF is empty or unreadable.")
+                }
+
+                parcelFileDescriptor = ParcelFileDescriptor.open(
+                    preparedFile,
+                    ParcelFileDescriptor.MODE_READ_ONLY
+                )
                 synchronized(renderLock) {
-                    pdfRenderer = PdfRenderer(parcelFileDescriptor!!)
+                    pdfRenderer = PdfRenderer(requireNotNull(parcelFileDescriptor))
                 }
 
                 val count = pageCount
-                Log.d(TAG, "Document opened successfully with $count pages.")
+                if (count <= 0) {
+                    throw IOException("The selected PDF contains no readable pages.")
+                }
+                Log.i(
+                    TAG,
+                    "open.success pages=" + count +
+                        " bytes=" + preparedFile.length() +
+                        " elapsedMs=" + (SystemClock.elapsedRealtime() - startedAt)
+                )
                 Result.success(count)
             } catch (e: CancellationException) {
-                // Cancellation must reach the caller, but any partially opened native resources
-                // still need to be released.
+                Log.d(TAG, "open.cancelled")
                 closeDocument()
                 throw e
             } catch (e: Exception) {
-                Log.e(TAG, "Failed to open PDF document", e)
+                Log.e(TAG, "open.failed category=" + e.javaClass.simpleName)
                 closeDocument()
                 Result.failure(e)
             }

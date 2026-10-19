@@ -181,4 +181,7 @@
     <string name="update_store_unavailable">Der Google-Play-Eintrag konnte nicht geöffnet werden. Bitte versuche es erneut, sobald Internet verfügbar ist.</string>
     <string name="internet_settings_unavailable">Die Netzwerkeinstellungen konnten nicht geöffnet werden. Öffne die WLAN-Einstellungen bitte manuell.</string>
 
+    <string name="document_load_error">Dieses PDF konnte nicht geöffnet werden. Prüfe den Zugriff auf die Datei und versuche es erneut.</string>
+    <string name="page_render_failed">Diese Seite konnte nicht gerendert werden.</string>
+    <string name="retry">Erneut versuchen</string>
 </resources>

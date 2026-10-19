@@ -181,4 +181,7 @@
     <string name="update_store_unavailable">Не удалось открыть страницу Google Play. Повторите попытку, когда появится подключение к Интернету.</string>
     <string name="internet_settings_unavailable">Не удалось открыть настройки сети. Откройте настройки Wi-Fi вручную.</string>
 
+    <string name="document_load_error">Не удалось открыть этот PDF. Проверьте доступность файла и повторите попытку.</string>
+    <string name="page_render_failed">Не удалось отобразить эту страницу.</string>
+    <string name="retry">Повторить</string>
 </resources>

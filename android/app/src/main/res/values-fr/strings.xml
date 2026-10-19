@@ -181,4 +181,7 @@
     <string name="update_store_unavailable">Impossible d’ouvrir la fiche Google Play. Réessayez lorsque la connexion Internet sera disponible.</string>
     <string name="internet_settings_unavailable">Impossible d’ouvrir les paramètres réseau. Ouvrez manuellement les paramètres Wi-Fi.</string>
 
+    <string name="document_load_error">Impossible d’ouvrir ce PDF. Vérifiez que le fichier est accessible, puis réessayez.</string>
+    <string name="page_render_failed">Impossible d’afficher cette page.</string>
+    <string name="retry">Réessayer</string>
 </resources>

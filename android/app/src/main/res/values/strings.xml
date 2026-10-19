@@ -189,4 +189,7 @@
     <string name="update_store_unavailable">Could not open the Google Play listing. Please try again when the internet is available.</string>
     <string name="internet_settings_unavailable">Could not open network settings. Please open Wi-Fi settings manually.</string>
 
+    <string name="document_load_error">Could not open this PDF. Check that the file is accessible, then retry.</string>
+    <string name="page_render_failed">Could not render this page.</string>
+    <string name="retry">Retry</string>
 </resources>

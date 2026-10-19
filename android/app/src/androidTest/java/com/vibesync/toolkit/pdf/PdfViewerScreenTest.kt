@@ -8,6 +8,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.vibesync.toolkit.pdf.data.model.PageMetadata
+import com.vibesync.toolkit.pdf.presentation.viewer.PdfPageItem
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
 import io.mockk.*
@@ -132,4 +133,53 @@ class PdfViewerScreenTest {
         // Verify viewModel received password submission
         verify(exactly = 1) { mockViewModel.submitPassword("SecretVault2026!") }
     }
+
+    @Test
+    fun nullPageBitmapShowsTerminalErrorAndRetryCanRecover() {
+        val recoveredBitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
+        coEvery { mockViewModel.getPageBitmap(0, 1.5f) } returnsMany listOf(null, recoveredBitmap)
+
+        composeTestRule.setContent {
+            PdfPageItem(
+                pageIndex = 0,
+                aspectRatio = 595f / 842f,
+                viewModel = mockViewModel,
+                documentKey = "regression-document"
+            )
+        }
+
+        composeTestRule.onNodeWithText("Could not render this page.").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Retry").performClick()
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule.onAllNodesWithContentDescription("PDF page 1")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        coVerify(exactly = 2) { mockViewModel.getPageBitmap(0, 1.5f) }
+    }
+
+    @Test
+    fun documentLoadErrorOffersRetryAction() {
+        val stateFlow = MutableStateFlow(
+            com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(
+                fileName = "unavailable.pdf",
+                isLoading = false,
+                errorMessage = "Could not open this PDF. Check that the file is accessible, then retry."
+            )
+        )
+        every { mockViewModel.uiState } returns stateFlow
+
+        composeTestRule.setContent {
+            PdfViewerScreen(
+                documentUri = testUri,
+                viewModel = mockViewModel,
+                onNavigateBack = {},
+                onNavigateToEditor = {},
+                onShareDocument = {}
+            )
+        }
+
+        composeTestRule.onNodeWithText("Retry").assertIsDisplayed().performClick()
+        verify(exactly = 1) { mockViewModel.retryLastDocument() }
+    }
+
 }

@@ -36,6 +36,7 @@ import androidx.compose.ui.text.input.VisualTransformation
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
 import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.R
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -196,6 +197,12 @@ fun PdfViewerScreen(
                         Text(stringResource(R.string.error_opening_pdf), fontWeight = FontWeight.Bold)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(uiState.errorMessage ?: "", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (!uiState.isPasswordRequired) {
+                            Spacer(modifier = Modifier.height(12.dp))
+                            TextButton(onClick = { viewModel.retryLastDocument() }) {
+                                Text(stringResource(R.string.retry))
+                            }
+                        }
                     }
                 }
             } else {
@@ -303,15 +310,32 @@ fun PdfPageItem(
     viewModel: PdfViewerViewModel,
     documentKey: String
 ) {
-    val bitmapState = produceState<Bitmap?>(
-        initialValue = null,
-        key1 = documentKey,
-        key2 = pageIndex
-    ) {
-        value = viewModel.getPageBitmap(pageIndex, scale = 1.5f)
+    var retryAttempt by remember(documentKey, pageIndex) { mutableIntStateOf(0) }
+    var bitmap by remember(documentKey, pageIndex) { mutableStateOf<Bitmap?>(null) }
+    var renderFailed by remember(documentKey, pageIndex) { mutableStateOf(false) }
+
+    LaunchedEffect(documentKey, pageIndex, retryAttempt) {
+        bitmap = null
+        renderFailed = false
+        try {
+            val rendered = viewModel.getPageBitmap(pageIndex, scale = 1.5f)
+            if (rendered != null && !rendered.isRecycled) {
+                bitmap = rendered
+            } else {
+                // Null is terminal for this attempt, not an implicit request to keep spinning.
+                renderFailed = true
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: OutOfMemoryError) {
+            renderFailed = true
+        } catch (_: Exception) {
+            renderFailed = true
+        }
     }
-    val bitmap = bitmapState.value
-    val cacheKey = if (bitmap != null && !bitmap.isRecycled) {
+
+    val validBitmap = bitmap?.takeUnless { it.isRecycled }
+    val cacheKey = if (validBitmap != null) {
         viewModel.cacheKeyForPage(pageIndex, scale = 1.5f)
     } else null
 
@@ -331,37 +355,64 @@ fun PdfPageItem(
         shape = RoundedCornerShape(4.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        if (bitmap != null && !bitmap.isRecycled) {
-            Image(
-                bitmap = bitmap.asImageBitmap(),
-                contentDescription = stringResource(R.string.pdf_page_description, pageIndex + 1),
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(bottom = 2.dp),
-                contentAlignment = Alignment.BottomCenter
-            ) {
-                Text(
-                    text = "VibeSync All in ONE PDF Suite",
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
-                    color = Color(0xFF8E0000).copy(alpha = 0.55f),
-                    fontSize = 8.sp,
-                    fontWeight = FontWeight.SemiBold
+        when {
+            validBitmap != null -> {
+                Image(
+                    bitmap = validBitmap.asImageBitmap(),
+                    contentDescription = stringResource(R.string.pdf_page_description, pageIndex + 1),
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit
                 )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(bottom = 2.dp),
+                    contentAlignment = Alignment.BottomCenter
+                ) {
+                    Text(
+                        text = "VibeSync All in ONE PDF Suite",
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
+                        color = Color(0xFF8E0000).copy(alpha = 0.55f),
+                        fontSize = 8.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
             }
-        } else {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(24.dp),
-                    strokeWidth = 2.dp,
-                    color = Color.LightGray
-                )
+            renderFailed -> {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        Icons.Default.ErrorOutline,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = stringResource(R.string.page_render_failed),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    TextButton(onClick = { retryAttempt += 1 }) {
+                        Text(stringResource(R.string.retry))
+                    }
+                }
+            }
+            else -> {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        strokeWidth = 2.dp,
+                        color = Color.LightGray
+                    )
+                }
             }
         }
     }

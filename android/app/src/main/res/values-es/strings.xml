@@ -181,4 +181,7 @@
     <string name="update_store_unavailable">No se pudo abrir la ficha de Google Play. Inténtalo de nuevo cuando haya conexión a Internet.</string>
     <string name="internet_settings_unavailable">No se pudieron abrir los ajustes de red. Abre manualmente los ajustes de Wi-Fi.</string>
 
+    <string name="document_load_error">No se pudo abrir este PDF. Comprueba que el archivo esté accesible e inténtalo de nuevo.</string>
+    <string name="page_render_failed">No se pudo mostrar esta página.</string>
+    <string name="retry">Reintentar</string>
 </resources>

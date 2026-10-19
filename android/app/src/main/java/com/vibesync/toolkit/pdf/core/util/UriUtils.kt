@@ -83,9 +83,9 @@ object UriUtils {
 
         try {
             val inputStream: InputStream = when (uri.scheme?.lowercase(Locale.US)) {
-                "file" -> FileInputStream(requireNotNull(uri.path) { "File Uri has no path: $uri" })
+                "file" -> FileInputStream(requireNotNull(uri.path) { "File Uri has no path." })
                 else -> context.contentResolver.openInputStream(uri)
-                    ?: throw IllegalArgumentException("Cannot open input stream for Uri: $uri")
+                    ?: throw IllegalArgumentException("Cannot open input stream for the selected document.")
             }
 
             inputStream.use { input ->
