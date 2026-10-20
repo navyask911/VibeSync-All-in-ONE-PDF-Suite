@@ -126,7 +126,7 @@ jobs:
           gradle-version: 8.13
           cache-disabled: true
       - name: Install Android 36 SDK
-        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;35.0.0" || true
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;35.0.0" "ndk;27.0.12077973"
       - name: Run unit tests
         working-directory: android
         run: |
@@ -152,7 +152,7 @@ jobs:
           gradle-version: 8.13
           cache-disabled: true
       - name: Install Android 36 SDK
-        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;35.0.0" || true
+        run: yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platforms;android-36" "build-tools;35.0.0" "ndk;27.0.12077973"
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
