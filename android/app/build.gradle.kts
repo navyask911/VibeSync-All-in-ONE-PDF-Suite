@@ -16,13 +16,15 @@ val hasReleaseSigning = releaseKeystoreFile.isFile && releaseKeystoreFile.length
 android {
     namespace = "com.vibesync.toolkit.pdf"
     compileSdk = 36
+    // Pin the NDK used by AGP to strip native libraries and extract symbols.
+    ndkVersion = "27.0.12077973"
 
     defaultConfig {
         applicationId = "com.vibesync.toolkit.pdf"
         minSdk = 24
         targetSdk = 36
-        versionCode = 15
-        versionName = "1.0.13"
+        versionCode = 16
+        versionName = "1.0.14"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -50,6 +52,8 @@ android {
                 "proguard-rules.pro"
             )
             ndk {
+                // Embed available native debug symbols in the release AAB for Play Console.
+                // FULL includes symbol names, source files, and line numbers when supplied by the native library.
                 debugSymbolLevel = "FULL"
             }
             // Never create a Play-looking release artifact signed with the debug key.
