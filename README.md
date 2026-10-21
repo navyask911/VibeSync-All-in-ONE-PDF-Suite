@@ -375,12 +375,6 @@ Push a tag or run the workflow manually. Artifacts appear under the run summary.
 ```
 
 ---
-
-### 🎯 What Makes This README More Attractive
-
-* **Centered hero section** – Logo, title, and layered badges create a strong first impression.
-* **Color‑coded badges** – Uses your brand palette (`#DC143C`, `#E0115F`, `#10B981`, `#0F52BA`) with matching logos.
-* **Inline navigation** – Anchor links let readers jump to any section instantly.
 * **Collapsible `<details>` blocks** – Keeps the page scannable while hiding prerequisites, toolkit details, test suites, and CI/CD secrets.
 * **GitHub Alerts** – `> [!IMPORTANT]` and `> [!NOTE]` callouts draw attention to critical privacy and security information.
 * **Feature tables** – Structured, easy‑to‑scan comparisons for every module.
