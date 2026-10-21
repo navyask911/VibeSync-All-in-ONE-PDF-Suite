@@ -1,5 +1,4 @@
 
-```markdown
 <!--
   ╔══════════════════════════════════════════════════════════════╗
   ║  VibeSync All in ONE PDF Suite — README                     ║
