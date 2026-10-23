@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +41,8 @@ private const val VIBESYNC_PUBLIC_INFO_URL = "https://github.com/navyask911/Vibe
 private const val VIBESYNC_PRIVACY_URL = "https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite-Read-Me/blob/main/PRIVACY_POLICY.md"
 private const val VIBESYNC_LICENSE_URL = "https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite-Read-Me/blob/main/LICENSE"
 private const val VIBESYNC_TERMS_URL = "https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite-Read-Me/blob/main/TERMS.md"
+private const val PDF_SECTION_PREFERENCES = "dashboard_pdf_section_preferences"
+private const val KEY_PDF_SECTION_VISIBLE = "pdf_section_visible"
 
 data class ToolItem(
     val title: String,
@@ -66,6 +69,9 @@ fun DashboardScreen(
     val coroutineScope = rememberCoroutineScope()
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
+    var showAllPdfs by rememberSaveable { mutableStateOf(false) }
+    var isPdfSectionVisible by remember(context) { mutableStateOf(context.getSharedPreferences(PDF_SECTION_PREFERENCES, android.content.Context.MODE_PRIVATE).getBoolean(KEY_PDF_SECTION_VISIBLE, true)) }
+    val visiblePdfs = remember(uiState.discoveredPdfs, showAllPdfs) { if (showAllPdfs) uiState.discoveredPdfs else uiState.discoveredPdfs.take(10) }
 
     fun launchPickerSafely(action: () -> Unit) {
         try {
@@ -341,96 +347,104 @@ fun DashboardScreen(
                 }
             }
 
-            // 4. "All PDFs on Device" Automatic Discovery Section
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            stringResource(if (uiState.isFolderScanResult) R.string.pdfs_in_selected_folder else R.string.all_pdfs_on_device),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            stringResource(R.string.pdfs_indexed_count, uiState.discoveredPdfs.size),
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    if (uiState.isScanning) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = VibeSyncCrimsonPrimary)
-                    } else {
-                        IconButton(onClick = { viewModel.refreshCurrentSource() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.rescan), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-
-            // Discovered PDFs List or Discovery Invitation
-            if (uiState.discoveredPdfs.isEmpty() && !uiState.isScanning) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(18.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+            // 4. Compact, persistent PDF discovery section. Hiding this section never
+            // changes permissions, the scanner index, or the underlying documents.
+            if (!isPdfSectionVisible) {
+                item(key = "show_pdfs_section") {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(
+                            onClick = {
+                                isPdfSectionVisible = true
+                                context.getSharedPreferences(PDF_SECTION_PREFERENCES, android.content.Context.MODE_PRIVATE).edit().putBoolean(KEY_PDF_SECTION_VISIBLE, true).apply()
+                            },
+                            modifier = Modifier.testTag("pdf_show_section")
                         ) {
-                            Icon(Icons.Default.FindInPage, contentDescription = null, tint = VibeSyncCrimsonPrimary, modifier = Modifier.size(36.dp))
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(stringResource(R.string.automatic_pdf_discovery), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text(
-                                stringResource(R.string.scan_storage_invitation),
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Button(
-                                onClick = { viewModel.triggerScanRequest() },
-                                colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
-                            ) {
-                                Text(stringResource(R.string.scan_device_storage))
-                            }
+                            Icon(Icons.Default.PictureAsPdf, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.pdfs_show_section))
                         }
                     }
                 }
             } else {
-                items(uiState.discoveredPdfs) { pdf ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onNavigateToViewer(pdf.uri) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = VibeSyncCrimsonPrimary, modifier = Modifier.size(32.dp))
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(pdf.name, fontWeight = FontWeight.SemiBold, maxLines = 1, fontSize = 13.sp)
-                                Text(
-                                    stringResource(R.string.modified_date, pdf.sizeFormatted, pdf.formattedDate),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                item(key = "pdf_section_header") {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                stringResource(if (uiState.isFolderScanResult) R.string.pdfs_in_selected_folder else R.string.pdf_recent_heading),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                if (uiState.discoveredPdfs.isEmpty()) stringResource(R.string.pdfs_indexed_count, 0)
+                                else stringResource(R.string.pdfs_showing_count, visiblePdfs.size, uiState.discoveredPdfs.size),
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (uiState.isScanning) {
+                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = VibeSyncCrimsonPrimary)
+                        } else {
+                            IconButton(onClick = { viewModel.refreshCurrentSource() }) {
+                                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.rescan), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        IconButton(
+                            onClick = {
+                                isPdfSectionVisible = false
+                                context.getSharedPreferences(PDF_SECTION_PREFERENCES, android.content.Context.MODE_PRIVATE).edit().putBoolean(KEY_PDF_SECTION_VISIBLE, false).apply()
+                            },
+                            modifier = Modifier.testTag("pdf_section_close")
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.pdfs_hide_section), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+
+                if (uiState.discoveredPdfs.isEmpty() && !uiState.isScanning) {
+                    item(key = "pdf_discovery_empty_state") {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        ) {
+                            Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Default.FindInPage, contentDescription = null, tint = VibeSyncCrimsonPrimary, modifier = Modifier.size(36.dp))
+                                Spacer(Modifier.height(8.dp))
+                                Text(stringResource(R.string.automatic_pdf_discovery), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text(stringResource(R.string.scan_storage_invitation), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.height(12.dp))
+                                Button(onClick = { viewModel.triggerScanRequest() }, colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)) {
+                                    Text(stringResource(R.string.scan_device_storage))
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    items(items = visiblePdfs, key = { pdf -> pdf.uri.toString() }) { pdf ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth().clickable { onNavigateToViewer(pdf.uri) },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        ) {
+                            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = VibeSyncCrimsonPrimary, modifier = Modifier.size(32.dp))
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(pdf.name, fontWeight = FontWeight.SemiBold, maxLines = 1, fontSize = 13.sp)
+                                    Text(stringResource(R.string.modified_date, pdf.sizeFormatted, pdf.formattedDate), style = MaterialTheme.typography.bodyMedium, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                    if (uiState.discoveredPdfs.size > 10) {
+                        item(key = "pdf_show_all_toggle") {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                                TextButton(onClick = { showAllPdfs = !showAllPdfs }, modifier = Modifier.testTag("pdf_show_all_toggle")) {
+                                    Text(if (showAllPdfs) stringResource(R.string.pdfs_show_less) else stringResource(R.string.pdfs_show_all, uiState.discoveredPdfs.size))
+                                }
+                            }
                         }
                     }
                 }
