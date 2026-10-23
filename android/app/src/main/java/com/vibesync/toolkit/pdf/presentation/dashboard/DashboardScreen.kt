@@ -19,7 +19,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,7 +68,7 @@ fun DashboardScreen(
     val coroutineScope = rememberCoroutineScope()
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
-    var showAllPdfs by rememberSaveable { mutableStateOf(false) }
+    var showAllPdfs by remember { mutableStateOf(false) }
     var isPdfSectionVisible by remember(context) { mutableStateOf(context.getSharedPreferences(PDF_SECTION_PREFERENCES, android.content.Context.MODE_PRIVATE).getBoolean(KEY_PDF_SECTION_VISIBLE, true)) }
     val visiblePdfs = remember(uiState.discoveredPdfs, showAllPdfs) { if (showAllPdfs) uiState.discoveredPdfs else uiState.discoveredPdfs.take(10) }
 
@@ -355,6 +354,7 @@ fun DashboardScreen(
                         TextButton(
                             onClick = {
                                 isPdfSectionVisible = true
+                                showAllPdfs = false
                                 context.getSharedPreferences(PDF_SECTION_PREFERENCES, android.content.Context.MODE_PRIVATE).edit().putBoolean(KEY_PDF_SECTION_VISIBLE, true).apply()
                             },
                             modifier = Modifier.testTag("pdf_show_section")
@@ -392,6 +392,7 @@ fun DashboardScreen(
                         IconButton(
                             onClick = {
                                 isPdfSectionVisible = false
+                                showAllPdfs = false
                                 context.getSharedPreferences(PDF_SECTION_PREFERENCES, android.content.Context.MODE_PRIVATE).edit().putBoolean(KEY_PDF_SECTION_VISIBLE, false).apply()
                             },
                             modifier = Modifier.testTag("pdf_section_close")
