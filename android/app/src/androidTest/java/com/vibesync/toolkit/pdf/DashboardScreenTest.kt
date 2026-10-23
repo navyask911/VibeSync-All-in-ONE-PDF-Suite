@@ -9,6 +9,9 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.assertDoesNotExist
+import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import androidx.lifecycle.ViewModel
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.data.pdf.DiscoveredPdf
@@ -62,4 +65,55 @@ class DashboardScreenTest {
         composeTestRule.onNodeWithContentDescription("Privacy & Terms").performClick()
         composeTestRule.onNodeWithText("Privacy & Data Safety Guarantee").assertIsDisplayed()
     }
+
+    @Test
+    fun pdfListShowsTenByDefaultAndSupportsExpandCollapseAndPersistentHide() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.getSharedPreferences("dashboard_pdf_section_preferences", Context.MODE_PRIVATE)
+            .edit().remove("pdf_section_visible").commit()
+        val pdfs = (1..11).map { index ->
+            DiscoveredPdf(
+                id = index.toLong(),
+                name = "sample_$index.pdf",
+                uri = android.net.Uri.parse("content://test/documents/$index.pdf"),
+                sizeBytes = 1024L,
+                sizeFormatted = "1 KB",
+                lastModified = (100 - index).toLong(),
+                formattedDate = "Oct 23, 2026"
+            )
+        }
+        val viewModel = mockk<DashboardViewModel>(relaxed = true)
+        every { viewModel.uiState } returns MutableStateFlow(DashboardUiState(discoveredPdfs = pdfs))
+
+        composeTestRule.setContent {
+            VibeSyncPdfTheme {
+                DashboardScreen(
+                    viewModel = viewModel,
+                    onNavigateToViewer = {},
+                    onNavigateToEditor = {},
+                    onNavigateToTool = {},
+                    onLaunchScanner = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithText("sample_1.pdf").assertIsDisplayed()
+        composeTestRule.onNodeWithText("sample_10.pdf").assertIsDisplayed()
+        composeTestRule.onNodeWithText("sample_11.pdf").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("pdf_show_all_toggle").assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithText("sample_11.pdf").assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag("pdf_show_all_toggle").performClick()
+        composeTestRule.onNodeWithText("sample_11.pdf").assertDoesNotExist()
+
+        composeTestRule.onNodeWithTag("pdf_section_close").performClick()
+        composeTestRule.onNodeWithTag("pdf_show_section").assertIsDisplayed()
+        composeTestRule.onNodeWithText("sample_1.pdf").assertDoesNotExist()
+        assertEquals(false, context.getSharedPreferences("dashboard_pdf_section_preferences", Context.MODE_PRIVATE).getBoolean("pdf_section_visible", true))
+
+        composeTestRule.onNodeWithTag("pdf_show_section").performClick()
+        composeTestRule.onNodeWithText("sample_1.pdf").assertIsDisplayed()
+        assertEquals(true, context.getSharedPreferences("dashboard_pdf_section_preferences", Context.MODE_PRIVATE).getBoolean("pdf_section_visible", false))
+    }
+
 }
