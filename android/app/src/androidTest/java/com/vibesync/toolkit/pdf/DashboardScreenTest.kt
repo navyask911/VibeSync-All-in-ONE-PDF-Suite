@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.hasText
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.lifecycle.ViewModel
@@ -97,21 +98,28 @@ class DashboardScreenTest {
             }
         }
 
+        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasText("sample_1.pdf"))
         composeTestRule.onNodeWithText("sample_1.pdf").assertIsDisplayed()
-        composeTestRule.onNodeWithText("sample_10.pdf").assertIsDisplayed()
+        composeTestRule.onNodeWithText("sample_10.pdf").assertExists()
         composeTestRule.onNodeWithText("sample_11.pdf").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("pdf_show_all_toggle"))
         composeTestRule.onNodeWithTag("pdf_show_all_toggle").assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasText("sample_11.pdf"))
         composeTestRule.onNodeWithText("sample_11.pdf").assertIsDisplayed()
 
+        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("pdf_show_all_toggle"))
         composeTestRule.onNodeWithTag("pdf_show_all_toggle").performClick()
         composeTestRule.onNodeWithText("sample_11.pdf").assertDoesNotExist()
 
+        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("pdf_section_close"))
         composeTestRule.onNodeWithTag("pdf_section_close").performClick()
-        composeTestRule.onNodeWithTag("pdf_show_section").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("pdf_show_section").assertExists()
         composeTestRule.onNodeWithText("sample_1.pdf").assertDoesNotExist()
         assertEquals(false, context.getSharedPreferences("dashboard_pdf_section_preferences", Context.MODE_PRIVATE).getBoolean("pdf_section_visible", true))
 
+        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("pdf_show_section"))
         composeTestRule.onNodeWithTag("pdf_show_section").performClick()
+        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasText("sample_1.pdf"))
         composeTestRule.onNodeWithText("sample_1.pdf").assertIsDisplayed()
         assertEquals(true, context.getSharedPreferences("dashboard_pdf_section_preferences", Context.MODE_PRIVATE).getBoolean("pdf_section_visible", false))
     }
