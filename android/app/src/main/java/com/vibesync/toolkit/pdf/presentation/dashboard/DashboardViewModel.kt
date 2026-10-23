@@ -173,11 +173,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
                     name.endsWith(".pdf", ignoreCase = true)
                 } ?: emptyArray()
 
-                (savedScans.asList() + cachedPdfs.asList())
+                // Keep every saved scan discoverable; only cache exports are capped because
+                // cache files are disposable and are not the user's permanent library.
+                (savedScans.asList() + cachedPdfs.asList().sortedByDescending { it.lastModified() }.take(5))
                     .filter { it.isFile && it.length() > 0L }
                     .distinctBy { it.absolutePath }
                     .sortedByDescending { it.lastModified() }
-                    .take(5)
                     .map { file ->
                         val pageCount = runCatching {
                             ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
