@@ -139,7 +139,7 @@ class PdfViewerScreenTest {
     @Test
     fun nullPageBitmapShowsTerminalErrorAndRetryCanRecover() {
         val recoveredBitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
-        coEvery { mockViewModel.acquirePageBitmap(0, 1.5f) } returnsMany listOf(null, fakeLease(recoveredBitmap))
+        coEvery { mockViewModel.acquirePageBitmap(0, 2.0f) } returnsMany listOf(null, fakeLease(recoveredBitmap))
 
         composeTestRule.setContent {
             PdfPageItem(
@@ -156,7 +156,7 @@ class PdfViewerScreenTest {
             composeTestRule.onAllNodesWithContentDescription("PDF page 1")
                 .fetchSemanticsNodes().isNotEmpty()
         }
-        coVerify(exactly = 2) { mockViewModel.acquirePageBitmap(0, 1.5f) }
+        coVerify(exactly = 2) { mockViewModel.acquirePageBitmap(0, 2.0f) }
     }
 
     @Test
