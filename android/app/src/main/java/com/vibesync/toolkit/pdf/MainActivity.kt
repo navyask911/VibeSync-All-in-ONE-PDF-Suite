@@ -173,8 +173,9 @@ class MainActivity : AppCompatActivity() {
             ActivityResultContracts.StartIntentSenderForResult()
         ) { result ->
             val scanResult = scannerManager.parseResult(result.resultCode, result.data)
-            scanResult?.pdfUri?.let { scannedPdfUri ->
-                Toast.makeText(this, getString(R.string.document_scanned_page_count, scanResult.pageCount), Toast.LENGTH_LONG).show()
+            scanResult?.let { completedScan ->
+                completedScan.pdfUri?.let { scannedPdfUri ->
+                Toast.makeText(this, getString(R.string.document_scanned_page_count, completedScan.pageCount), Toast.LENGTH_LONG).show()
                 lifecycleScope.launch(Dispatchers.IO) {
                     // Scans are user documents, not disposable exports: keep them in app-private
                     // persistent storage rather than cacheDir so they survive cache eviction.
@@ -208,7 +209,7 @@ class MainActivity : AppCompatActivity() {
                                     // page export/reprocessing workflows.
                                     val copiedPageFiles = mutableListOf<File>()
                                     try {
-                                        scanResult.pageImageUris.forEachIndexed { index, pageUri ->
+                                        completedScan.pageImageUris.forEachIndexed { index, pageUri ->
                                             val pageFile = File(
                                                 scanDirectory,
                                                 "${baseName}_page_${index + 1}.jpg"
@@ -256,6 +257,7 @@ class MainActivity : AppCompatActivity() {
                             ).show()
                         }
                     }
+                }
                 }
             }
         }
