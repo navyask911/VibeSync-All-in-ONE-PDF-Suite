@@ -213,6 +213,7 @@ class MainActivity : AppCompatActivity() {
                                                 scanDirectory,
                                                 "${baseName}_page_${index + 1}.jpg"
                                             )
+                                            copiedPageFiles.add(pageFile)
                                             contentResolver.openInputStream(pageUri)?.use { input ->
                                                 pageFile.outputStream().use { outputStream ->
                                                     input.copyTo(outputStream)
@@ -221,7 +222,6 @@ class MainActivity : AppCompatActivity() {
                                             if (!pageFile.isFile || pageFile.length() == 0L) {
                                                 throw java.io.IOException("Scanned page ${index + 1} was empty.")
                                             }
-                                            copiedPageFiles.add(pageFile)
                                         }
                                     } catch (pageError: Exception) {
                                         copiedPageFiles.forEach { it.delete() }
