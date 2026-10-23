@@ -186,4 +186,10 @@
     <string name="language_korean">한국어</string>
     <string name="language_italian">Italiano</string>
     <string name="pdf_brand_watermark">VibeSync All in ONE PDF Suite</string>
+    <string name="pdf_recent_heading">최근 PDF</string>
+    <string name="pdfs_showing_count">PDF %2$d개 중 %1$d개 표시</string>
+    <string name="pdfs_show_all">모든 PDF 표시 (%1$d)</string>
+    <string name="pdfs_show_less">간략히 보기</string>
+    <string name="pdfs_show_section">PDF 표시</string>
+    <string name="pdfs_hide_section">PDF 목록 섹션 숨기기</string>
 </resources>
