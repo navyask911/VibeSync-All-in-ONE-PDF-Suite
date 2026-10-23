@@ -176,18 +176,60 @@ class MainActivity : AppCompatActivity() {
             scanResult?.pdfUri?.let { scannedPdfUri ->
                 Toast.makeText(this, getString(R.string.document_scanned_page_count, scanResult.pageCount), Toast.LENGTH_LONG).show()
                 lifecycleScope.launch(Dispatchers.IO) {
-                    val watermarkedFile = UriUtils.createExportCacheFile(this@MainActivity, "VibeSync_Scanned_Document")
-                    val watermarkResult = toolkitEngine.watermarkPdf(
-                        sourceUri = scannedPdfUri,
-                        watermarkText = "VibeSync All in ONE PDF Suite",
-                        outputFile = watermarkedFile
-                    )
+                    // Scans are user documents, not disposable exports: keep them in app-private
+                    // persistent storage rather than cacheDir so they survive cache eviction.
+                    val scanDirectory = File(filesDir, "scans")
+                    val savedFile: File? = try {
+                        if (!scanDirectory.exists() && !scanDirectory.mkdirs()) {
+                            throw java.io.IOException("Unable to create the saved scans directory.")
+                        }
+                        if (!scanDirectory.isDirectory) {
+                            throw java.io.IOException("The saved scans path is not a directory.")
+                        }
+
+                        val timestamp = System.currentTimeMillis()
+                        val baseName = "Scan_$timestamp"
+                        var finalFile = File(scanDirectory, "$baseName.pdf")
+                        var suffix = 1
+                        while (finalFile.exists()) {
+                            finalFile = File(scanDirectory, "${baseName}_${suffix++}.pdf")
+                        }
+                        val temporaryFile = File.createTempFile("scan_work_", ".pdf", scanDirectory)
+                        val watermarkResult = toolkitEngine.watermarkPdf(
+                            sourceUri = scannedPdfUri,
+                            watermarkText = "VibeSync All in ONE PDF Suite",
+                            outputFile = temporaryFile
+                        )
+                        watermarkResult.fold(
+                            onSuccess = { output ->
+                                if (output.isFile && output.length() > 0L && output.renameTo(finalFile)) {
+                                    finalFile
+                                } else {
+                                    output.delete()
+                                    null
+                                }
+                            },
+                            onFailure = {
+                                temporaryFile.delete()
+                                null
+                            }
+                        )
+                    } catch (error: Exception) {
+                        Log.e(TAG, "Failed to save scanned PDF to persistent storage", error)
+                        null
+                    }
+
                     launch(Dispatchers.Main) {
-                        watermarkResult.onSuccess {
-                            pendingPdfUriState.value = Uri.fromFile(watermarkedFile)
+                        if (savedFile != null) {
+                            pendingPdfUriState.value = Uri.fromFile(savedFile)
+                            dashboardViewModel.refreshRecentDocuments()
                             recordSuccessfulPdfOperation()
-                        }.onFailure {
-                            Toast.makeText(this@MainActivity, getString(R.string.error_watermark_scanned_pdf), Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(
+                                this@MainActivity,
+                                getString(R.string.error_watermark_scanned_pdf),
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
                     }
                 }
