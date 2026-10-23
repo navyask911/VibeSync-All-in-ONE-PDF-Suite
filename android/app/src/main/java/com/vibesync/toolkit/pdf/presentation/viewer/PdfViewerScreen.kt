@@ -3,7 +3,8 @@ package com.vibesync.toolkit.pdf.presentation.viewer
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -17,10 +18,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.awaitPointerEvent
+import androidx.compose.ui.input.pointer.consume
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -38,6 +42,7 @@ import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import kotlin.math.sqrt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,7 +62,10 @@ fun PdfViewerScreen(
     var offsetY by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(documentUri) {
-        // Do not retain the previous document's scroll position when the URI changes.
+        // A new document must not inherit the previous document's zoom or pan.
+        scale = 1f
+        offsetX = 0f
+        offsetY = 0f
         listState.scrollToItem(0)
         viewModel.loadDocument(documentUri)
     }
@@ -178,27 +186,65 @@ fun PdfViewerScreen(
                 .padding(paddingValues)
                 .background(Color(0xFFE2E8F0))
                 .pointerInput(documentUri) {
-                    detectTransformGestures { centroid, pan, zoom, _ ->
-                        val previousScale = scale
-                        val nextScale = (previousScale * zoom).coerceIn(1.0f, 4.0f)
-                        val scaleFactor = nextScale / previousScale
-                        scale = nextScale
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        var previousCentroid: Offset? = null
+                        var previousDistance = 0f
+                        var previousPointerCount = 0
 
-                        if (nextScale > 1f) {
-                            // graphicsLayer scales around the container center. Adjust translation
-                            // around the gesture centroid so the content under the fingers stays put.
-                            val focusX = centroid.x - size.width / 2f
-                            val focusY = centroid.y - size.height / 2f
-                            val maxOffsetX = (size.width * (nextScale - 1f)) / 2f
-                            val maxOffsetY = (size.height * (nextScale - 1f)) / 2f
-                            offsetX = ((offsetX - focusX) * scaleFactor + focusX + pan.x)
-                                .coerceIn(-maxOffsetX, maxOffsetX)
-                            offsetY = ((offsetY - focusY) * scaleFactor + focusY + pan.y)
-                                .coerceIn(-maxOffsetY, maxOffsetY)
-                        } else {
-                            offsetX = 0f
-                            offsetY = 0f
-                        }
+                        do {
+                            val event = awaitPointerEvent()
+                            val pressed = event.changes.filter { it.pressed }
+                            if (pressed.isEmpty()) break
+
+                            val centroid = Offset(
+                                pressed.map { it.position.x }.average().toFloat(),
+                                pressed.map { it.position.y }.average().toFloat()
+                            )
+                            val distance = if (pressed.size > 1) {
+                                sqrt(
+                                    pressed.sumOf { change ->
+                                        val dx = (change.position.x - centroid.x).toDouble()
+                                        val dy = (change.position.y - centroid.y).toDouble()
+                                        dx * dx + dy * dy
+                                    } / pressed.size
+                                ).toFloat()
+                            } else 0f
+
+                            val priorCentroid = previousCentroid
+                            if (priorCentroid != null && previousPointerCount == pressed.size) {
+                                val pan = centroid - priorCentroid
+                                val zoomFactor = if (pressed.size > 1 && previousDistance > 0f) {
+                                    distance / previousDistance
+                                } else 1f
+                                val shouldHandleGesture = scale > 1f || pressed.size > 1
+                                if (shouldHandleGesture) {
+                                    val previousScale = scale
+                                    val nextScale = (previousScale * zoomFactor).coerceIn(1f, 4f)
+                                    val scaleFactor = nextScale / previousScale
+                                    scale = nextScale
+                                    if (nextScale > 1f) {
+                                        // Keep the content beneath the pinch centroid stationary.
+                                        val focusX = centroid.x - size.width / 2f
+                                        val focusY = centroid.y - size.height / 2f
+                                        val maxOffsetX = size.width * (nextScale - 1f) / 2f
+                                        val maxOffsetY = size.height * (nextScale - 1f) / 2f
+                                        offsetX = ((offsetX - focusX) * scaleFactor + focusX + pan.x)
+                                            .coerceIn(-maxOffsetX, maxOffsetX)
+                                        offsetY = ((offsetY - focusY) * scaleFactor + focusY + pan.y)
+                                            .coerceIn(-maxOffsetY, maxOffsetY)
+                                    } else {
+                                        offsetX = 0f
+                                        offsetY = 0f
+                                    }
+                                    event.changes.forEach { it.consume() }
+                                }
+                            }
+
+                            previousCentroid = centroid
+                            previousDistance = distance
+                            previousPointerCount = pressed.size
+                        } while (event.changes.any { it.pressed })
                     }
                 }
                 .pointerInput(documentUri) {
@@ -252,6 +298,7 @@ fun PdfViewerScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .testTag("pdf_page_list")
+                        .then(Modifier)
                         .graphicsLayer(
                             scaleX = scale,
                             scaleY = scale,
@@ -259,7 +306,8 @@ fun PdfViewerScreen(
                             translationY = offsetY
                         ),
                     contentPadding = PaddingValues(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    userScrollEnabled = scale <= 1f
                 ) {
                     items(
                         count = uiState.pageCount,
