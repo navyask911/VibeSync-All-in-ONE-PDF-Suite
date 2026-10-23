@@ -203,6 +203,30 @@ class MainActivity : AppCompatActivity() {
                         watermarkResult.fold(
                             onSuccess = { output ->
                                 if (output.isFile && output.length() > 0L && output.renameTo(finalFile)) {
+                                    // Preserve ML Kit's original page images alongside the PDF. They
+                                    // are copied byte-for-byte (not resized or recompressed) for future
+                                    // page export/reprocessing workflows.
+                                    val copiedPageFiles = mutableListOf<File>()
+                                    try {
+                                        scanResult.pageImageUris.forEachIndexed { index, pageUri ->
+                                            val pageFile = File(
+                                                scanDirectory,
+                                                "${baseName}_page_${index + 1}.jpg"
+                                            )
+                                            contentResolver.openInputStream(pageUri)?.use { input ->
+                                                pageFile.outputStream().use { outputStream ->
+                                                    input.copyTo(outputStream)
+                                                }
+                                            } ?: throw java.io.IOException("Unable to read scanned page ${index + 1}.")
+                                            if (!pageFile.isFile || pageFile.length() == 0L) {
+                                                throw java.io.IOException("Scanned page ${index + 1} was empty.")
+                                            }
+                                            copiedPageFiles.add(pageFile)
+                                        }
+                                    } catch (pageError: Exception) {
+                                        copiedPageFiles.forEach { it.delete() }
+                                        Log.w(TAG, "PDF saved, but original page images could not all be retained.", pageError)
+                                    }
                                     finalFile
                                 } else {
                                     output.delete()
