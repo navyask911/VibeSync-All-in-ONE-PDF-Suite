@@ -298,7 +298,6 @@ fun PdfViewerScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .testTag("pdf_page_list")
-                        .then(Modifier)
                         .graphicsLayer(
                             scaleX = scale,
                             scaleY = scale,
