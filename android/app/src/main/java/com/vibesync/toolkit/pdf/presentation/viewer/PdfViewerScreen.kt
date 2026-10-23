@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -19,6 +20,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -98,7 +100,23 @@ fun PdfViewerScreen(
                     }
                 },
                 actions = {
-                    // Zoom reset
+                    IconButton(
+                        onClick = {
+                            scale = (scale / 1.25f).coerceAtLeast(1f)
+                            if (scale <= 1f) {
+                                offsetX = 0f
+                                offsetY = 0f
+                            }
+                        },
+                        enabled = scale > 1f
+                    ) {
+                        Icon(Icons.Default.ZoomOut, contentDescription = stringResource(R.string.reset_zoom))
+                    }
+                    IconButton(onClick = {
+                        scale = (scale * 1.25f).coerceAtMost(4f)
+                    }) {
+                        Icon(Icons.Default.ZoomIn, contentDescription = stringResource(R.string.reset_zoom))
+                    }
                     if (scale > 1.05f) {
                         IconButton(onClick = {
                             scale = 1f
@@ -160,19 +178,44 @@ fun PdfViewerScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .background(Color(0xFFE2E8F0))
-                .pointerInput(Unit) {
-                    detectTransformGestures { _, pan, zoom, _ ->
-                        scale = (scale * zoom).coerceIn(1.0f, 4.0f) // 100% to 400% zoom
-                        if (scale > 1f) {
-                            val maxOffsetX = (size.width * (scale - 1)) / 2
-                            val maxOffsetY = (size.height * (scale - 1)) / 2
-                            offsetX = (offsetX + pan.x).coerceIn(-maxOffsetX, maxOffsetX)
-                            offsetY = (offsetY + pan.y).coerceIn(-maxOffsetY, maxOffsetY)
+                .pointerInput(documentUri) {
+                    detectTransformGestures { centroid, pan, zoom, _ ->
+                        val previousScale = scale
+                        val nextScale = (previousScale * zoom).coerceIn(1.0f, 4.0f)
+                        val scaleFactor = nextScale / previousScale
+                        scale = nextScale
+
+                        if (nextScale > 1f) {
+                            // graphicsLayer scales around the container center. Adjust translation
+                            // around the gesture centroid so the content under the fingers stays put.
+                            val focusX = centroid.x - size.width / 2f
+                            val focusY = centroid.y - size.height / 2f
+                            val maxOffsetX = (size.width * (nextScale - 1f)) / 2f
+                            val maxOffsetY = (size.height * (nextScale - 1f)) / 2f
+                            offsetX = ((offsetX - focusX) * scaleFactor + focusX + pan.x)
+                                .coerceIn(-maxOffsetX, maxOffsetX)
+                            offsetY = ((offsetY - focusY) * scaleFactor + focusY + pan.y)
+                                .coerceIn(-maxOffsetY, maxOffsetY)
                         } else {
                             offsetX = 0f
                             offsetY = 0f
                         }
                     }
+                }
+                .pointerInput(documentUri) {
+                    detectTapGestures(
+                        onDoubleTap = {
+                            if (scale > 1f) {
+                                scale = 1f
+                                offsetX = 0f
+                                offsetY = 0f
+                            } else {
+                                scale = 2f
+                                offsetX = 0f
+                                offsetY = 0f
+                            }
+                        }
+                    )
                 }
         ) {
             if (uiState.isLoading) {
@@ -461,4 +504,4 @@ fun PdfPageItem(
     }
 }
 
-private const val PAGE_RENDER_SCALE = 1.5f
+private const val PAGE_RENDER_SCALE = 2.0f
