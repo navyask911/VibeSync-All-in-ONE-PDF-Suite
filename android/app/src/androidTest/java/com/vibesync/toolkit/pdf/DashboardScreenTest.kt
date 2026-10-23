@@ -100,7 +100,9 @@ class DashboardScreenTest {
 
         composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasText("sample_1.pdf"))
         composeTestRule.onNodeWithText("sample_1.pdf").assertIsDisplayed()
-        composeTestRule.onNodeWithText("sample_10.pdf").assertExists()
+        composeTestRule.onNodeWithText("sample_11.pdf").assertDoesNotExist()
+        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasText("sample_10.pdf"))
+        composeTestRule.onNodeWithText("sample_10.pdf").assertIsDisplayed()
         composeTestRule.onNodeWithText("sample_11.pdf").assertDoesNotExist()
         composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("pdf_show_all_toggle"))
         composeTestRule.onNodeWithTag("pdf_show_all_toggle").assertIsDisplayed().performClick()
