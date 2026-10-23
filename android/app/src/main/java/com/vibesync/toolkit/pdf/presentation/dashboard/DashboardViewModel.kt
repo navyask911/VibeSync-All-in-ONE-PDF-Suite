@@ -91,7 +91,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             try {
                 val pdfs = scanner.scanDevicePdfs()
                 _uiState.value = _uiState.value.copy(
-                    discoveredPdfs = pdfs,
+                    discoveredPdfs = normalizeDiscoveredPdfs(pdfs),
                     isScanning = false,
                     isFolderScanResult = false
                 )
@@ -127,7 +127,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             try {
                 val pdfs = folderScanner.scanFolder(treeUri)
                 _uiState.value = _uiState.value.copy(
-                    discoveredPdfs = pdfs,
+                    discoveredPdfs = normalizeDiscoveredPdfs(pdfs),
                     isScanning = false,
                     isFolderScanResult = true,
                     message = getApplication<Application>().getString(
@@ -156,6 +156,14 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
     }
+
+    /**
+     * Deduplicate by URI and use the available modification timestamp for deterministic newest-first ordering.
+     * Access timestamps are not reliably exposed by MediaStore or SAF providers.
+     */
+    private fun normalizeDiscoveredPdfs(pdfs: List<DiscoveredPdf>): List<DiscoveredPdf> =
+        pdfs.distinctBy { it.uri.toString() }
+            .sortedWith(compareByDescending<DiscoveredPdf> { it.lastModified }.thenBy { it.name }.thenBy { it.uri.toString() })
 
     /** Refreshes the recent list after a scan is committed to persistent storage. */
     fun refreshRecentDocuments() = loadRecentDocuments()
