@@ -26,6 +26,36 @@ import java.io.File
 class PdfRendererEngineInstrumentedTest {
 
     @Test
+    fun rapidCacheClearAndReacquireNeverRecycleBitmapsExposedToUiLeases() = runBlocking {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val file = File(context.cacheDir, "renderer_cache_refresh_${System.nanoTime()}.pdf")
+        PDFBoxResourceLoader.init(context)
+        val engine = PdfRendererEngine(context)
+        val cache = BitmapCache.getInstance()
+        val leases = mutableListOf<BitmapCache.BitmapLease>()
+        try {
+            PDDocument().use { document ->
+                document.addPage(PDPage(PDRectangle.A4))
+                document.save(file)
+            }
+            assertEquals(1, engine.openDocument(Uri.fromFile(file)).getOrThrow())
+            repeat(8) {
+                val lease = requireNotNull(engine.renderPageLease(0, 1.0f))
+                leases += lease
+                cache.clear()
+                assertTrue("Every bitmap already leased by UI remains valid.", leases.all { !it.bitmap.isRecycled })
+            }
+            val renderedBitmaps = leases.map { it.bitmap }
+            leases.forEach { it.close() }
+            assertTrue("Leased bitmaps remain valid after rapid cache clear/reload cycles.", renderedBitmaps.all { !it.isRecycled })
+        } finally {
+            leases.forEach { runCatching { it.close() } }
+            engine.closeDocumentSafely()
+            file.delete()
+        }
+    }
+
+    @Test
     fun concurrentRequestsReuseLeasedBitmapAndCloseSafelyDuringContinuousScrolling() = runBlocking {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val file = File(context.cacheDir, "renderer_concurrency_${System.nanoTime()}.pdf")
@@ -59,16 +89,19 @@ class PdfRendererEngineInstrumentedTest {
                 leases.all { it.bitmap === bitmap }
             )
 
-            // Evict the cache while the UI still owns leases: visible bitmaps must survive until
-            // the final holder is released, even if the document is closed during scrolling.
+            // Stress eviction while Compose may still have recorded draw commands for this bitmap.
+            val cache = BitmapCache.getInstance()
+            repeat(5) { cache.clear() }
             engine.closeDocumentSafely()
             assertFalse("A leased bitmap must survive cache eviction.", bitmap.isRecycled)
 
             leases.forEach { it.close() }
-            assertTrue(
-                "The bitmap should be recycled only after the final lease closes.",
+            assertFalse(
+                "Closing the final lease must not recycle a Bitmap that Compose may still be drawing.",
                 bitmap.isRecycled
             )
+            cache.clear()
+            assertFalse("Cache/history refresh after lease release must remain draw-safe.", bitmap.isRecycled)
             leases.clear()
         } finally {
             leases.forEach { it.close() }

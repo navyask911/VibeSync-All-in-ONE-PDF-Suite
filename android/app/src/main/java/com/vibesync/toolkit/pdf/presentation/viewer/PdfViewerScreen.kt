@@ -610,12 +610,24 @@ fun PdfPageItem(
     ) {
         when {
             bitmapReady -> {
-                Image(
-                    bitmap = checkNotNull(bitmap).asImageBitmap(),
-                    contentDescription = stringResource(R.string.pdf_page_description, pageIndex + 1),
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Fit
-                )
+                val bitmapForCompose = bitmap?.takeUnless { it.isRecycled }
+                if (bitmapForCompose != null && !bitmapForCompose.isRecycled) {
+                    Image(
+                        bitmap = bitmapForCompose.asImageBitmap(),
+                        contentDescription = stringResource(R.string.pdf_page_description, pageIndex + 1),
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(12.dp),
+                        verticalArrangement = Arrangement.Center,
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+                        Text(stringResource(R.string.page_render_failed), fontSize = 12.sp)
+                    }
+                }
                 Box(
                     modifier = Modifier
                         .fillMaxSize()

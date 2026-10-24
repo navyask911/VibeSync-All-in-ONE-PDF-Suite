@@ -258,4 +258,18 @@
     <string name="scan_save_failed">Could not save this scan to the selected location</string>
     <string name="scan_images_unavailable">Could not prepare JPEG images for this scan</string>
     <string name="scan_operation_failed">Could not complete this scan action. Try again.</string>
+
+    <!-- PDF document context actions -->
+    <string name="document_actions_title">Document actions</string>
+    <string name="action_open_view_pdf">Open / View PDF</string>
+    <string name="action_share_jpg_images">Share as JPG Images</string>
+    <string name="action_compress_pdf">Compress PDF</string>
+    <string name="action_watermark_pdf">Watermark PDF</string>
+    <string name="rename_document_title">Rename document</string>
+    <string name="rename_document_hint">Document name</string>
+    <string name="delete_document_title">Delete document?</string>
+    <string name="delete_document_message">Delete %1$s from this device? This cannot be undone.</string>
+    <string name="document_rename_success">Document renamed.</string>
+    <string name="document_delete_success">Document deleted.</string>
+    <string name="document_action_failed">Could not complete this document action. Try again.</string>
 </resources>

@@ -239,4 +239,18 @@
     <string name="scan_save_failed">Impossibile salvare la scansione nella posizione scelta</string>
     <string name="scan_images_unavailable">Impossibile preparare le immagini JPEG</string>
     <string name="scan_operation_failed">Impossibile completare l’operazione. Riprova.</string>
+
+    <!-- PDF document context actions -->
+    <string name="document_actions_title">Azioni documento</string>
+    <string name="action_open_view_pdf">Apri / Visualizza PDF</string>
+    <string name="action_share_jpg_images">Condividi come immagini JPG</string>
+    <string name="action_compress_pdf">Comprimi PDF</string>
+    <string name="action_watermark_pdf">Aggiungi filigrana al PDF</string>
+    <string name="rename_document_title">Rinomina documento</string>
+    <string name="rename_document_hint">Nome documento</string>
+    <string name="delete_document_title">Eliminare il documento?</string>
+    <string name="delete_document_message">Eliminare %1$s da questo dispositivo? L’operazione non può essere annullata.</string>
+    <string name="document_rename_success">Documento rinominato.</string>
+    <string name="document_delete_success">Documento eliminato.</string>
+    <string name="document_action_failed">Impossibile completare l’azione. Riprova.</string>
 </resources>

@@ -10,6 +10,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -37,6 +39,7 @@ import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncRubyAccent
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncRubyDeep
 import com.vibesync.toolkit.pdf.presentation.monetization.BannerAd
 import com.vibesync.toolkit.pdf.core.util.UriUtils
+import com.vibesync.toolkit.pdf.presentation.common.PdfDocumentActionsSheet
 import kotlinx.coroutines.launch
 
 private const val VIBESYNC_PUBLIC_INFO_URL = "https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite-Read-Me"
@@ -46,6 +49,8 @@ private const val VIBESYNC_TERMS_URL = "https://github.com/navyask911/VibeSync-A
 private const val PDF_SECTION_PREFERENCES = "dashboard_pdf_section_preferences"
 private const val KEY_PDF_SECTION_VISIBLE = "pdf_section_visible"
 
+private data class DashboardPdfTarget(val uri: Uri, val name: String)
+
 data class ToolItem(
     val title: String,
     val subtitle: String,
@@ -54,7 +59,7 @@ data class ToolItem(
     val color: Color
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun DashboardScreen(
     viewModel: DashboardViewModel,
@@ -63,7 +68,12 @@ fun DashboardScreen(
     onNavigateToTool: (String) -> Unit,
     onLaunchScanner: () -> Unit,
     onRequestStoragePermission: () -> Unit = {},
-    onSelectLanguage: (String) -> Unit = {}
+    onSelectLanguage: (String) -> Unit = {},
+    onSharePdfDocument: (Uri) -> Unit = {},
+    onShareJpgImages: (Uri) -> Unit = {},
+    onRenameDocument: (Uri, String) -> Unit = { _, _ -> },
+    onDeleteDocument: (Uri) -> Unit = {},
+    onNavigateToPdfTool: (String, Uri) -> Unit = { route, _ -> onNavigateToTool(route) }
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
@@ -73,7 +83,18 @@ fun DashboardScreen(
     var showLanguageDialog by remember { mutableStateOf(false) }
     var showAllPdfs by remember { mutableStateOf(false) }
     var isPdfSectionVisible by remember(context) { mutableStateOf(context.getSharedPreferences(PDF_SECTION_PREFERENCES, android.content.Context.MODE_PRIVATE).getBoolean(KEY_PDF_SECTION_VISIBLE, true)) }
+    var selectedDocument by remember { mutableStateOf<DashboardPdfTarget?>(null) }
+    var showDocumentActions by remember { mutableStateOf(false) }
+    var showRenameDocumentDialog by remember { mutableStateOf(false) }
+    var showDeleteDocumentDialog by remember { mutableStateOf(false) }
+    var requestedDocumentName by remember { mutableStateOf("") }
     val visiblePdfs = remember(uiState.discoveredPdfs, showAllPdfs) { if (showAllPdfs) uiState.discoveredPdfs else uiState.discoveredPdfs.take(10) }
+
+    fun openDocumentActions(uri: Uri, name: String) {
+        selectedDocument = DashboardPdfTarget(uri, name)
+        requestedDocumentName = name.removeSuffix(".pdf").removeSuffix(".PDF")
+        showDocumentActions = true
+    }
 
     fun launchPickerSafely(action: () -> Unit) {
         try {
@@ -155,52 +176,62 @@ fun DashboardScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
+            Surface(color = MaterialTheme.colorScheme.surface, tonalElevation = 2.dp) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().testTag("dashboard_brand_banner"),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.size(36.dp).clip(RoundedCornerShape(10.dp))
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.PictureAsPdf,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                         Text(
-                            stringResource(R.string.app_name),
-                            style = MaterialTheme.typography.titleLarge.copy(
-                                fontSize = 20.sp,
-                                lineHeight = 22.sp,
-                                letterSpacing = (-0.2).sp
-                            ),
+                            text = stringResource(R.string.app_name),
+                            modifier = Modifier.weight(1f).testTag("dashboard_brand_title"),
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                        Text(
-                            stringResource(R.string.dashboard_subtitle),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 16.sp,
+                            lineHeight = 20.sp,
+                            letterSpacing = (-0.25).sp,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            fontSize = 12.sp,
-                            lineHeight = 15.sp
+                            overflow = TextOverflow.Clip
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface
-                ),
-                actions = {
-                    IconButton(onClick = { showPrivacyDialog = true }) {
-                        Icon(Icons.Default.Security, contentDescription = stringResource(R.string.privacy_terms), tint = Color(0xFF10B981))
-                    }
-                    IconButton(onClick = { showLanguageDialog = true }) {
-                        Icon(Icons.Default.Language, contentDescription = stringResource(R.string.language_settings), tint = VibeSyncCrimsonPrimary)
-                    }
-                    IconButton(onClick = { launchPickerSafely { folderPickerLauncher.launch(null) } }) {
-                        Icon(Icons.Default.FolderOpen, contentDescription = stringResource(R.string.choose_pdf_folder), tint = VibeSyncCrimsonPrimary)
-                    }
-                    IconButton(onClick = { viewModel.triggerScanRequest() }) {
-                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.scan_device_pdfs), tint = VibeSyncCrimsonPrimary)
-                    }
-                    IconButton(onClick = { launchPickerSafely { viewerPickerLauncher.launch(arrayOf("application/pdf")) } }) {
-                        Icon(Icons.Default.FileOpen, contentDescription = stringResource(R.string.open_document), tint = VibeSyncCrimsonPrimary)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().testTag("dashboard_action_toolbar"),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = { showPrivacyDialog = true }, modifier = Modifier.testTag("dashboard_action_privacy")) {
+                            Icon(Icons.Default.Security, contentDescription = stringResource(R.string.privacy_terms), tint = Color(0xFF10B981))
+                        }
+                        IconButton(onClick = { showLanguageDialog = true }, modifier = Modifier.testTag("dashboard_action_language")) {
+                            Icon(Icons.Default.Language, contentDescription = stringResource(R.string.language_settings), tint = VibeSyncCrimsonPrimary)
+                        }
+                        IconButton(onClick = { launchPickerSafely { folderPickerLauncher.launch(null) } }, modifier = Modifier.testTag("dashboard_action_folder")) {
+                            Icon(Icons.Default.FolderOpen, contentDescription = stringResource(R.string.choose_pdf_folder), tint = VibeSyncCrimsonPrimary)
+                        }
+                        IconButton(onClick = { viewModel.triggerScanRequest() }, modifier = Modifier.testTag("dashboard_action_refresh")) {
+                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.scan_device_pdfs), tint = VibeSyncCrimsonPrimary)
+                        }
+                        IconButton(onClick = { launchPickerSafely { viewerPickerLauncher.launch(arrayOf("application/pdf")) } }, modifier = Modifier.testTag("dashboard_action_import")) {
+                            Icon(Icons.Default.FileOpen, contentDescription = stringResource(R.string.open_document), tint = VibeSyncCrimsonPrimary)
+                        }
                     }
                 }
-            )
+            }
         },
         bottomBar = {
             BannerAd(modifier = Modifier.fillMaxWidth())
@@ -445,7 +476,13 @@ fun DashboardScreen(
                 } else {
                     items(items = visiblePdfs, key = { pdf -> pdf.uri.toString() }) { pdf ->
                         Card(
-                            modifier = Modifier.fillMaxWidth().clickable { onNavigateToViewer(pdf.uri) },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .combinedClickable(
+                                    onClick = { onNavigateToViewer(pdf.uri) },
+                                    onLongClick = { openDocumentActions(pdf.uri, pdf.name) }
+                                )
+                                .testTag("pdf_item_${pdf.name}"),
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                         ) {
@@ -456,7 +493,12 @@ fun DashboardScreen(
                                     Text(pdf.name, fontWeight = FontWeight.SemiBold, maxLines = 1, fontSize = 13.sp)
                                     Text(stringResource(R.string.modified_date, pdf.sizeFormatted, pdf.formattedDate), style = MaterialTheme.typography.bodyMedium, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
-                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                IconButton(
+                                    onClick = { openDocumentActions(pdf.uri, pdf.name) },
+                                    modifier = Modifier.testTag("pdf_actions_${pdf.name}")
+                                ) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.document_actions_title))
+                                }
                             }
                         }
                     }
@@ -488,7 +530,11 @@ fun DashboardScreen(
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onNavigateToViewer(Uri.parse(doc.uriString)) },
+                            .combinedClickable(
+                                onClick = { onNavigateToViewer(Uri.parse(doc.uriString)) },
+                                onLongClick = { openDocumentActions(Uri.parse(doc.uriString), doc.fileName) }
+                            )
+                            .testTag("recent_pdf_item_${doc.fileName}"),
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
                     ) {
@@ -509,7 +555,12 @@ fun DashboardScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            IconButton(
+                                onClick = { openDocumentActions(Uri.parse(doc.uriString), doc.fileName) },
+                                modifier = Modifier.testTag("recent_pdf_actions_${doc.fileName}")
+                            ) {
+                                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.document_actions_title))
+                            }
                         }
                     }
                 }
@@ -519,6 +570,94 @@ fun DashboardScreen(
                 Spacer(modifier = Modifier.height(60.dp))
             }
         }
+    }
+
+    if (showDocumentActions) {
+        selectedDocument?.let { target ->
+            PdfDocumentActionsSheet(
+                documentName = target.name,
+                onDismissRequest = { showDocumentActions = false },
+                onOpen = {
+                    showDocumentActions = false
+                    selectedDocument = null
+                    onNavigateToViewer(target.uri)
+                },
+                onEdit = {
+                    showDocumentActions = false
+                    selectedDocument = null
+                    onNavigateToEditor(target.uri)
+                },
+                onRename = {
+                    requestedDocumentName = target.name.removeSuffix(".pdf").removeSuffix(".PDF")
+                    showRenameDocumentDialog = true
+                },
+                onSharePdf = { onSharePdfDocument(target.uri) },
+                onShareImages = { onShareJpgImages(target.uri) },
+                onSplit = { onNavigateToPdfTool("split", target.uri) },
+                onCompress = { onNavigateToPdfTool("compress", target.uri) },
+                onWatermark = { onNavigateToPdfTool("watermark", target.uri) },
+                onEncrypt = { onNavigateToPdfTool("encrypt", target.uri) },
+                onDelete = { showDeleteDocumentDialog = true }
+            )
+        }
+    }
+
+    if (showRenameDocumentDialog && selectedDocument != null) {
+        AlertDialog(
+            onDismissRequest = { showRenameDocumentDialog = false },
+            title = { Text(stringResource(R.string.rename_document_title)) },
+            text = {
+                OutlinedTextField(
+                    value = requestedDocumentName,
+                    onValueChange = { requestedDocumentName = it },
+                    label = { Text(stringResource(R.string.rename_document_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("rename_document_field")
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = requestedDocumentName.isNotBlank(),
+                    onClick = {
+                        selectedDocument?.let { onRenameDocument(it.uri, requestedDocumentName.trim()) }
+                        showRenameDocumentDialog = false
+                        showDocumentActions = false
+                        selectedDocument = null
+                    },
+                    modifier = Modifier.testTag("rename_document_confirm")
+                ) { Text(stringResource(R.string.continue_label)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameDocumentDialog = false }, modifier = Modifier.testTag("rename_document_cancel")) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    if (showDeleteDocumentDialog && selectedDocument != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteDocumentDialog = false },
+            title = { Text(stringResource(R.string.delete_document_title)) },
+            text = { Text(stringResource(R.string.delete_document_message, selectedDocument!!.name)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        selectedDocument?.let { onDeleteDocument(it.uri) }
+                        showDeleteDocumentDialog = false
+                        showDocumentActions = false
+                        selectedDocument = null
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                    modifier = Modifier.testTag("delete_document_confirm")
+                ) { Text(stringResource(R.string.scan_delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteDocumentDialog = false }, modifier = Modifier.testTag("delete_document_cancel")) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
     }
 
     if (showLanguageDialog) {

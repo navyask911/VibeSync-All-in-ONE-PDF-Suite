@@ -239,4 +239,18 @@
     <string name="scan_save_failed">Tarama seçilen konuma kaydedilemedi</string>
     <string name="scan_images_unavailable">Bu taramanın JPEG görüntüleri hazırlanamadı</string>
     <string name="scan_operation_failed">Bu işlem tamamlanamadı. Tekrar deneyin.</string>
+
+    <!-- PDF document context actions -->
+    <string name="document_actions_title">Belge işlemleri</string>
+    <string name="action_open_view_pdf">PDF’yi aç / görüntüle</string>
+    <string name="action_share_jpg_images">JPG görselleri olarak paylaş</string>
+    <string name="action_compress_pdf">PDF’yi sıkıştır</string>
+    <string name="action_watermark_pdf">PDF’ye filigran ekle</string>
+    <string name="rename_document_title">Belgeyi yeniden adlandır</string>
+    <string name="rename_document_hint">Belge adı</string>
+    <string name="delete_document_title">Belge silinsin mi?</string>
+    <string name="delete_document_message">%1$s bu cihazdan silinsin mi? Bu işlem geri alınamaz.</string>
+    <string name="document_rename_success">Belge yeniden adlandırıldı.</string>
+    <string name="document_delete_success">Belge silindi.</string>
+    <string name="document_action_failed">Belge işlemi tamamlanamadı. Tekrar deneyin.</string>
 </resources>

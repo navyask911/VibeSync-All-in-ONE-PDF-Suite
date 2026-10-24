@@ -239,4 +239,18 @@
     <string name="scan_save_failed">Pindaian tidak dapat disimpan ke lokasi yang dipilih</string>
     <string name="scan_images_unavailable">Gambar JPEG untuk pindaian ini tidak dapat disiapkan</string>
     <string name="scan_operation_failed">Tindakan gagal diselesaikan. Coba lagi.</string>
+
+    <!-- PDF document context actions -->
+    <string name="document_actions_title">Tindakan dokumen</string>
+    <string name="action_open_view_pdf">Buka / Lihat PDF</string>
+    <string name="action_share_jpg_images">Bagikan sebagai gambar JPG</string>
+    <string name="action_compress_pdf">Kompres PDF</string>
+    <string name="action_watermark_pdf">Tambahkan tanda air ke PDF</string>
+    <string name="rename_document_title">Ganti nama dokumen</string>
+    <string name="rename_document_hint">Nama dokumen</string>
+    <string name="delete_document_title">Hapus dokumen?</string>
+    <string name="delete_document_message">Hapus %1$s dari perangkat ini? Tindakan ini tidak dapat dibatalkan.</string>
+    <string name="document_rename_success">Nama dokumen diubah.</string>
+    <string name="document_delete_success">Dokumen dihapus.</string>
+    <string name="document_action_failed">Tindakan dokumen gagal diselesaikan. Coba lagi.</string>
 </resources>

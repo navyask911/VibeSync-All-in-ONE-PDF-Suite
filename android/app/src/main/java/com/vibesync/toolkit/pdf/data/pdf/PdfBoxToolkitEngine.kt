@@ -391,6 +391,35 @@ class PdfBoxToolkitEngine(private val context: Context) {
     }
 
     /**
+     * Rewrites a PDF through PDFBox's stream serializer into a fresh private output file.
+     * This can remove redundant object layout and lets PDFBox apply its normal stream filters.
+     */
+    suspend fun compressPdf(sourceUri: Uri, outputFile: File): Result<File> = withContext(Dispatchers.IO) {
+        var sourceFile: File? = null
+        try {
+            val stagedFile = UriUtils.copyUriToCacheFile(context, sourceUri, "compress_src")
+            sourceFile = stagedFile
+            PDDocument.load(stagedFile).use { document ->
+                require(document.numberOfPages > 0) { "The source PDF contains no pages." }
+                document.save(outputFile)
+            }
+            if (!outputFile.isFile || outputFile.length() <= 0L) {
+                throw java.io.IOException("PDF compression did not produce a valid output.")
+            }
+            Result.success(outputFile)
+        } catch (cancelled: CancellationException) {
+            outputFile.delete()
+            throw cancelled
+        } catch (error: Exception) {
+            outputFile.delete()
+            Log.e(TAG, "Failed to compress PDF", error)
+            Result.failure(error)
+        } finally {
+            sourceFile?.delete()
+        }
+    }
+
+    /**
      * Adds the small VibeSync footer watermark to every PDF page.
      */
     suspend fun watermarkPdf(
