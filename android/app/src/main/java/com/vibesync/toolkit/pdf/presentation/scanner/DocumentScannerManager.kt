@@ -86,6 +86,12 @@ class DocumentScannerManager(private val activity: Activity) {
         }
     }
 
+    /** Starts a capture for the explicit multi-round Batch Scan flow. */
+    fun startBatchScan(
+        launcher: ActivityResultLauncher<IntentSenderRequest>,
+        onFailure: (Exception) -> Unit
+    ) = startScan(launcher, onFailure)
+
     /**
      * Parses the scan result data into direct PDF Uri and page image Uris.
      */

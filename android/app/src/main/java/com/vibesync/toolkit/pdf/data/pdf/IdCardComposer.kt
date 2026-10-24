@@ -9,6 +9,7 @@ import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.ensureActive
 import java.io.File
 import java.io.IOException
 
@@ -54,14 +55,26 @@ object IdCardComposer {
             document = PDDocument()
             document.addPage(page)
             val (frontPlacement, backPlacement) = placements(front.width, front.height, back.width, back.height)
-            val frontImage = LosslessFactory.createFromImage(document, front)
-            PDPageContentStream(document, page).use {
-                it.drawImage(frontImage, frontPlacement.x, frontPlacement.y, frontPlacement.width, frontPlacement.height)
+            val frontSpec = ResolutionProfile.STANDARD.spec(Runtime.getRuntime().maxMemory(), front.width, front.height)
+            val preparedFront = frontSpec.scaleBitmap(front)
+            try {
+                val frontImage = LosslessFactory.createFromImage(document, preparedFront)
+                PDPageContentStream(document, page).use {
+                    it.drawImage(frontImage, frontPlacement.x, frontPlacement.y, frontPlacement.width, frontPlacement.height)
+                }
+            } finally {
+                if (preparedFront !== front && !preparedFront.isRecycled) preparedFront.recycle()
             }
-            kotlinx.coroutines.currentCoroutineContext().ensureActive()
-            val backImage = LosslessFactory.createFromImage(document, back)
-            PDPageContentStream(document, page, true, true).use {
-                it.drawImage(backImage, backPlacement.x, backPlacement.y, backPlacement.width, backPlacement.height)
+            currentCoroutineContext().ensureActive()
+            val backSpec = ResolutionProfile.STANDARD.spec(Runtime.getRuntime().maxMemory(), back.width, back.height)
+            val preparedBack = backSpec.scaleBitmap(back)
+            try {
+                val backImage = LosslessFactory.createFromImage(document, preparedBack)
+                PDPageContentStream(document, page, true, true).use {
+                    it.drawImage(backImage, backPlacement.x, backPlacement.y, backPlacement.width, backPlacement.height)
+                }
+            } finally {
+                if (preparedBack !== back && !preparedBack.isRecycled) preparedBack.recycle()
             }
             val parent = outputFile.parentFile ?: throw IOException("Output folder is missing.")
             if (!parent.exists() && !parent.mkdirs()) throw IOException("Could not create output folder.")

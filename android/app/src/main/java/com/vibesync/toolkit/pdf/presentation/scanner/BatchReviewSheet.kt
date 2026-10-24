@@ -145,7 +145,7 @@ private fun BatchPageThumbnail(
                 IconButton(onClick = { onMove(index, (index - 1).coerceAtLeast(0)) }, enabled = index > 0, modifier = Modifier.testTag("batch_move_left_${index}")) {
                     Icon(Icons.Default.KeyboardArrowLeft, contentDescription = stringResource(R.string.batch_move_left))
                 }
-                IconButton(onClick = { onMove(index, (index + 1).coerceAtMost(index + 1)) }, enabled = index < Int.MAX_VALUE, modifier = Modifier.testTag("batch_move_right_${index}")) {
+                IconButton(onClick = { onMove(index, (index + 1).coerceAtMost(index + 1)) }, enabled = true, modifier = Modifier.testTag("batch_move_right_${index}")) {
                     Icon(Icons.Default.KeyboardArrowRight, contentDescription = stringResource(R.string.batch_move_right))
                 }
                 IconButton(onClick = onDelete, modifier = Modifier.testTag("batch_delete_${index}")) {
@@ -167,7 +167,6 @@ fun BatchScanScreen(
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("scan_settings_prefs", 0) }
     var selectedFilterName by remember { androidx.compose.runtime.mutableStateOf(prefs.getString(BatchScanViewModel.KEY_FILTER_ID, "") ?: "") }
-    val scope = rememberCoroutineScope()
 
     LaunchedEffect(state.savedFile) {
         state.savedFile?.let { file ->
