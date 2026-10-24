@@ -51,6 +51,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.awaitDispose
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -222,7 +223,11 @@ private fun ScanHistoryCard(
     var showDeleteDialog by rememberSaveable(entry.file.absolutePath) { mutableStateOf(false) }
     var requestedName by rememberSaveable(entry.file.absolutePath) { mutableStateOf(entry.file.nameWithoutExtension) }
     val preview by produceState<Bitmap?>(initialValue = null, key1 = entry.file.absolutePath, key2 = entry.file.lastModified()) {
-        value = withContext(Dispatchers.IO) { repository.loadThumbnail(entry.file) }
+        val loadedPreview = withContext(Dispatchers.IO) { repository.loadThumbnail(entry.file) }
+        value = loadedPreview
+        awaitDispose {
+            if (loadedPreview != null && !loadedPreview.isRecycled) loadedPreview.recycle()
+        }
     }
 
     Card(
