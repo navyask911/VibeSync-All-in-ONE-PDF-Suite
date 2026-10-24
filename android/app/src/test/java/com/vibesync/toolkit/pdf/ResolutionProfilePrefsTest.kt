@@ -1,5 +1,6 @@
 package com.vibesync.toolkit.pdf
 
+import android.app.Application
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.vibesync.toolkit.pdf.data.pdf.ResolutionProfile
@@ -8,6 +9,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -36,9 +38,19 @@ class ResolutionProfilePrefsTest {
     }
 
     @Test
-    fun selectedProfileSurvivesRecreatingPreferenceAccessor() {
+    fun selectedProfileSurvivesProcessRestartSimulation() {
         ResolutionProfilePrefs(context).write(ResolutionProfile.HD_AUTO)
-        assertEquals(ResolutionProfile.HD_AUTO, ResolutionProfilePrefs(context).read())
+
+        // Flush the async SharedPreferences write, then construct a separate Application context
+        // to simulate a fresh process reading the on-disk preference file.
+        assertEquals(
+            true,
+            context.getSharedPreferences(ResolutionProfilePrefs.PREFERENCES_FILE, Context.MODE_PRIVATE)
+                .edit()
+                .commit()
+        )
+        val restartedContext = Robolectric.buildApplication(Application::class.java).create().get()
+        assertEquals(ResolutionProfile.HD_AUTO, ResolutionProfilePrefs(restartedContext).read())
     }
 
     @Test
