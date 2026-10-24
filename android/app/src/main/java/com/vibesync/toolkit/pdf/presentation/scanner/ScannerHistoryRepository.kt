@@ -11,6 +11,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.Locale
+import kotlin.math.sqrt
 
 data class ScanHistoryEntry(
     val file: File,
@@ -147,7 +148,9 @@ class ScannerHistoryRepository(private val scansDirectory: File) {
                 PdfRenderer(descriptor).use rendererUse@ { renderer ->
                     if (renderer.pageCount == 0) return@rendererUse null
                     renderer.openPage(0).use { page ->
-                        val targetWidth = 360
+                        // Gallery previews stay lighter than a full-page export, but are rendered
+                        // large enough for crisp zoomed thumbnails rather than tiny 360px previews.
+                        val targetWidth = 1200
                         val targetHeight =
                             (targetWidth * page.height.toFloat() / page.width.toFloat().coerceAtLeast(1f))
                                 .toInt().coerceAtLeast(1)
@@ -197,9 +200,10 @@ class ScannerHistoryRepository(private val scansDirectory: File) {
                 PdfRenderer(descriptor).use { renderer ->
                     for (pageIndex in 0 until renderer.pageCount) {
                         renderer.openPage(pageIndex).use { page ->
-                            val scale = minOf(2.0f, 1600f / page.width.toFloat().coerceAtLeast(1f))
-                            val width = (page.width * scale).toInt().coerceAtLeast(1)
-                            val height = (page.height * scale).toInt().coerceAtLeast(1)
+                            // Android PdfRenderer exposes page dimensions in PDF points (72 DPI).
+                            // Render at 300 DPI for normal documents; cap unusually large custom
+                            // pages at 16 MP / 6000 px per side to keep bitmap memory bounded.
+                            val (width, height) = targetPixelSize(page.width, page.height)
                             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                             try {
                                 bitmap.eraseColor(android.graphics.Color.WHITE)
@@ -216,7 +220,7 @@ class ScannerHistoryRepository(private val scansDirectory: File) {
                                     outputDirectory
                                 )
                                 FileOutputStream(output).use { stream ->
-                                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 92, stream)) {
+                                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)) {
                                         throw IOException("Could not export page " + (pageIndex + 1) + " as JPEG.")
                                     }
                                 }
@@ -239,7 +243,7 @@ class ScannerHistoryRepository(private val scansDirectory: File) {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(imageFile.absolutePath, bounds)
         var sampleSize = 1
-        while (bounds.outWidth / sampleSize > 480 || bounds.outHeight / sampleSize > 640) {
+        while (bounds.outWidth / sampleSize > 1200 || bounds.outHeight / sampleSize > 1600) {
             sampleSize *= 2
         }
         BitmapFactory.decodeFile(
@@ -258,7 +262,28 @@ class ScannerHistoryRepository(private val scansDirectory: File) {
     private fun String.removeSuffixIgnoreCase(suffix: String): String =
         if (endsWith(suffix, ignoreCase = true)) dropLast(suffix.length) else this
 
-    private companion object {
-        const val TAG = "ScannerHistoryRepository"
+    companion object {
+        private const val TAG = "ScannerHistoryRepository"
+        private const val TARGET_EXPORT_DPI = 300f
+        private const val PDF_POINTS_PER_INCH = 72f
+        private const val MAX_EXPORT_PIXELS = 16_000_000L
+        private const val MAX_EXPORT_SIDE = 6_000
+
+        /**
+         * Computes high-resolution raster dimensions for PDF pages whose size is in 72-DPI points.
+         * Standard A4/Letter pages retain the full 300-DPI target. Oversized engineering pages are
+         * bounded by pixel count and maximum side length to avoid allocating unsafe bitmaps.
+         */
+        internal fun targetPixelSize(pageWidthPoints: Int, pageHeightPoints: Int): Pair<Int, Int> {
+            require(pageWidthPoints > 0 && pageHeightPoints > 0) { "Page dimensions must be positive." }
+            val areaInPoints = pageWidthPoints.toDouble() * pageHeightPoints.toDouble()
+            val dpiScale = TARGET_EXPORT_DPI / PDF_POINTS_PER_INCH
+            val pixelCapScale = sqrt(MAX_EXPORT_PIXELS.toDouble() / areaInPoints).toFloat()
+            val sideCapScale = MAX_EXPORT_SIDE.toFloat() / maxOf(pageWidthPoints, pageHeightPoints)
+            val scale = minOf(dpiScale, pixelCapScale, sideCapScale)
+            val width = (pageWidthPoints * scale).toInt().coerceAtLeast(1)
+            val height = (pageHeightPoints * scale).toInt().coerceAtLeast(1)
+            return width to height
+        }
     }
 }

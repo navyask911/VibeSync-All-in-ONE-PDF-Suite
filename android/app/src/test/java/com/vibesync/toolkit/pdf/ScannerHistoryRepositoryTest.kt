@@ -19,6 +19,25 @@ class ScannerHistoryRepositoryTest {
     }
 
     @Test
+    fun standardPageRasterDimensionsTargetApproximately300DpiWithoutLowResolutionCap() {
+        // A standard A4 PDF page is about 595 x 842 points. A 300-DPI raster is about
+        // 2479 x 3508 pixels, substantially larger than the previous 1600-pixel export cap.
+        val (width, height) = ScannerHistoryRepository.targetPixelSize(595, 842)
+
+        assertTrue(width >= 2470)
+        assertTrue(height >= 3500)
+        assertTrue(width.toLong() * height.toLong() <= 16_000_000L)
+    }
+
+    @Test
+    fun oversizedPageDimensionsStayWithinBitmapMemoryBounds() {
+        val (width, height) = ScannerHistoryRepository.targetPixelSize(9000, 9000)
+
+        assertTrue(maxOf(width, height) <= 6000)
+        assertTrue(width.toLong() * height.toLong() <= 16_000_000L)
+    }
+
+    @Test
     fun listsOnlySavedPdfScansNewestFirst() {
         val older = File(scans, "Scan_old.pdf").apply { writeBytes(byteArrayOf(1)); setLastModified(1000L) }
         val newer = File(scans, "Scan_new.pdf").apply { writeBytes(byteArrayOf(1)); setLastModified(2000L) }

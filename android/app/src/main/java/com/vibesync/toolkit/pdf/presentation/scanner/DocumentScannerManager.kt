@@ -23,14 +23,17 @@ class DocumentScannerManager(private val activity: Activity) {
 
     private val scanner: GmsDocumentScanner? by lazy {
         try {
+            // FULL mode requests ML Kit's enhanced document-capture flow. Requesting both
+            // JPEG and PDF keeps original page images available beside ML Kit's compiled PDF;
+            // downstream persistence copies those JPEG bytes without lossy re-encoding.
             val options = GmsDocumentScannerOptions.Builder()
                 .setGalleryImportAllowed(true)
                 .setPageLimit(50)
+                .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
                 .setResultFormats(
                     GmsDocumentScannerOptions.RESULT_FORMAT_JPEG,
                     GmsDocumentScannerOptions.RESULT_FORMAT_PDF
                 )
-                .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
                 .build()
             GmsDocumentScanning.getClient(options)
         } catch (e: Throwable) {

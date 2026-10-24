@@ -212,9 +212,9 @@ class MainActivity : AppCompatActivity() {
                         watermarkResult.fold(
                             onSuccess = { output ->
                                 if (output.isFile && output.length() > 0L && output.renameTo(finalFile)) {
-                                    // Preserve ML Kit's original page images alongside the PDF. They
-                                    // are copied byte-for-byte (not resized or recompressed) for future
-                                    // page export/reprocessing workflows.
+                                    // ML Kit's PDF is loaded and saved with a vector footer watermark;
+                                    // its embedded page images are not rasterized/recompressed here.
+                                    // Keep the original JPEG page bytes at their captured resolution.
                                     val copiedPageFiles = mutableListOf<File>()
                                     try {
                                         completedScan.pageImageUris.forEachIndexed { index, pageUri ->
@@ -222,14 +222,24 @@ class MainActivity : AppCompatActivity() {
                                                 scanDirectory,
                                                 "${baseName}_page_${index + 1}.jpg"
                                             )
-                                            copiedPageFiles.add(pageFile)
-                                            contentResolver.openInputStream(pageUri)?.use { input ->
-                                                pageFile.outputStream().use { outputStream ->
-                                                    input.copyTo(outputStream)
+                                            val temporaryPageFile = File.createTempFile(
+                                                "scan_page_work_", ".jpg", scanDirectory
+                                            )
+                                            try {
+                                                contentResolver.openInputStream(pageUri)?.use { input ->
+                                                    temporaryPageFile.outputStream().use { outputStream ->
+                                                        input.copyTo(outputStream)
+                                                    }
+                                                } ?: throw java.io.IOException("Unable to read scanned page ${index + 1}.")
+                                                if (!temporaryPageFile.isFile || temporaryPageFile.length() == 0L) {
+                                                    throw java.io.IOException("Scanned page ${index + 1} was empty.")
                                                 }
-                                            } ?: throw java.io.IOException("Unable to read scanned page ${index + 1}.")
-                                            if (!pageFile.isFile || pageFile.length() == 0L) {
-                                                throw java.io.IOException("Scanned page ${index + 1} was empty.")
+                                                if (!temporaryPageFile.renameTo(pageFile)) {
+                                                    throw java.io.IOException("Could not persist scanned page ${index + 1}.")
+                                                }
+                                                copiedPageFiles.add(pageFile)
+                                            } finally {
+                                                temporaryPageFile.delete()
                                             }
                                         }
                                     } catch (pageError: Exception) {
