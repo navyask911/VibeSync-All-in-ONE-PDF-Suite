@@ -1,6 +1,7 @@
 package com.vibesync.toolkit.pdf
 
 import com.vibesync.toolkit.pdf.data.pdf.ResolutionProfile
+import com.vibesync.toolkit.pdf.R
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNull
@@ -55,6 +56,8 @@ class ResolutionProfileTest {
         assertEquals(88, spec.jpegQuality)
         assertFalse(spec.applyUnsharpMask)
         assertFalse(spec.fellBack)
+        assertEquals(R.string.resolution_profile_hd_auto, spec.labelRes)
+        assertEquals(R.string.resolution_profile_hd_auto_description, spec.descriptionRes)
     }
 
     @Test
@@ -64,6 +67,8 @@ class ResolutionProfileTest {
             assertNull(spec.targetWidthPx)
             assertNull(spec.targetHeightPx)
             assertEquals(95, spec.jpegQuality)
+            assertEquals(R.string.resolution_profile_hd_auto, spec.labelRes)
+            assertEquals(R.string.resolution_profile_hd_auto_description, spec.descriptionRes)
             assertTrue(spec.applyUnsharpMask)
         }
     }
@@ -72,6 +77,8 @@ class ResolutionProfileTest {
     fun hdAutoUsesQuality96Above768MiBAndEnablesSharpening() {
         val spec = ResolutionProfile.HD_AUTO.spec(769 * mb, 1000, 1400)
         assertEquals(96, spec.jpegQuality)
+        assertEquals(R.string.resolution_profile_hd_auto, spec.labelRes)
+        assertEquals(R.string.resolution_profile_hd_auto_description, spec.descriptionRes)
         assertTrue(spec.applyUnsharpMask)
         assertNull(spec.targetWidthPx)
         assertNull(spec.targetHeightPx)

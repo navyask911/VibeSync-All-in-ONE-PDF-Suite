@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -113,11 +114,14 @@ fun ResolutionProfilePreferencePanel(
     )
 }
 
-/** Call when a resolved source profile reports a memory fallback. */
+/** Shows the required warning when a real source raster falls back to STANDARD. */
 @Composable
-fun ResolutionProfileFallbackWarning(spec: ProfileSpec, onShowWarning: (String) -> Unit) {
-    val context = LocalContext.current
-    androidx.compose.runtime.LaunchedEffect(spec.fellBack) {
-        if (spec.fellBack) onShowWarning(context.getString(R.string.resolution_profile_memory_fallback))
+fun ResolutionProfileFallbackSnackbar(
+    spec: ProfileSpec,
+    snackbarHostState: SnackbarHostState
+) {
+    val message = stringResource(R.string.resolution_profile_memory_fallback)
+    androidx.compose.runtime.LaunchedEffect(spec.fellBack, message) {
+        if (spec.fellBack) snackbarHostState.showSnackbar(message)
     }
 }

@@ -25,7 +25,10 @@ enum class ResolutionProfile {
                 }
             }
             HD_AUTO -> when {
-                memoryBytes < MB_256 -> STANDARD.spec(memoryBytes, sourceWidth, sourceHeight)
+                memoryBytes < MB_256 -> STANDARD.spec(memoryBytes, sourceWidth, sourceHeight).copy(
+                    labelRes = R.string.resolution_profile_hd_auto,
+                    descriptionRes = R.string.resolution_profile_hd_auto_description
+                )
                 memoryBytes <= MB_768 -> largestTierSpec(memoryBytes, sourceWidth, sourceHeight, 95)
                 else -> largestTierSpec(memoryBytes, sourceWidth, sourceHeight, 96)
             }
@@ -51,6 +54,8 @@ enum class ResolutionProfile {
     private fun largestTierSpec(memoryBytes: Long, sourceWidth: Int, sourceHeight: Int, quality: Int): ProfileSpec =
         LARGEST.spec(memoryBytes, sourceWidth, sourceHeight).copy(
             jpegQuality = quality,
+            labelRes = R.string.resolution_profile_hd_auto,
+            descriptionRes = R.string.resolution_profile_hd_auto_description,
             applyUnsharpMask = true
         )
 
