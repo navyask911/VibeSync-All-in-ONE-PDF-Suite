@@ -61,14 +61,14 @@ class FilterCarouselTest {
             VibeSyncPdfTheme {
                 FilterCarousel(
                     thumbnails = thumbnails,
-                    selectedFilter = FilterId.NO_SHADOW,
+                    selectedFilter = FilterId.BW,
                     onFilterSelected = {},
-                    processingFilter = FilterId.NO_SHADOW,
+                    processingFilter = FilterId.BW,
                     progress = 0.42f
                 )
             }
         }
-        composeRule.onNodeWithTag("filter_carousel_progress_NO_SHADOW").assertIsDisplayed()
+        composeRule.onNodeWithTag("filter_carousel_progress_BW").assertIsDisplayed()
         composeRule.onNodeWithTag("filter_carousel_progress_indicator").assertIsDisplayed()
     }
 }
