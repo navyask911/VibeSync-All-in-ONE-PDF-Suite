@@ -84,7 +84,8 @@ fun BatchReviewSheet(
                     page = page,
                     index = index,
                     onDelete = { onDeletePage(page.id) },
-                    onMove = onMovePage
+                    onMove = onMovePage,
+                    pageCount = pages.size
                 )
             }
         }
