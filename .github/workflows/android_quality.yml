@@ -231,8 +231,8 @@ jobs:
               sys.exit("Instrumented test console log is missing; completion cannot be verified.")
 
           log = log_path.read_text(encoding="utf-8", errors="replace")
-          starts = re.findall(r"Starting (\\d+) tests on", log)
-          finishes = re.findall(r"Finished (\\d+) tests on", log)
+          starts = re.findall(r"Starting (\d+) tests on", log)
+          finishes = re.findall(r"Finished (\d+) tests on", log)
           if not starts:
               sys.exit("No 'Starting N tests' line was captured from connectedDebugAndroidTest.")
           if not finishes:
