@@ -144,26 +144,27 @@ class ScannerHistoryRepository(private val scansDirectory: File) {
 
         return runCatching {
             ParcelFileDescriptor.open(pdfFile, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
-                PdfRenderer(descriptor).use { renderer ->
-                    if (renderer.pageCount == 0) return@use null
+                PdfRenderer(descriptor).use rendererUse@ { renderer ->
+                    if (renderer.pageCount == 0) return@rendererUse null
                     renderer.openPage(0).use { page ->
                         val targetWidth = 360
-                        val targetHeight = (targetWidth * page.height.toFloat() / page.width.toFloat().coerceAtLeast(1f))
-                            .toInt().coerceAtLeast(1)
+                        val targetHeight =
+                            (targetWidth * page.height.toFloat() / page.width.toFloat().coerceAtLeast(1f))
+                                .toInt().coerceAtLeast(1)
                         Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888).also { bitmap ->
                             bitmap.eraseColor(android.graphics.Color.WHITE)
                             val pageMatrix = Matrix().apply {
-                            postScale(
-                                targetWidth.toFloat() / page.width.toFloat().coerceAtLeast(1f),
-                                targetHeight.toFloat() / page.height.toFloat().coerceAtLeast(1f)
+                                postScale(
+                                    targetWidth.toFloat() / page.width.toFloat().coerceAtLeast(1f),
+                                    targetHeight.toFloat() / page.height.toFloat().coerceAtLeast(1f)
+                                )
+                            }
+                            page.render(
+                                bitmap,
+                                Rect(0, 0, targetWidth, targetHeight),
+                                pageMatrix,
+                                PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY
                             )
-                        }
-                        page.render(
-                            bitmap,
-                            Rect(0, 0, targetWidth, targetHeight),
-                            pageMatrix,
-                            PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY
-                        )
                         }
                     }
                 }
