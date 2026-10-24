@@ -631,17 +631,36 @@ class MainActivity : AppCompatActivity() {
         val action = intent.action
         val type = intent.type
 
-        if ((Intent.ACTION_VIEW == action || Intent.ACTION_SEND == action) && type != null) {
-            if ("application/pdf" == type) {
-                return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    intent.data ?: intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
-                } else {
-                    @Suppress("DEPRECATION")
-                    intent.data ?: intent.getParcelableExtra(Intent.EXTRA_STREAM)
-                }
+        val incomingUri = if (
+            (Intent.ACTION_VIEW == action || Intent.ACTION_SEND == action) &&
+            type == "application/pdf"
+        ) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.data ?: intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.data ?: intent.getParcelableExtra(Intent.EXTRA_STREAM)
+            }
+        } else {
+            intent.data
+        }
+
+        // ACTION_VIEW/ACTION_SEND usually grant temporary access. Retain it only when the sender
+        // explicitly marked the content URI grant as persistable; otherwise the renderer promptly
+        // copies the stream into app-private cache while the temporary grant is active.
+        if (
+            incomingUri?.scheme == "content" &&
+            intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0 &&
+            intent.flags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION != 0
+        ) {
+            val persisted = UriUtils.persistReadPermission(this, incomingUri)
+            if (!persisted) {
+                Log.w(TAG, "Incoming PDF URI did not permit persistent read access; staging it from the active grant.")
+            } else {
+                Log.i(TAG, "Persisted read access for incoming PDF content URI.")
             }
         }
-        return intent.data
+        return incomingUri
     }
 
     private fun checkAndRequestPermissions() {

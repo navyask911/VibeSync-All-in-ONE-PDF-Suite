@@ -26,6 +26,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileNotFoundException
+import java.io.IOException
 
 data class ViewerUiState(
     val fileName: String = "",
@@ -176,37 +178,25 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                 )
             } catch (cancelled: CancellationException) {
                 Log.d(TAG, "load.cancelled request=" + requestId)
-                closeRendererNonCancellable()
-                throw cancelled
-            } catch (error: OutOfMemoryError) {
-                Log.e(TAG, "load.failed request=" + requestId + " category=OutOfMemoryError")
-                closeRendererNonCancellable()
-                if (requestId == loadSequence) {
+                if (requestId == loadSequence && _uiState.value.isLoading) {
                     _uiState.value = _uiState.value.copy(
                         isLoading = false,
                         isPasswordRequired = false,
                         errorMessage = app.getString(R.string.document_load_error)
                     )
                 }
-            } catch (error: Exception) {
-                val passwordFailure = isPasswordFailure(error)
-                Log.e(
-                    TAG,
-                    "load.failed request=" + requestId +
-                        " category=" + error.javaClass.simpleName
-                )
                 closeRendererNonCancellable()
-                if (requestId == loadSequence) {
-                    _uiState.value = _uiState.value.copy(
-                        isLoading = false,
-                        isPasswordRequired = passwordFailure,
-                        errorMessage = if (passwordFailure) {
-                            app.getString(R.string.encrypted_document)
-                        } else {
-                            app.getString(R.string.document_load_error)
-                        }
-                    )
-                }
+                throw cancelled
+            } catch (error: FileNotFoundException) {
+                publishLoadFailure(requestId, app, error)
+            } catch (error: SecurityException) {
+                publishLoadFailure(requestId, app, error)
+            } catch (error: IOException) {
+                publishLoadFailure(requestId, app, error)
+            } catch (error: OutOfMemoryError) {
+                publishLoadFailure(requestId, app, error)
+            } catch (error: Exception) {
+                publishLoadFailure(requestId, app, error)
             } finally {
                 pendingUnlockedFile?.delete()
                 // Safety net: any active request that exits without publishing success or failure
@@ -272,6 +262,32 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
     fun setZoom(scale: Float) {
         val clamped = scale.coerceIn(1.0f, 4.0f)
         _uiState.value = _uiState.value.copy(zoomScale = clamped)
+    }
+
+    private suspend fun publishLoadFailure(
+        requestId: Long,
+        app: Application,
+        error: Throwable
+    ) {
+        // Keep the exception and stack trace in Logcat so provider/permission/IO failures
+        // can be diagnosed instead of appearing as a silent, permanent loading spinner.
+        Log.e("PdfViewer", "Failed to render PDF", error)
+        closeRendererNonCancellable()
+
+        if (requestId == loadSequence) {
+            val passwordFailure = isPasswordFailure(error)
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                isPasswordRequired = passwordFailure,
+                errorMessage = when {
+                    passwordFailure -> app.getString(R.string.encrypted_document)
+                    error is FileNotFoundException -> app.getString(R.string.document_load_error)
+                    error is SecurityException -> app.getString(R.string.document_load_error)
+                    error is IOException -> app.getString(R.string.document_load_error)
+                    else -> app.getString(R.string.document_load_error)
+                }
+            )
+        }
     }
 
     private suspend fun closeRendererNonCancellable() {

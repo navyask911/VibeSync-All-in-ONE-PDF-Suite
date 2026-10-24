@@ -102,7 +102,7 @@ class PdfRendererEngine(private val context: Context) {
                 closeDocument()
                 throw e
             } catch (e: Exception) {
-                Log.e(TAG, "open.failed category=" + e.javaClass.simpleName)
+                Log.e(TAG, "Failed to open PDF (scheme=" + (uri.scheme ?: "unknown") + ")", e)
                 closeDocument()
                 Result.failure(e)
             }
