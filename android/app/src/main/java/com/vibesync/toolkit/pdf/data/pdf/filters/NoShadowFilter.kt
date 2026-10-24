@@ -8,6 +8,7 @@ import kotlin.math.min
 /**
  * Estimates the paper/shadow field with a separable box blur whose radius is min(width,height)/40,
  * divides luminance by that field, then normalizes the ratio into 0..255 and restores chroma.
+ * The horizontal buffer is reused for ratios after the vertical blur is complete to bound memory.
  */
 class NoShadowFilter : ScanFilter {
     override val id: FilterId = FilterId.NO_SHADOW
@@ -20,7 +21,6 @@ class NoShadowFilter : ScanFilter {
     ): IntArray {
         FilterMath.validate(pixels, width, height)
         val radius = min(width, height) / 40
-        val originalY = FloatArray(pixels.size) { index -> FilterMath.luminance(pixels[index]) }
         if (radius <= 0) {
             FilterMath.report(1f, onProgress)
             return pixels.copyOf()
@@ -36,7 +36,7 @@ class NoShadowFilter : ScanFilter {
             var sum = 0f
             var count = 0
             for (x in 0..min(width - 1, radius)) {
-                sum += originalY[row + x]
+                sum += FilterMath.luminance(pixels[row + x])
                 count++
             }
             for (x in 0 until width) {
@@ -44,11 +44,11 @@ class NoShadowFilter : ScanFilter {
                 val removeX = x - radius
                 val addX = x + radius + 1
                 if (removeX >= 0) {
-                    sum -= originalY[row + removeX]
+                    sum -= FilterMath.luminance(pixels[row + removeX])
                     count--
                 }
                 if (addX < width) {
-                    sum += originalY[row + addX]
+                    sum += FilterMath.luminance(pixels[row + addX])
                     count++
                 }
             }
@@ -84,13 +84,13 @@ class NoShadowFilter : ScanFilter {
             }
         }
 
-        val ratios = FloatArray(pixels.size)
+        // Reuse the no-longer-needed horizontal buffer to hold each pixel's Y / boxBlur(Y) ratio.
         var minimum = Float.POSITIVE_INFINITY
         var maximum = Float.NEGATIVE_INFINITY
-        for (index in ratios.indices) {
+        for (index in horizontal.indices) {
             if (index % width == 0) context.ensureActive()
-            val ratio = originalY[index] / max(1f, vertical[index])
-            ratios[index] = ratio
+            val ratio = FilterMath.luminance(pixels[index]) / max(1f, vertical[index])
+            horizontal[index] = ratio
             minimum = min(minimum, ratio)
             maximum = max(maximum, ratio)
         }
@@ -103,9 +103,9 @@ class NoShadowFilter : ScanFilter {
             for (x in 0 until width) {
                 val index = start + x
                 val normalized = if (range < 0.0001f) {
-                    originalY[index]
+                    FilterMath.luminance(pixels[index])
                 } else {
-                    (ratios[index] - minimum) * 255f / range
+                    (horizontal[index] - minimum) * 255f / range
                 }
                 output[index] = FilterMath.replaceLuminance(pixels[index], normalized.coerceIn(0f, 255f))
             }
