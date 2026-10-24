@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -44,7 +45,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.border
+import androidx.compose.foundation.border
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -85,6 +86,14 @@ fun IdPhotoMakerScreen(
         }
     }
     val cropAspect = selected.widthPx.toFloat() / selected.heightPx.toFloat()
+    val cropGuideColor = MaterialTheme.colorScheme.primary
+    val savedPreview by produceState<Bitmap?>(initialValue = null, key1 = savedUri) {
+        value = withContext(Dispatchers.IO) {
+            savedUri?.let { uri ->
+                runCatching { context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } }.getOrNull()
+            }
+        }
+    }
     val openOrShare = { share: Boolean ->
         savedUri?.let { uri ->
             val intent = if (share) Intent(Intent.ACTION_SEND).setType("image/jpeg").putExtra(Intent.EXTRA_STREAM, uri)
@@ -117,7 +126,7 @@ fun IdPhotoMakerScreen(
                     RadioButton(selected = selected == preset, onClick = { selected = preset; zoom = 1f; panX = 0f; panY = 0f })
                     Column(Modifier.weight(1f)) {
                         Text(stringResource(preset.labelRes))
-                        Text("${preset.widthPx} × ${preset.heightPx} px · 300 DPI", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.id_photo_resolution_size, preset.widthPx, preset.heightPx), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -143,7 +152,7 @@ fun IdPhotoMakerScreen(
                     } else {
                         Text(stringResource(R.string.id_photo_pick_first))
                     }
-                    Canvas(Modifier.fillMaxSize().testTag("id_photo_crop_guide")) {
+                    Canvas(Modifier.fillMaxSize().testTag("id_photo_crop_guide_${selected.name}")) {
                         val target = cropAspect
                         val rectWidth: Float
                         val rectHeight: Float
@@ -162,7 +171,7 @@ fun IdPhotoMakerScreen(
                         drawRect(shade, topLeft = androidx.compose.ui.geometry.Offset(0f, top), size = androidx.compose.ui.geometry.Size(left, rectHeight))
                         drawRect(shade, topLeft = androidx.compose.ui.geometry.Offset(left + rectWidth, top), size = androidx.compose.ui.geometry.Size(size.width - left - rectWidth, rectHeight))
                         drawRect(
-                            color = MaterialTheme.colorScheme.primary,
+                            color = cropGuideColor,
                             topLeft = androidx.compose.ui.geometry.Offset(left, top),
                             size = androidx.compose.ui.geometry.Size(rectWidth, rectHeight),
                             style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx())
@@ -173,14 +182,26 @@ fun IdPhotoMakerScreen(
             Text(stringResource(R.string.id_photo_crop_hint), style = MaterialTheme.typography.bodySmall)
             error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             savedUri?.let {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Text(stringResource(R.string.id_photo_saved), modifier = Modifier.weight(1f))
-                    androidx.compose.material3.IconButton(onClick = { openOrShare(false) }, modifier = Modifier.testTag("id_photo_open")) {
-                        Icon(Icons.Default.OpenInNew, contentDescription = stringResource(R.string.id_photo_open))
-                    }
-                    androidx.compose.material3.IconButton(onClick = { openOrShare(true) }, modifier = Modifier.testTag("id_photo_share")) {
-                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.id_photo_share))
+                Card(modifier = Modifier.fillMaxWidth().testTag("id_photo_saved_confirmation")) {
+                    Column(Modifier.fillMaxWidth().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        savedPreview?.let { thumbnail ->
+                            Image(
+                                bitmap = thumbnail.asImageBitmap(),
+                                contentDescription = stringResource(R.string.id_photo_saved),
+                                modifier = Modifier.size(104.dp),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Text(stringResource(R.string.id_photo_saved), modifier = Modifier.weight(1f))
+                            androidx.compose.material3.IconButton(onClick = { openOrShare(false) }, modifier = Modifier.testTag("id_photo_open")) {
+                                Icon(Icons.Default.OpenInNew, contentDescription = stringResource(R.string.id_photo_open))
+                            }
+                            androidx.compose.material3.IconButton(onClick = { openOrShare(true) }, modifier = Modifier.testTag("id_photo_share")) {
+                                Icon(Icons.Default.Share, contentDescription = stringResource(R.string.id_photo_share))
+                            }
+                        }
                     }
                 }
             }
