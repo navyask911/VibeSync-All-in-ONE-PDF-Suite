@@ -31,9 +31,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.activity.compose.setContent
 import androidx.compose.ui.platform.ComposeView
-import androidx.lifecycle.ViewTreeLifecycleOwner
-import androidx.lifecycle.ViewTreeViewModelStoreOwner
-import androidx.savedstate.ViewTreeSavedStateRegistryOwner
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -1001,9 +1001,9 @@ class MainActivity : AppCompatActivity() {
             ))
             if (mimeType == "application/pdf") {
                 val profileSelector = ComposeView(this@MainActivity).apply {
-                    ViewTreeLifecycleOwner.set(this, this@MainActivity)
-                    ViewTreeViewModelStoreOwner.set(this, this@MainActivity)
-                    ViewTreeSavedStateRegistryOwner.set(this, this@MainActivity)
+                    setViewTreeLifecycleOwner(this@MainActivity)
+                    setViewTreeViewModelStoreOwner(this@MainActivity)
+                    setViewTreeSavedStateRegistryOwner(this@MainActivity)
                     setContent {
                         VibeSyncPdfTheme {
                             ResolutionProfilePreferencePanel(
