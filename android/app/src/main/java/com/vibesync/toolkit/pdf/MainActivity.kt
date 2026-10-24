@@ -197,12 +197,17 @@ class MainActivity : AppCompatActivity() {
                         }
 
                         val timestamp = System.currentTimeMillis()
-                        val baseName = "Scan_$timestamp"
-                        var finalFile = File(scanDirectory, "$baseName.pdf")
+                        val requestedBaseName = "Scan_$timestamp"
+                        var finalFile = File(scanDirectory, "$requestedBaseName.pdf")
                         var suffix = 1
-                        while (finalFile.exists()) {
-                            finalFile = File(scanDirectory, "${baseName}_${suffix++}.pdf")
+                        while (finalFile.exists() || scanDirectory.listFiles { _, name ->
+                                name.startsWith("${finalFile.nameWithoutExtension}_page_")
+                            }?.isNotEmpty() == true
+                        ) {
+                            finalFile = File(scanDirectory, "${requestedBaseName}_${suffix++}.pdf")
                         }
+                        // Use the unique PDF stem for all page images, including rare timestamp collisions.
+                        val baseName = finalFile.nameWithoutExtension
                         val temporaryFile = File.createTempFile("scan_work_", ".pdf", scanDirectory)
                         val watermarkResult = toolkitEngine.watermarkPdf(
                             sourceUri = scannedPdfUri,
