@@ -212,8 +212,7 @@ jobs:
           script: |
             gradle wrapper --gradle-version 8.13 --distribution-type bin
             chmod +x gradlew
-            set -o pipefail
-            ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace 2>&1 | tee connected-debug-android-test.log
+            bash -o pipefail -c './gradlew connectedDebugAndroidTest --no-daemon --stacktrace 2>&1 | tee "$GITHUB_WORKSPACE/android/connected-debug-android-test.log"'
 
       - name: Verify connected test completion against JUnit reports
         if: always()
