@@ -69,7 +69,8 @@ class FilterCarouselTest {
             }
         }
         composeRule.onNodeWithTag("filter_carousel").assertIsDisplayed()
-        composeRule.onNodeWithTag("filter_carousel_progress_BW").assertExists()
-        composeRule.onNodeWithTag("filter_carousel_progress_indicator").assertExists()
+        // Filter items are clickable and merge descendant semantics; inspect overlay nodes unmerged.
+        composeRule.onNodeWithTag("filter_carousel_progress_BW", useUnmergedTree = true).assertExists()
+        composeRule.onNodeWithTag("filter_carousel_progress_indicator", useUnmergedTree = true).assertExists()
     }
 }
