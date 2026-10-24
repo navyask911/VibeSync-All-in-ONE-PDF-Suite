@@ -158,6 +158,7 @@ class BatchScanViewModel(application: Application) : AndroidViewModel(applicatio
                 )
             } catch (cancelled: CancellationException) {
                 output.delete()
+                _state.value = _state.value.copy(isCompiling = false, progress = 0f, savedFile = null)
                 throw cancelled
             } catch (error: Exception) {
                 output.delete()
