@@ -213,7 +213,7 @@ class ScannerHistoryRepository(private val scansDirectory: File) {
                                         height.toFloat() / page.height.toFloat().coerceAtLeast(1f)
                                     )
                                 }
-                                page.render(bitmap, Rect(0, 0, width, height), pageMatrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                page.render(bitmap, Rect(0, 0, width, height), pageMatrix, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
                                 val output = File.createTempFile(
                                     safePrefix + "_p" + (pageIndex + 1) + "_",
                                     ".jpg",
