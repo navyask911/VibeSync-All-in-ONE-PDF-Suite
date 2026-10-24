@@ -123,7 +123,7 @@ fun IdPhotoMakerScreen(
             Text(stringResource(R.string.id_photo_presets), style = MaterialTheme.typography.titleSmall)
             IdPhotoPresets.values().forEach { preset ->
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().testTag("id_photo_preset_${preset.name}")) {
-                    RadioButton(selected = selected == preset, onClick = { selected = preset; zoom = 1f; panX = 0f; panY = 0f })
+                    RadioButton(selected = selected == preset, onClick = { selected = preset; zoom = 1f; panX = 0f; panY = 0f }, modifier = Modifier.testTag("id_photo_radio_" + preset.name))
                     Column(Modifier.weight(1f)) {
                         Text(stringResource(preset.labelRes))
                         Text(stringResource(R.string.id_photo_resolution_size, preset.widthPx, preset.heightPx), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
