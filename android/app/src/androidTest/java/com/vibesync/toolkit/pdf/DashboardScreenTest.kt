@@ -8,6 +8,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTextClearance
 import androidx.compose.ui.test.performTouchInput
@@ -77,6 +78,7 @@ class DashboardScreenTest {
         val viewModel = mockk<DashboardViewModel>(relaxed = true)
         every { viewModel.uiState } returns MutableStateFlow(DashboardUiState(discoveredPdfs = listOf(pdf)))
         var sharedUri: android.net.Uri? = null
+        var sharedImagesUri: android.net.Uri? = null
         var renamed: Pair<android.net.Uri, String>? = null
         var deletedUri: android.net.Uri? = null
 
@@ -89,6 +91,7 @@ class DashboardScreenTest {
                     onNavigateToTool = {},
                     onLaunchScanner = {},
                     onSharePdfDocument = { sharedUri = it },
+                    onShareJpgImages = { sharedImagesUri = it },
                     onRenameDocument = { uri, name -> renamed = uri to name },
                     onDeleteDocument = { deletedUri = it }
                 )
@@ -97,10 +100,17 @@ class DashboardScreenTest {
 
         composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("pdf_item_sample_1.pdf"))
         composeTestRule.onNodeWithTag("pdf_item_sample_1.pdf").performTouchInput { longClick() }
+        composeTestRule.onNodeWithTag("document_action_share_pdf").performScrollTo()
         composeTestRule.onNodeWithTag("document_action_share_pdf").performClick()
         assertEquals(pdf.uri, sharedUri)
 
         composeTestRule.onNodeWithTag("pdf_item_sample_1.pdf").performTouchInput { longClick() }
+        composeTestRule.onNodeWithTag("document_action_share_images").performScrollTo()
+        composeTestRule.onNodeWithTag("document_action_share_images").performClick()
+        assertEquals(pdf.uri, sharedImagesUri)
+
+        composeTestRule.onNodeWithTag("pdf_item_sample_1.pdf").performTouchInput { longClick() }
+        composeTestRule.onNodeWithTag("document_action_rename").performScrollTo()
         composeTestRule.onNodeWithTag("document_action_rename").performClick()
         composeTestRule.onNodeWithTag("rename_document_field").performTextClearance()
         composeTestRule.onNodeWithTag("rename_document_field").performTextInput("renamed_doc")
@@ -108,6 +118,7 @@ class DashboardScreenTest {
         assertEquals(pdf.uri to "renamed_doc", renamed)
 
         composeTestRule.onNodeWithTag("pdf_item_sample_1.pdf").performTouchInput { longClick() }
+        composeTestRule.onNodeWithTag("document_action_delete").performScrollTo()
         composeTestRule.onNodeWithTag("document_action_delete").performClick()
         composeTestRule.onNodeWithTag("delete_document_confirm").performClick()
         assertEquals(pdf.uri, deletedUri)

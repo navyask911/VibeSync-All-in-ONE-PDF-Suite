@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ApplicationProvider
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.presentation.scanner.ScanHistoryEntry
@@ -82,8 +83,8 @@ class ScanHistoryScreenTest {
         composeTestRule.onNodeWithText("Scan_123").assertIsDisplayed()
         composeTestRule.onNodeWithText(context.getString(R.string.scan_page_count, 2)).assertIsDisplayed()
         composeTestRule.onNodeWithTag("scan_thumbnail_Scan_123.pdf").performTouchInput { longClick() }
-        composeTestRule.onNodeWithText(context.getString(R.string.action_share_jpg_images)).assertIsDisplayed()
-        composeTestRule.onNodeWithText(context.getString(R.string.scan_save_downloads)).assertIsDisplayed()
+        composeTestRule.onNodeWithText(context.getString(R.string.action_share_jpg_images)).performScrollTo().assertIsDisplayed()
+        composeTestRule.onNodeWithText(context.getString(R.string.scan_save_downloads)).performScrollTo().assertIsDisplayed()
         folder.deleteRecursively()
     }
 }

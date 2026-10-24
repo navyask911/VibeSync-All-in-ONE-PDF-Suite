@@ -766,7 +766,7 @@ class MainActivity : AppCompatActivity() {
             }
             staged?.delete()
             withContext(Dispatchers.Main) {
-                result.onSuccess { shareFiles(it, "image/jpeg", "VibeSync_PDF_Pages") }
+                result.onSuccess { shareFiles(it, "image/jpeg", "VibeSync_PDF_Pages", forceMultiple = true) }
                     .onFailure { error ->
                         generated.forEach { it.delete() }
                         Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.document_action_failed), Toast.LENGTH_LONG).show()
@@ -966,7 +966,12 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-    private fun shareFiles(files: List<File>, mimeType: String, defaultBaseName: String) {
+    private fun shareFiles(
+        files: List<File>,
+        mimeType: String,
+        defaultBaseName: String,
+        forceMultiple: Boolean = false
+    ) {
         val validFiles = files.filter { it.exists() && it.length() > 0L }
         if (validFiles.isEmpty()) {
             Toast.makeText(this, getString(R.string.error_no_output_files), Toast.LENGTH_LONG).show()
@@ -996,28 +1001,34 @@ class MainActivity : AppCompatActivity() {
                             Toast.makeText(this@MainActivity, getString(R.string.error_rename_output_files), Toast.LENGTH_LONG).show()
                             return@launch
                         }
-                        shareRenamedFiles(renamedFiles, mimeType)
+                        shareRenamedFiles(renamedFiles, mimeType, forceMultiple)
                     }
                 }
             }
             .show()
     }
 
-    private fun shareRenamedFiles(files: List<File>, mimeType: String) {
+    private fun shareRenamedFiles(
+        files: List<File>,
+        mimeType: String,
+        forceMultiple: Boolean = false
+    ) {
         val uris = files.map { UriUtils.getShareableUri(this, it) }
-        val shareIntent = if (uris.size == 1) {
+        val clipData = ClipData.newUri(contentResolver, "VibeSync output", uris.first())
+        uris.drop(1).forEach { clipData.addItem(ClipData.Item(it)) }
+        val shareIntent = if (uris.size == 1 && !forceMultiple) {
             Intent(Intent.ACTION_SEND).apply {
                 type = mimeType
                 putExtra(Intent.EXTRA_STREAM, uris.first())
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                clipData = ClipData.newUri(contentResolver, "VibeSync output", uris.first())
+                this.clipData = clipData
             }
         } else {
             Intent(Intent.ACTION_SEND_MULTIPLE).apply {
                 type = mimeType
                 putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                clipData = ClipData.newUri(contentResolver, "VibeSync output", uris.first())
+                this.clipData = clipData
             }
         }
         startActivity(Intent.createChooser(shareIntent, getString(R.string.share_vibesync_output)))
