@@ -227,4 +227,26 @@
     <string name="pdfs_show_less">Показать меньше</string>
     <string name="pdfs_show_section">Показать PDF</string>
     <string name="pdfs_hide_section">Скрыть раздел списка PDF</string>
+    <string name="scan_history_title">История сканирования</string>
+    <string name="scan_history_subtitle">Просматривайте, переименовывайте, отправляйте или удаляйте сканы</string>
+    <string name="scan_empty_title">Сканов пока нет</string>
+    <string name="scan_empty_body">Сканы сохраняются на этом устройстве. Создайте историю, выполнив новое сканирование.</string>
+    <string name="scan_new">Новое сканирование</string>
+    <string name="scan_page_count">%1$d стр.</string>
+    <string name="scan_scanned_at">Отсканировано %1$s</string>
+    <string name="scan_action_menu">Действия со сканом</string>
+    <string name="scan_share_images">Отправить как изображения (JPEG)</string>
+    <string name="scan_save_downloads">Сохранить в Загрузки / на устройство</string>
+    <string name="scan_rename">Переименовать</string>
+    <string name="scan_delete">Удалить скан</string>
+    <string name="scan_delete_title">Удалить этот скан?</string>
+    <string name="scan_delete_message">Удалить %1$s и сохранённые изображения страниц? Это действие нельзя отменить.</string>
+    <string name="scan_rename_title">Переименовать скан</string>
+    <string name="scan_name_label">Имя документа</string>
+    <string name="scan_rename_success">Скан переименован</string>
+    <string name="scan_delete_success">Скан удалён</string>
+    <string name="scan_save_success">Скан сохранён в выбранное место</string>
+    <string name="scan_save_failed">Не удалось сохранить скан в выбранное место</string>
+    <string name="scan_images_unavailable">Не удалось подготовить изображения JPEG</string>
+    <string name="scan_operation_failed">Не удалось выполнить действие. Повторите попытку.</string>
 </resources>

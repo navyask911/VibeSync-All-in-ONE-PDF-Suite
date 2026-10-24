@@ -68,6 +68,9 @@ import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
 import com.vibesync.toolkit.pdf.presentation.editor.PdfEditorScreen
 import com.vibesync.toolkit.pdf.presentation.monetization.AdMobManager
 import com.vibesync.toolkit.pdf.presentation.scanner.DocumentScannerManager
+import com.vibesync.toolkit.pdf.presentation.scanner.ScanHistoryScreen
+import com.vibesync.toolkit.pdf.presentation.scanner.ScannerHistoryRepository
+import com.vibesync.toolkit.pdf.presentation.scanner.ScannerHistoryViewModel
 import com.vibesync.toolkit.pdf.presentation.tools.ConvertImagesScreen
 import com.vibesync.toolkit.pdf.presentation.tools.EncryptScreen
 import com.vibesync.toolkit.pdf.presentation.tools.ExtractImagesScreen
@@ -79,6 +82,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.nio.charset.StandardCharsets
 
 class MainActivity : AppCompatActivity() {
@@ -132,10 +136,14 @@ class MainActivity : AppCompatActivity() {
     private val dashboardViewModel: DashboardViewModel by viewModels()
     private val viewerViewModel: PdfViewerViewModel by viewModels()
     private val editorViewModel: EditorViewModel by viewModels()
+    private val scannerHistoryViewModel: ScannerHistoryViewModel by viewModels()
+    private val scannerHistoryRepository by lazy { ScannerHistoryRepository(File(filesDir, "scans")) }
     private val toolkitEngine by lazy { PdfBoxToolkitEngine(applicationContext) }
 
     private lateinit var scannerManager: DocumentScannerManager
     private lateinit var scannerLauncher: ActivityResultLauncher<IntentSenderRequest>
+    private lateinit var saveScanLauncher: ActivityResultLauncher<String>
+    private var pendingScanExportFile: File? = null
 
     // Permission launcher for Android 14+ photo and media access
     private val permissionLauncher = registerForActivityResult(
@@ -189,12 +197,17 @@ class MainActivity : AppCompatActivity() {
                         }
 
                         val timestamp = System.currentTimeMillis()
-                        val baseName = "Scan_$timestamp"
-                        var finalFile = File(scanDirectory, "$baseName.pdf")
+                        val requestedBaseName = "Scan_$timestamp"
+                        var finalFile = File(scanDirectory, "$requestedBaseName.pdf")
                         var suffix = 1
-                        while (finalFile.exists()) {
-                            finalFile = File(scanDirectory, "${baseName}_${suffix++}.pdf")
+                        while (finalFile.exists() || scanDirectory.listFiles { _, name ->
+                                name.startsWith("${finalFile.nameWithoutExtension}_page_")
+                            }?.isNotEmpty() == true
+                        ) {
+                            finalFile = File(scanDirectory, "${requestedBaseName}_${suffix++}.pdf")
                         }
+                        // Use the unique PDF stem for all page images, including rare timestamp collisions.
+                        val baseName = finalFile.nameWithoutExtension
                         val temporaryFile = File.createTempFile("scan_work_", ".pdf", scanDirectory)
                         val watermarkResult = toolkitEngine.watermarkPdf(
                             sourceUri = scannedPdfUri,
@@ -204,9 +217,9 @@ class MainActivity : AppCompatActivity() {
                         watermarkResult.fold(
                             onSuccess = { output ->
                                 if (output.isFile && output.length() > 0L && output.renameTo(finalFile)) {
-                                    // Preserve ML Kit's original page images alongside the PDF. They
-                                    // are copied byte-for-byte (not resized or recompressed) for future
-                                    // page export/reprocessing workflows.
+                                    // ML Kit's PDF is loaded and saved with a vector footer watermark;
+                                    // its embedded page images are not rasterized/recompressed here.
+                                    // Keep the original JPEG page bytes at their captured resolution.
                                     val copiedPageFiles = mutableListOf<File>()
                                     try {
                                         completedScan.pageImageUris.forEachIndexed { index, pageUri ->
@@ -214,14 +227,24 @@ class MainActivity : AppCompatActivity() {
                                                 scanDirectory,
                                                 "${baseName}_page_${index + 1}.jpg"
                                             )
-                                            copiedPageFiles.add(pageFile)
-                                            contentResolver.openInputStream(pageUri)?.use { input ->
-                                                pageFile.outputStream().use { outputStream ->
-                                                    input.copyTo(outputStream)
+                                            val temporaryPageFile = File.createTempFile(
+                                                "scan_page_work_", ".jpg", scanDirectory
+                                            )
+                                            try {
+                                                contentResolver.openInputStream(pageUri)?.use { input ->
+                                                    temporaryPageFile.outputStream().use { outputStream ->
+                                                        input.copyTo(outputStream)
+                                                    }
+                                                } ?: throw java.io.IOException("Unable to read scanned page ${index + 1}.")
+                                                if (!temporaryPageFile.isFile || temporaryPageFile.length() == 0L) {
+                                                    throw java.io.IOException("Scanned page ${index + 1} was empty.")
                                                 }
-                                            } ?: throw java.io.IOException("Unable to read scanned page ${index + 1}.")
-                                            if (!pageFile.isFile || pageFile.length() == 0L) {
-                                                throw java.io.IOException("Scanned page ${index + 1} was empty.")
+                                                if (!temporaryPageFile.renameTo(pageFile)) {
+                                                    throw java.io.IOException("Could not persist scanned page ${index + 1}.")
+                                                }
+                                                copiedPageFiles.add(pageFile)
+                                            } finally {
+                                                temporaryPageFile.delete()
                                             }
                                         }
                                     } catch (pageError: Exception) {
@@ -248,6 +271,7 @@ class MainActivity : AppCompatActivity() {
                         if (savedFile != null) {
                             pendingPdfUriState.value = Uri.fromFile(savedFile)
                             dashboardViewModel.refreshRecentDocuments()
+                            scannerHistoryViewModel.refresh()
                             recordSuccessfulPdfOperation()
                         } else {
                             Toast.makeText(
@@ -258,6 +282,29 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 }
+                }
+            }
+        }
+
+        saveScanLauncher = registerForActivityResult(
+            ActivityResultContracts.CreateDocument("application/pdf")
+        ) { destinationUri ->
+            val sourceFile = pendingScanExportFile
+            pendingScanExportFile = null
+            if (destinationUri != null && sourceFile != null && sourceFile.isFile) {
+                lifecycleScope.launch(Dispatchers.IO) {
+                    val result = runCatching {
+                        contentResolver.openOutputStream(destinationUri, "w")?.use { output ->
+                            sourceFile.inputStream().use { input -> input.copyTo(output) }
+                        } ?: throw java.io.IOException("The selected download location could not be opened.")
+                    }
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            if (result.isSuccess) getString(R.string.scan_save_success) else getString(R.string.scan_save_failed),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                 }
             }
         }
@@ -363,6 +410,29 @@ class MainActivity : AppCompatActivity() {
                             )
                         }
 
+                        // Saved scans are browsed and managed before the user launches the camera.
+                        composable("scan_history") {
+                            ScanHistoryScreen(
+                                viewModel = scannerHistoryViewModel,
+                                onNavigateBack = { navController.popBackStack() },
+                                onNewScan = {
+                                    scannerManager.startScan(scannerLauncher) { error ->
+                                        Toast.makeText(
+                                            this@MainActivity,
+                                            getString(R.string.error_scanner, error.message ?: ""),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                },
+                                onOpenScan = { uri ->
+                                    navController.navigate("viewer/" + encodeUriRoute(uri))
+                                },
+                                onSharePdf = { file -> shareScanPdf(file) },
+                                onShareImages = { file -> shareScanImages(file) },
+                                onSaveToDownloads = { file -> saveScanToDownloads(file) }
+                            )
+                        }
+
                         // Full-Screen System PDF Viewer
                         composable(
                             route = "viewer/{encodedUri}",
@@ -371,6 +441,8 @@ class MainActivity : AppCompatActivity() {
                             val encodedUri = backStackEntry.arguments?.getString("encodedUri") ?: ""
                             val decodedUri = decodeUriRoute(encodedUri)
 
+                            val isManagedScan = scannerHistoryViewModel.isManagedScanUri(decodedUri)
+                            val managedScanFile = scannerHistoryRepository.fileFromUri(decodedUri)
                             PdfViewerScreen(
                                 documentUri = decodedUri,
                                 viewModel = viewerViewModel,
@@ -380,7 +452,48 @@ class MainActivity : AppCompatActivity() {
                                     navController.navigate("editor/$enc")
                                 },
                                 onShareDocument = {
-                                    shareViewedDocument(decodedUri)
+                                    if (isManagedScan && managedScanFile != null) shareScanPdf(managedScanFile)
+                                    else shareViewedDocument(decodedUri)
+                                },
+                                isManagedScan = isManagedScan && managedScanFile != null,
+                                onRenameScan = { requestedName ->
+                                    if (managedScanFile != null) {
+                                        scannerHistoryViewModel.renameScan(managedScanFile, requestedName) { result ->
+                                            result.onSuccess { renamedFile ->
+                                                val oldRoute = "viewer/" + encodeUriRoute(decodedUri)
+                                                val newRoute = "viewer/" + encodeUriRoute(Uri.fromFile(renamedFile))
+                                                // Remove the old URI route before opening the renamed file;
+                                                // otherwise Back could reopen the now-missing original path.
+                                                navController.popBackStack()
+                                                navController.navigate(newRoute) {
+                                                    launchSingleTop = true
+                                                }
+                                            }.onFailure { error ->
+                                                Toast.makeText(
+                                                    this@MainActivity,
+                                                    error.localizedMessage ?: getString(R.string.scan_operation_failed),
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                            }
+                                        }
+                                    }
+                                },
+                                onShareScanPdf = { managedScanFile?.let { shareScanPdf(it) } },
+                                onShareScanImages = { managedScanFile?.let { shareScanImages(it) } },
+                                onSaveScanToDownloads = { managedScanFile?.let { saveScanToDownloads(it) } },
+                                onDeleteScan = {
+                                    if (managedScanFile != null) {
+                                        scannerHistoryViewModel.deleteScan(managedScanFile) { result ->
+                                            result.onSuccess { navController.popBackStack() }
+                                                .onFailure { error ->
+                                                    Toast.makeText(
+                                                        this@MainActivity,
+                                                        error.localizedMessage ?: getString(R.string.scan_operation_failed),
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
+                                                }
+                                        }
+                                    }
                                 }
                             )
                         }
@@ -495,6 +608,71 @@ class MainActivity : AppCompatActivity() {
                             dismissButton = { TextButton(onClick = { dismissOfflinePrompt() }) { Text(getString(R.string.not_now)) } }
                         )
                     }
+                }
+            }
+        }
+    }
+
+    private fun saveScanToDownloads(scanFile: File) {
+        if (!scanFile.isFile || scanFile.length() <= 0L) {
+            Toast.makeText(this, getString(R.string.scan_operation_failed), Toast.LENGTH_LONG).show()
+            return
+        }
+        pendingScanExportFile = scanFile
+        saveScanLauncher.launch(scanFile.name)
+    }
+
+    private fun shareScanPdf(scanFile: File) {
+        if (!scanFile.isFile || scanFile.length() <= 0L) {
+            Toast.makeText(this, getString(R.string.scan_operation_failed), Toast.LENGTH_LONG).show()
+            return
+        }
+        try {
+            val uri = UriUtils.getShareableUri(this, scanFile)
+            val intent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/pdf"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                clipData = ClipData.newUri(contentResolver, scanFile.name, uri)
+            }
+            startActivity(Intent.createChooser(intent, getString(R.string.share_pdf)))
+        } catch (error: Exception) {
+            Toast.makeText(this, error.localizedMessage ?: getString(R.string.scan_operation_failed), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun shareScanImages(scanFile: File) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val result = scannerHistoryRepository.exportPageImagesForSharing(
+                scanFile,
+                File(cacheDir, "pdf_cache")
+            )
+            withContext(Dispatchers.Main) {
+                result.onSuccess { imageFiles ->
+                    try {
+                        val uris = imageFiles.map { UriUtils.getShareableUri(this@MainActivity, it) }
+                        if (uris.isEmpty()) {
+                            Toast.makeText(this@MainActivity, getString(R.string.scan_images_unavailable), Toast.LENGTH_LONG).show()
+                            return@onSuccess
+                        }
+                        val clip = ClipData.newUri(contentResolver, "Scanned pages", uris.first())
+                        uris.drop(1).forEach { clip.addItem(ClipData.Item(it)) }
+                        val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
+                            type = "image/jpeg"
+                            putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                            clipData = clip
+                        }
+                        startActivity(Intent.createChooser(intent, getString(R.string.scan_share_images)))
+                    } catch (error: Exception) {
+                        Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.scan_images_unavailable), Toast.LENGTH_LONG).show()
+                    }
+                }.onFailure { error ->
+                    Toast.makeText(
+                        this@MainActivity,
+                        error.localizedMessage ?: getString(R.string.scan_images_unavailable),
+                        Toast.LENGTH_LONG
+                    ).show()
                 }
             }
         }

@@ -217,4 +217,26 @@
     <string name="pdfs_show_less">Daha az göster</string>
     <string name="pdfs_show_section">PDF\'leri göster</string>
     <string name="pdfs_hide_section">PDF listesi bölümünü gizle</string>
+    <string name="scan_history_title">Tarama Geçmişi</string>
+    <string name="scan_history_subtitle">Kaydedilen taramaları görüntüleyin, yeniden adlandırın, paylaşın veya silin</string>
+    <string name="scan_empty_title">Henüz tarama yok</string>
+    <string name="scan_empty_body">Taramalarınız bu cihazda kalır. Geçmiş oluşturmak için yeni bir tarama başlatın.</string>
+    <string name="scan_new">Yeni Tarama</string>
+    <string name="scan_page_count">%1$d sayfa</string>
+    <string name="scan_scanned_at">Tarandı: %1$s</string>
+    <string name="scan_action_menu">Tarama işlemleri</string>
+    <string name="scan_share_images">Görüntü olarak paylaş (JPEG)</string>
+    <string name="scan_save_downloads">İndirilenlere / cihaza kaydet</string>
+    <string name="scan_rename">Yeniden adlandır</string>
+    <string name="scan_delete">Taramayı sil</string>
+    <string name="scan_delete_title">Bu tarama silinsin mi?</string>
+    <string name="scan_delete_message">%1$s ve kaydedilmiş sayfa görselleri silinsin mi? Bu işlem geri alınamaz.</string>
+    <string name="scan_rename_title">Taramayı yeniden adlandır</string>
+    <string name="scan_name_label">Belge adı</string>
+    <string name="scan_rename_success">Tarama yeniden adlandırıldı</string>
+    <string name="scan_delete_success">Tarama silindi</string>
+    <string name="scan_save_success">Tarama seçilen konuma kaydedildi</string>
+    <string name="scan_save_failed">Tarama seçilen konuma kaydedilemedi</string>
+    <string name="scan_images_unavailable">Bu taramanın JPEG görüntüleri hazırlanamadı</string>
+    <string name="scan_operation_failed">Bu işlem tamamlanamadı. Tekrar deneyin.</string>
 </resources>

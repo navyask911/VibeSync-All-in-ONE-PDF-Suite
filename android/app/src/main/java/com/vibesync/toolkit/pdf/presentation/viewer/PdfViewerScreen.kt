@@ -2,6 +2,7 @@ package com.vibesync.toolkit.pdf.presentation.viewer
 
 import android.net.Uri
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -49,7 +50,13 @@ fun PdfViewerScreen(
     viewModel: PdfViewerViewModel,
     onNavigateBack: () -> Unit,
     onNavigateToEditor: (Uri) -> Unit,
-    onShareDocument: () -> Unit
+    onShareDocument: () -> Unit,
+    isManagedScan: Boolean = false,
+    onRenameScan: (String) -> Unit = {},
+    onShareScanPdf: () -> Unit = {},
+    onShareScanImages: () -> Unit = {},
+    onSaveScanToDownloads: () -> Unit = {},
+    onDeleteScan: () -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
@@ -58,6 +65,14 @@ fun PdfViewerScreen(
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
+    var scanMenuExpanded by remember(documentUri) { mutableStateOf(false) }
+    var showRenameScanDialog by remember(documentUri) { mutableStateOf(false) }
+    var showDeleteScanDialog by remember(documentUri) { mutableStateOf(false) }
+    var renamedScanName by rememberSaveable(documentUri) { mutableStateOf("") }
+
+    LaunchedEffect(uiState.fileName, documentUri) {
+        renamedScanName = uiState.fileName.removeSuffix(".pdf").removeSuffix(".PDF")
+    }
 
     LaunchedEffect(documentUri) {
         // A new document must not inherit the previous document's zoom or pan.
@@ -98,7 +113,18 @@ fun PdfViewerScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text(uiState.fileName, maxLines = 1, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            uiState.fileName,
+                            maxLines = 1,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = if (isManagedScan) {
+                                Modifier.clickable {
+                                    renamedScanName = uiState.fileName.removeSuffix(".pdf").removeSuffix(".PDF")
+                                    showRenameScanDialog = true
+                                }.testTag("viewer_rename_title")
+                            } else Modifier
+                        )
                         if (uiState.pageCount > 0) {
                             Text(
                                 stringResource(R.string.page_position, uiState.currentPageIndex + 1, uiState.pageCount),
@@ -140,12 +166,52 @@ fun PdfViewerScreen(
                             Icon(Icons.Default.ZoomOutMap, contentDescription = stringResource(R.string.reset_zoom))
                         }
                     }
-                    // Jump to Editor / Signer
-                    IconButton(onClick = onShareDocument) {
-                        Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share_pdf), tint = VibeSyncCrimsonPrimary)
+                    // Saved scans get dedicated export/manage actions; other documents keep standard sharing.
+                    if (!isManagedScan) {
+                        IconButton(onClick = onShareDocument) {
+                            Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share_pdf), tint = VibeSyncCrimsonPrimary)
+                        }
                     }
                     IconButton(onClick = { onNavigateToEditor(documentUri) }) {
                         Icon(Icons.Default.Draw, contentDescription = stringResource(R.string.edit_sign_action), tint = VibeSyncCrimsonPrimary)
+                    }
+                    if (isManagedScan) {
+                        Box {
+                            IconButton(onClick = { scanMenuExpanded = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.scan_action_menu))
+                            }
+                            DropdownMenu(expanded = scanMenuExpanded, onDismissRequest = { scanMenuExpanded = false }) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.share_pdf)) },
+                                    leadingIcon = { Icon(Icons.Default.PictureAsPdf, contentDescription = null) },
+                                    onClick = { scanMenuExpanded = false; onShareScanPdf() }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.scan_share_images)) },
+                                    leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
+                                    onClick = { scanMenuExpanded = false; onShareScanImages() }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.scan_save_downloads)) },
+                                    leadingIcon = { Icon(Icons.Default.SaveAlt, contentDescription = null) },
+                                    onClick = { scanMenuExpanded = false; onSaveScanToDownloads() }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.scan_rename)) },
+                                    leadingIcon = { Icon(Icons.Default.DriveFileRenameOutline, contentDescription = null) },
+                                    onClick = {
+                                        scanMenuExpanded = false
+                                        renamedScanName = uiState.fileName.removeSuffix(".pdf").removeSuffix(".PDF")
+                                        showRenameScanDialog = true
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.scan_delete)) },
+                                    leadingIcon = { Icon(Icons.Default.DeleteOutline, contentDescription = null) },
+                                    onClick = { scanMenuExpanded = false; showDeleteScanDialog = true }
+                                )
+                            }
+                        }
                     }
                 }
             )
@@ -332,6 +398,54 @@ fun PdfViewerScreen(
                 }
             }
         }
+    }
+
+    if (isManagedScan && showRenameScanDialog) {
+        AlertDialog(
+            onDismissRequest = { showRenameScanDialog = false },
+            title = { Text(stringResource(R.string.scan_rename_title)) },
+            text = {
+                OutlinedTextField(
+                    value = renamedScanName,
+                    onValueChange = { renamedScanName = it },
+                    label = { Text(stringResource(R.string.scan_name_label)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("viewer_rename_field")
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = renamedScanName.isNotBlank(),
+                    onClick = {
+                        showRenameScanDialog = false
+                        onRenameScan(renamedScanName.trim())
+                    }
+                ) { Text(stringResource(R.string.continue_label)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRenameScanDialog = false }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
+    }
+
+    if (isManagedScan && showDeleteScanDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteScanDialog = false },
+            title = { Text(stringResource(R.string.scan_delete_title)) },
+            text = { Text(stringResource(R.string.scan_delete_message, uiState.fileName)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDeleteScanDialog = false
+                        onDeleteScan()
+                    },
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                ) { Text(stringResource(R.string.scan_delete)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteScanDialog = false }) { Text(stringResource(R.string.cancel)) }
+            }
+        )
     }
 
     // Password Protected PDF Unlock Dialog

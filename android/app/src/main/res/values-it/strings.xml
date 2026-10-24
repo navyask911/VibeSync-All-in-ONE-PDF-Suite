@@ -217,4 +217,26 @@
     <string name="pdfs_show_less">Mostra meno</string>
     <string name="pdfs_show_section">Mostra PDF</string>
     <string name="pdfs_hide_section">Nascondi la sezione PDF</string>
+    <string name="scan_history_title">Cronologia scansioni</string>
+    <string name="scan_history_subtitle">Sfoglia, rinomina, condividi o elimina le scansioni salvate</string>
+    <string name="scan_empty_title">Nessuna scansione</string>
+    <string name="scan_empty_body">Le scansioni restano su questo dispositivo. Avvia una nuova scansione per creare la cronologia.</string>
+    <string name="scan_new">Nuova scansione</string>
+    <string name="scan_page_count">%1$d pagine</string>
+    <string name="scan_scanned_at">Scansionato il %1$s</string>
+    <string name="scan_action_menu">Azioni scansione</string>
+    <string name="scan_share_images">Condividi come immagini (JPEG)</string>
+    <string name="scan_save_downloads">Salva in Download / sul dispositivo</string>
+    <string name="scan_rename">Rinomina</string>
+    <string name="scan_delete">Elimina scansione</string>
+    <string name="scan_delete_title">Eliminare questa scansione?</string>
+    <string name="scan_delete_message">Eliminare %1$s e le immagini delle pagine salvate? L’operazione non può essere annullata.</string>
+    <string name="scan_rename_title">Rinomina scansione</string>
+    <string name="scan_name_label">Nome documento</string>
+    <string name="scan_rename_success">Scansione rinominata</string>
+    <string name="scan_delete_success">Scansione eliminata</string>
+    <string name="scan_save_success">Scansione salvata nella posizione scelta</string>
+    <string name="scan_save_failed">Impossibile salvare la scansione nella posizione scelta</string>
+    <string name="scan_images_unavailable">Impossibile preparare le immagini JPEG</string>
+    <string name="scan_operation_failed">Impossibile completare l’operazione. Riprova.</string>
 </resources>

@@ -217,4 +217,26 @@
     <string name="pdfs_show_less">कम दिखाएँ</string>
     <string name="pdfs_show_section">PDF दिखाएँ</string>
     <string name="pdfs_hide_section">PDF सूची अनुभाग छिपाएँ</string>
+    <string name="scan_history_title">स्कैन इतिहास</string>
+    <string name="scan_history_subtitle">सहेजे गए स्कैन देखें, नाम बदलें, साझा करें या हटाएँ</string>
+    <string name="scan_empty_title">अभी कोई स्कैन नहीं</string>
+    <string name="scan_empty_body">आपके स्कैन इसी डिवाइस पर सहेजे जाते हैं। इतिहास बनाने के लिए नया स्कैन शुरू करें।</string>
+    <string name="scan_new">नया स्कैन</string>
+    <string name="scan_page_count">%1$d पृष्ठ</string>
+    <string name="scan_scanned_at">स्कैन किया गया %1$s</string>
+    <string name="scan_action_menu">स्कैन क्रियाएँ</string>
+    <string name="scan_share_images">इमेज के रूप में साझा करें (JPEG)</string>
+    <string name="scan_save_downloads">डाउनलोड / डिवाइस में सहेजें</string>
+    <string name="scan_rename">नाम बदलें</string>
+    <string name="scan_delete">स्कैन हटाएँ</string>
+    <string name="scan_delete_title">यह स्कैन हटाएँ?</string>
+    <string name="scan_delete_message">क्या %1$s और इसकी सहेजी गई पेज इमेज हटाएँ? इसे वापस नहीं किया जा सकता।</string>
+    <string name="scan_rename_title">स्कैन का नाम बदलें</string>
+    <string name="scan_name_label">दस्तावेज़ का नाम</string>
+    <string name="scan_rename_success">स्कैन का नाम बदल दिया गया</string>
+    <string name="scan_delete_success">स्कैन हटा दिया गया</string>
+    <string name="scan_save_success">स्कैन चुने गए स्थान पर सहेजा गया</string>
+    <string name="scan_save_failed">स्कैन को चुने गए स्थान पर सहेजा नहीं जा सका</string>
+    <string name="scan_images_unavailable">इस स्कैन के JPEG इमेज तैयार नहीं हो सके</string>
+    <string name="scan_operation_failed">स्कैन की यह कार्रवाई पूरी नहीं हो सकी। फिर प्रयास करें।</string>
 </resources>

@@ -61,8 +61,8 @@ class DashboardScreenTest {
         composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("tool_scanner"))
         composeTestRule.onNodeWithTag("tool_scanner").performClick()
 
-        assertEquals(listOf("convert", "extract"), routes)
-        assertTrue(scannerLaunched)
+        assertEquals(listOf("convert", "extract", "scan_history"), routes)
+        assertEquals(false, scannerLaunched)
 
         composeTestRule.onNodeWithContentDescription("Privacy & Terms").performClick()
         composeTestRule.onNodeWithText("Privacy & Data Safety Guarantee").assertIsDisplayed()

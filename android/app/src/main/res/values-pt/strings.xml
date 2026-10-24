@@ -217,4 +217,26 @@
     <string name="pdfs_show_less">Mostrar menos</string>
     <string name="pdfs_show_section">Mostrar PDFs</string>
     <string name="pdfs_hide_section">Ocultar seção de PDFs</string>
+    <string name="scan_history_title">Histórico de digitalizações</string>
+    <string name="scan_history_subtitle">Consulte, renomeie, partilhe ou elimine digitalizações guardadas</string>
+    <string name="scan_empty_title">Ainda não existem digitalizações</string>
+    <string name="scan_empty_body">As digitalizações ficam guardadas neste dispositivo. Inicie uma nova para criar o histórico.</string>
+    <string name="scan_new">Nova digitalização</string>
+    <string name="scan_page_count">%1$d páginas</string>
+    <string name="scan_scanned_at">Digitalizado em %1$s</string>
+    <string name="scan_action_menu">Ações da digitalização</string>
+    <string name="scan_share_images">Partilhar como imagens (JPEG)</string>
+    <string name="scan_save_downloads">Guardar em Transferências / dispositivo</string>
+    <string name="scan_rename">Renomear</string>
+    <string name="scan_delete">Eliminar digitalização</string>
+    <string name="scan_delete_title">Eliminar esta digitalização?</string>
+    <string name="scan_delete_message">Eliminar %1$s e as imagens de página guardadas? Esta ação não pode ser anulada.</string>
+    <string name="scan_rename_title">Renomear digitalização</string>
+    <string name="scan_name_label">Nome do documento</string>
+    <string name="scan_rename_success">Digitalização renomeada</string>
+    <string name="scan_delete_success">Digitalização eliminada</string>
+    <string name="scan_save_success">Digitalização guardada na localização escolhida</string>
+    <string name="scan_save_failed">Não foi possível guardar nesta localização</string>
+    <string name="scan_images_unavailable">Não foi possível preparar as imagens JPEG</string>
+    <string name="scan_operation_failed">Não foi possível concluir esta ação. Tente novamente.</string>
 </resources>

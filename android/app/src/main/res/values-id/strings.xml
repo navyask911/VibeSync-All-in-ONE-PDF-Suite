@@ -217,4 +217,26 @@
     <string name="pdfs_show_less">Tampilkan lebih sedikit</string>
     <string name="pdfs_show_section">Tampilkan PDF</string>
     <string name="pdfs_hide_section">Sembunyikan bagian daftar PDF</string>
+    <string name="scan_history_title">Riwayat Pindaian</string>
+    <string name="scan_history_subtitle">Lihat, ganti nama, bagikan, atau hapus pindaian tersimpan</string>
+    <string name="scan_empty_title">Belum ada pindaian</string>
+    <string name="scan_empty_body">Pindaian Anda tetap tersimpan di perangkat ini. Mulai pindaian baru untuk membuat riwayat.</string>
+    <string name="scan_new">Pindaian Baru</string>
+    <string name="scan_page_count">%1$d halaman</string>
+    <string name="scan_scanned_at">Dipindai %1$s</string>
+    <string name="scan_action_menu">Tindakan pindaian</string>
+    <string name="scan_share_images">Bagikan sebagai gambar (JPEG)</string>
+    <string name="scan_save_downloads">Simpan ke Unduhan / perangkat</string>
+    <string name="scan_rename">Ganti nama</string>
+    <string name="scan_delete">Hapus pindaian</string>
+    <string name="scan_delete_title">Hapus pindaian ini?</string>
+    <string name="scan_delete_message">Hapus %1$s beserta gambar halamannya? Tindakan ini tidak dapat dibatalkan.</string>
+    <string name="scan_rename_title">Ganti Nama Pindaian</string>
+    <string name="scan_name_label">Nama dokumen</string>
+    <string name="scan_rename_success">Nama pindaian diubah</string>
+    <string name="scan_delete_success">Pindaian dihapus</string>
+    <string name="scan_save_success">Pindaian disimpan ke lokasi yang dipilih</string>
+    <string name="scan_save_failed">Pindaian tidak dapat disimpan ke lokasi yang dipilih</string>
+    <string name="scan_images_unavailable">Gambar JPEG untuk pindaian ini tidak dapat disiapkan</string>
+    <string name="scan_operation_failed">Tindakan gagal diselesaikan. Coba lagi.</string>
 </resources>
