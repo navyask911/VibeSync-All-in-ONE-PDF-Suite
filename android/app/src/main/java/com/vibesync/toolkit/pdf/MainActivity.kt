@@ -786,7 +786,6 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread {
                     result.onSuccess {
                         Toast.makeText(this, getString(R.string.document_rename_success), Toast.LENGTH_SHORT).show()
-                        dashboardViewModel.removeRecentDocument(uri)
                         dashboardViewModel.refreshCurrentSource()
                         dashboardViewModel.refreshRecentDocuments()
                     }.onFailure { error ->
@@ -798,35 +797,43 @@ class MainActivity : AppCompatActivity() {
         }
 
         lifecycleScope.launch(Dispatchers.IO) {
+            val newName = requestedName.trim().removeSuffix(".pdf").removeSuffix(".PDF")
+                .filter { it.isLetterOrDigit() || it.isWhitespace() || it in "-_()." }
+                .replace(Regex("\\s+"), " ").trim(' ', '.', '_').take(80) + ".pdf"
             val result = runCatching {
-                val safeName = requestedName.trim().removeSuffix(".pdf").removeSuffix(".PDF")
-                    .filter { it.isLetterOrDigit() || it.isWhitespace() || it in "-_()." }
-                    .replace(Regex("\\s+"), " ").trim(' ', '.', '_').take(80)
-                require(safeName.isNotBlank()) { getString(R.string.rename_document_hint) }
-                val newName = "$safeName.pdf"
+                require(newName != ".pdf") { getString(R.string.rename_document_hint) }
                 when (uri.scheme) {
                     "file" -> {
                         val source = File(requireNotNull(uri.path))
                         val destination = File(source.parentFile ?: filesDir, newName)
-                        require(source.isFile && (source.canonicalFile == destination.canonicalFile || !destination.exists())) { "A document with that name already exists." }
-                        if (source.canonicalFile != destination.canonicalFile && !source.renameTo(destination)) throw java.io.IOException("Could not rename the PDF.")
+                        require(source.isFile && (source.canonicalFile == destination.canonicalFile || !destination.exists())) {
+                            "A document with that name already exists."
+                        }
+                        if (source.canonicalFile != destination.canonicalFile && !source.renameTo(destination)) {
+                            throw java.io.IOException("Could not rename the PDF.")
+                        }
+                        Uri.fromFile(destination)
                     }
                     "content" -> {
                         val updated = runCatching {
-                            contentResolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.DISPLAY_NAME, newName) }, null, null)
+                            contentResolver.update(uri, ContentValues().apply {
+                                put(MediaStore.MediaColumns.DISPLAY_NAME, newName)
+                            }, null, null)
                         }.getOrDefault(0)
-                        if (updated <= 0) {
-                            val renamed = runCatching { DocumentsContract.renameDocument(contentResolver, uri, newName) }.getOrNull()
-                            if (renamed == null) throw java.io.IOException("This document provider does not permit renaming this PDF.")
+                        if (updated > 0) {
+                            uri
+                        } else {
+                            DocumentsContract.renameDocument(contentResolver, uri, newName)
+                                ?: throw java.io.IOException("This document provider does not permit renaming this PDF.")
                         }
                     }
                     else -> throw java.io.IOException("Unsupported document URI.")
                 }
             }
             withContext(Dispatchers.Main) {
-                result.onSuccess {
+                result.onSuccess { renamedUri ->
                     Toast.makeText(this@MainActivity, getString(R.string.document_rename_success), Toast.LENGTH_SHORT).show()
-                    dashboardViewModel.removeRecentDocument(uri)
+                    dashboardViewModel.updateRecentDocument(uri, renamedUri, newName)
                     dashboardViewModel.refreshCurrentSource()
                 }.onFailure { error ->
                     Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.document_action_failed), Toast.LENGTH_LONG).show()

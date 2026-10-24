@@ -391,9 +391,6 @@ class PdfBoxToolkitEngine(private val context: Context) {
     }
 
     /**
-     * Adds the small VibeSync footer watermark to every PDF page.
-     */
-    /**
      * Rewrites a PDF through PDFBox's stream serializer into a fresh private output file.
      * This can remove redundant object layout and lets PDFBox apply its normal stream filters.
      */
@@ -422,6 +419,9 @@ class PdfBoxToolkitEngine(private val context: Context) {
         }
     }
 
+    /**
+     * Adds the small VibeSync footer watermark to every PDF page.
+     */
     suspend fun watermarkPdf(
         sourceUri: Uri,
         watermarkText: String,

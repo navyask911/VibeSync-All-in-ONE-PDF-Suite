@@ -230,6 +230,18 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun updateRecentDocument(oldUri: Uri, newUri: Uri, newName: String) {
+        val existing = _uiState.value.recentDocuments
+        val oldEntry = existing.firstOrNull { it.uriString == oldUri.toString() }
+        if (oldEntry == null) return
+        val updated = oldEntry.copy(fileName = newName, uriString = newUri.toString())
+        _uiState.value = _uiState.value.copy(
+            recentDocuments = (listOf(updated) + existing.filterNot {
+                it.uriString == oldUri.toString() || it.uriString == newUri.toString()
+            }).take(5)
+        )
+    }
+
     fun removeRecentDocument(uri: Uri) {
         _uiState.value = _uiState.value.copy(
             recentDocuments = _uiState.value.recentDocuments.filterNot { it.uriString == uri.toString() }

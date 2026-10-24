@@ -249,8 +249,8 @@
     <string name="rename_document_title">Rinomina documento</string>
     <string name="rename_document_hint">Nome documento</string>
     <string name="delete_document_title">Eliminare il documento?</string>
-    <string name="delete_document_message">Eliminare %1$s da questo dispositivo? L'operazione non può essere annullata.</string>
+    <string name="delete_document_message">Eliminare %1$s da questo dispositivo? L’operazione non può essere annullata.</string>
     <string name="document_rename_success">Documento rinominato.</string>
     <string name="document_delete_success">Documento eliminato.</string>
-    <string name="document_action_failed">Impossibile completare l'azione. Riprova.</string>
+    <string name="document_action_failed">Impossibile completare l’azione. Riprova.</string>
 </resources>
