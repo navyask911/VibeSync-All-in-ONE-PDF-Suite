@@ -2,5 +2,6 @@
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
     <cache-path name="cached_pdfs" path="pdf_cache/" />
     <files-path name="internal_pdfs" path="documents/" />
+    <files-path name="scanned_documents" path="scans/" />
     <external-cache-path name="ext_cached_pdfs" path="pdf_cache/" />
 </paths>
