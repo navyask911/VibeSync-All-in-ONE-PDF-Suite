@@ -227,4 +227,26 @@
     <string name="pdfs_show_less">Mostrar menos</string>
     <string name="pdfs_show_section">Mostrar PDF</string>
     <string name="pdfs_hide_section">Ocultar la sección de PDF</string>
+    <string name="scan_history_title">Historial de escaneos</string>
+    <string name="scan_history_subtitle">Explora, cambia el nombre, comparte o elimina escaneos guardados</string>
+    <string name="scan_empty_title">Todavía no hay escaneos</string>
+    <string name="scan_empty_body">Tus escaneos se guardan en este dispositivo. Inicia un escaneo para crear tu historial.</string>
+    <string name="scan_new">Nuevo escaneo</string>
+    <string name="scan_page_count">%1$d páginas</string>
+    <string name="scan_scanned_at">Escaneado %1$s</string>
+    <string name="scan_action_menu">Acciones del escaneo</string>
+    <string name="scan_share_images">Compartir como imágenes (JPEG)</string>
+    <string name="scan_save_downloads">Guardar en Descargas / dispositivo</string>
+    <string name="scan_rename">Cambiar nombre</string>
+    <string name="scan_delete">Eliminar escaneo</string>
+    <string name="scan_delete_title">¿Eliminar este escaneo?</string>
+    <string name="scan_delete_message">¿Eliminar %1$s y sus imágenes de página guardadas? Esta acción no se puede deshacer.</string>
+    <string name="scan_rename_title">Cambiar nombre del escaneo</string>
+    <string name="scan_name_label">Nombre del documento</string>
+    <string name="scan_rename_success">Escaneo renombrado</string>
+    <string name="scan_delete_success">Escaneo eliminado</string>
+    <string name="scan_save_success">Escaneo guardado en la ubicación seleccionada</string>
+    <string name="scan_save_failed">No se pudo guardar el escaneo en la ubicación seleccionada</string>
+    <string name="scan_images_unavailable">No se pudieron preparar las imágenes JPEG de este escaneo</string>
+    <string name="scan_operation_failed">No se pudo completar esta acción. Inténtalo de nuevo.</string>
 </resources>

@@ -236,4 +236,26 @@
     <string name="pdfs_show_less">Show less</string>
     <string name="pdfs_show_section">Show PDFs</string>
     <string name="pdfs_hide_section">Hide PDF list section</string>
+    <string name="scan_history_title">Scan History</string>
+    <string name="scan_history_subtitle">Browse, rename, share, or remove saved scans</string>
+    <string name="scan_empty_title">No scans yet</string>
+    <string name="scan_empty_body">Your saved scans stay on this device. Start a new scan to build your history.</string>
+    <string name="scan_new">New Scan</string>
+    <string name="scan_page_count">%1$d pages</string>
+    <string name="scan_scanned_at">Scanned %1$s</string>
+    <string name="scan_action_menu">Scan actions</string>
+    <string name="scan_share_images">Share as Images (JPEG)</string>
+    <string name="scan_save_downloads">Save to Downloads / Device</string>
+    <string name="scan_rename">Rename</string>
+    <string name="scan_delete">Delete Scan</string>
+    <string name="scan_delete_title">Delete this scan?</string>
+    <string name="scan_delete_message">Delete %1$s and its saved page images? This cannot be undone.</string>
+    <string name="scan_rename_title">Rename scan</string>
+    <string name="scan_name_label">Document name</string>
+    <string name="scan_rename_success">Scan renamed</string>
+    <string name="scan_delete_success">Scan deleted</string>
+    <string name="scan_save_success">Scan saved to the selected location</string>
+    <string name="scan_save_failed">Could not save this scan to the selected location</string>
+    <string name="scan_images_unavailable">Could not prepare JPEG images for this scan</string>
+    <string name="scan_operation_failed">Could not complete this scan action. Try again.</string>
 </resources>

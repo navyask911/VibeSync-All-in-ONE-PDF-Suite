@@ -217,4 +217,26 @@
     <string name="pdfs_show_less">收起</string>
     <string name="pdfs_show_section">显示 PDF</string>
     <string name="pdfs_hide_section">隐藏 PDF 列表部分</string>
+    <string name="scan_history_title">扫描历史</string>
+    <string name="scan_history_subtitle">浏览、重命名、分享或删除已保存的扫描</string>
+    <string name="scan_empty_title">尚无扫描记录</string>
+    <string name="scan_empty_body">扫描文件会保存在此设备上。开始新的扫描以建立历史记录。</string>
+    <string name="scan_new">新建扫描</string>
+    <string name="scan_page_count">%1$d 页</string>
+    <string name="scan_scanned_at">扫描时间：%1$s</string>
+    <string name="scan_action_menu">扫描操作</string>
+    <string name="scan_share_images">分享为图像（JPEG）</string>
+    <string name="scan_save_downloads">保存到下载目录 / 设备</string>
+    <string name="scan_rename">重命名</string>
+    <string name="scan_delete">删除扫描</string>
+    <string name="scan_delete_title">删除此扫描？</string>
+    <string name="scan_delete_message">要删除 %1$s 及其已保存的页面图像吗？此操作无法撤销。</string>
+    <string name="scan_rename_title">重命名扫描</string>
+    <string name="scan_name_label">文档名称</string>
+    <string name="scan_rename_success">已重命名扫描</string>
+    <string name="scan_delete_success">已删除扫描</string>
+    <string name="scan_save_success">扫描已保存到所选位置</string>
+    <string name="scan_save_failed">无法将扫描保存到所选位置</string>
+    <string name="scan_images_unavailable">无法为此扫描准备 JPEG 图像</string>
+    <string name="scan_operation_failed">无法完成此扫描操作，请重试。</string>
 </resources>
