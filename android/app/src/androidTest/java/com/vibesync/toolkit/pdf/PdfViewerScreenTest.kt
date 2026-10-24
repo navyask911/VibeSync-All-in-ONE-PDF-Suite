@@ -35,6 +35,30 @@ class PdfViewerScreenTest {
     }
 
     @Test
+    fun documentLoadStartsWhileInitialLoadingSpinnerIsVisible() {
+        val stateFlow = MutableStateFlow(
+            com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(
+                fileName = "sample.pdf",
+                isLoading = true
+            )
+        )
+        every { mockViewModel.uiState } returns stateFlow
+
+        composeTestRule.setContent {
+            PdfViewerScreen(
+                documentUri = testUri,
+                viewModel = mockViewModel,
+                onNavigateBack = {},
+                onNavigateToEditor = {},
+                onShareDocument = {}
+            )
+        }
+
+        composeTestRule.waitForIdle()
+        verify(exactly = 1) { mockViewModel.loadDocument(testUri) }
+    }
+
+    @Test
     fun testRapidContinuousVerticalScrollAndZoomGestures() {
         // Setup 30 mock pages to test continuous rapid vertical list scroll
         val pages = (1..30).map { PageMetadata(pageIndex = it - 1, widthPt = 595f, heightPt = 842f) }
@@ -139,7 +163,7 @@ class PdfViewerScreenTest {
     @Test
     fun nullPageBitmapShowsTerminalErrorAndRetryCanRecover() {
         val recoveredBitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
-        coEvery { mockViewModel.acquirePageBitmap(0, 1.5f) } returnsMany listOf(null, fakeLease(recoveredBitmap))
+        coEvery { mockViewModel.acquirePageBitmap(0, 2.0f) } returnsMany listOf(null, fakeLease(recoveredBitmap))
 
         composeTestRule.setContent {
             PdfPageItem(
@@ -156,7 +180,7 @@ class PdfViewerScreenTest {
             composeTestRule.onAllNodesWithContentDescription("PDF page 1")
                 .fetchSemanticsNodes().isNotEmpty()
         }
-        coVerify(exactly = 2) { mockViewModel.acquirePageBitmap(0, 1.5f) }
+        coVerify(exactly = 2) { mockViewModel.acquirePageBitmap(0, 2.0f) }
     }
 
     @Test

@@ -7,6 +7,10 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextDirectionHeuristics
+import android.text.TextPaint
 import android.net.Uri
 import android.util.Log
 import com.vibesync.toolkit.pdf.core.util.UriUtils
@@ -38,6 +42,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.OutputStream
+import kotlin.math.ceil
 import java.security.Security
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 
@@ -398,7 +403,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "watermark_src_")
             sourceFileToDelete = sourceFile
             PDDocument.load(sourceFile).use { document ->
-                applyVibeSyncWatermark(document)
+                applyVibeSyncWatermark(document, watermarkText)
                 document.save(outputFile)
             }
             Result.success(outputFile)
@@ -651,41 +656,67 @@ class PdfBoxToolkitEngine(private val context: Context) {
         }
     }
 
-    private fun applyVibeSyncWatermark(document: PDDocument) {
+    private fun applyVibeSyncWatermark(
+        document: PDDocument,
+        watermarkText: String = context.getString(R.string.pdf_watermark_text)
+    ) {
         val documentInfo = document.documentInformation
         if (documentInfo.getCustomMetadataValue(WATERMARK_METADATA_KEY) == WATERMARK_METADATA_VALUE) {
             return
         }
+        if (watermarkText.isBlank()) return
 
-        val font = PDType1Font.HELVETICA_BOLD
-        val watermarkText = VIBESYNC_WATERMARK_TEXT
-
-        for (page in document.pages) {
-            val mediaBox = page.mediaBox
-            val fontSize = 8.5f
-            val textWidth = font.getStringWidth(watermarkText) / 1000f * fontSize
-            val footerCenterX = mediaBox.lowerLeftX + mediaBox.width / 2f
-            val footerY = mediaBox.lowerLeftY + 9f
-            val startX = footerCenterX - textWidth / 2f
-
-            PDPageContentStream(
-                document,
-                page,
-                PDPageContentStream.AppendMode.APPEND,
-                true,
-                true
-            ).use { cs ->
-                val graphicsState = PDExtendedGraphicsState().apply {
-                    nonStrokingAlphaConstant = 0.45f
-                }
-                cs.setGraphicsStateParameters(graphicsState)
-                cs.setNonStrokingColor(142, 0, 0)
-                cs.beginText()
-                cs.setFont(font, fontSize)
-                cs.newLineAtOffset(startX, footerY)
-                cs.showText(watermarkText)
-                cs.endText()
+        // Built-in Type1 fonts cannot encode Arabic, CJK, and many Indic glyphs. Shape the
+        // localized footer with Android text layout and embed a transparent image in the PDF.
+        val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(150, 142, 0, 0)
+            typeface = Typeface.create("sans-serif", Typeface.BOLD)
+            textSize = 28f
+        }
+        val measuredTextWidth = ceil(paint.measureText(watermarkText)).toInt().coerceAtLeast(1)
+        val sidePaddingPx = 8
+        val bitmap = Bitmap.createBitmap(
+            measuredTextWidth + sidePaddingPx * 2,
+            (ceil(paint.fontMetrics.descent - paint.fontMetrics.ascent).toInt() + 8).coerceAtLeast(1),
+            Bitmap.Config.ARGB_8888
+        )
+        try {
+            val textLayout = StaticLayout.Builder
+                .obtain(watermarkText, 0, watermarkText.length, paint, measuredTextWidth)
+                .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                .setTextDirection(TextDirectionHeuristics.FIRSTSTRONG_LTR)
+                .setIncludePad(true)
+                .setMaxLines(1)
+                .build()
+            Canvas(bitmap).apply {
+                save()
+                translate(sidePaddingPx.toFloat(), ((bitmap.height - textLayout.height) / 2f).coerceAtLeast(0f))
+                textLayout.draw(this)
+                restore()
             }
+
+            val watermarkImage = LosslessFactory.createFromImage(document, bitmap)
+            for (page in document.pages) {
+                val mediaBox = page.mediaBox
+                val maxWidthPt = mediaBox.width * 0.85f
+                val aspectRatio = bitmap.width.toFloat() / bitmap.height.toFloat().coerceAtLeast(1f)
+                val targetHeightPt = minOf(10f, maxWidthPt / aspectRatio)
+                val targetWidthPt = targetHeightPt * aspectRatio
+                val x = mediaBox.lowerLeftX + (mediaBox.width - targetWidthPt) / 2f
+                val y = mediaBox.lowerLeftY + 6f
+
+                PDPageContentStream(
+                    document,
+                    page,
+                    PDPageContentStream.AppendMode.APPEND,
+                    true,
+                    true
+                ).use { stream ->
+                    stream.drawImage(watermarkImage, x, y, targetWidthPt, targetHeightPt)
+                }
+            }
+        } finally {
+            if (!bitmap.isRecycled) bitmap.recycle()
         }
 
         documentInfo.setCustomMetadataValue(WATERMARK_METADATA_KEY, WATERMARK_METADATA_VALUE)
@@ -703,7 +734,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.035f).coerceIn(10f, 22f)
             }
 
-            val watermarkText = VIBESYNC_WATERMARK_TEXT
+            val watermarkText = context.getString(R.string.pdf_watermark_text)
             val x = mutableBitmap.width / 2f - paint.measureText(watermarkText) / 2f
             val y = mutableBitmap.height - 10f
             canvas.drawText(watermarkText, x, y, paint)
@@ -723,7 +754,6 @@ class PdfBoxToolkitEngine(private val context: Context) {
 
     companion object {
         private const val TAG = "PdfBoxToolkitEngine"
-        private const val VIBESYNC_WATERMARK_TEXT = "VibeSync All in ONE PDF Suite"
         private const val WATERMARK_METADATA_KEY = "VibeSync-Watermarked"
         private const val WATERMARK_METADATA_VALUE = "true"
     }

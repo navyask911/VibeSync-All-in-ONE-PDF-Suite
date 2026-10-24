@@ -27,6 +27,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.platform.testTag
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
@@ -40,6 +43,8 @@ private const val VIBESYNC_PUBLIC_INFO_URL = "https://github.com/navyask911/Vibe
 private const val VIBESYNC_PRIVACY_URL = "https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite-Read-Me/blob/main/PRIVACY_POLICY.md"
 private const val VIBESYNC_LICENSE_URL = "https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite-Read-Me/blob/main/LICENSE"
 private const val VIBESYNC_TERMS_URL = "https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite-Read-Me/blob/main/TERMS.md"
+private const val PDF_SECTION_PREFERENCES = "dashboard_pdf_section_preferences"
+private const val KEY_PDF_SECTION_VISIBLE = "pdf_section_visible"
 
 data class ToolItem(
     val title: String,
@@ -66,6 +71,9 @@ fun DashboardScreen(
     val coroutineScope = rememberCoroutineScope()
     var showPrivacyDialog by remember { mutableStateOf(false) }
     var showLanguageDialog by remember { mutableStateOf(false) }
+    var showAllPdfs by remember { mutableStateOf(false) }
+    var isPdfSectionVisible by remember(context) { mutableStateOf(context.getSharedPreferences(PDF_SECTION_PREFERENCES, android.content.Context.MODE_PRIVATE).getBoolean(KEY_PDF_SECTION_VISIBLE, true)) }
+    val visiblePdfs = remember(uiState.discoveredPdfs, showAllPdfs) { if (showAllPdfs) uiState.discoveredPdfs else uiState.discoveredPdfs.take(10) }
 
     fun launchPickerSafely(action: () -> Unit) {
         try {
@@ -150,8 +158,26 @@ fun DashboardScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.dashboard_subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            stringResource(R.string.app_name),
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontSize = 20.sp,
+                                lineHeight = 22.sp,
+                                letterSpacing = (-0.2).sp
+                            ),
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            stringResource(R.string.dashboard_subtitle),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 12.sp,
+                            lineHeight = 15.sp
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -341,96 +367,106 @@ fun DashboardScreen(
                 }
             }
 
-            // 4. "All PDFs on Device" Automatic Discovery Section
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            stringResource(if (uiState.isFolderScanResult) R.string.pdfs_in_selected_folder else R.string.all_pdfs_on_device),
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            stringResource(R.string.pdfs_indexed_count, uiState.discoveredPdfs.size),
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    if (uiState.isScanning) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp, color = VibeSyncCrimsonPrimary)
-                    } else {
-                        IconButton(onClick = { viewModel.refreshCurrentSource() }) {
-                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.rescan), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                }
-            }
-
-            // Discovered PDFs List or Discovery Invitation
-            if (uiState.discoveredPdfs.isEmpty() && !uiState.isScanning) {
-                item {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(18.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally
+            // 4. Compact, persistent PDF discovery section. Hiding this section never
+            // changes permissions, the scanner index, or the underlying documents.
+            if (!isPdfSectionVisible) {
+                item(key = "show_pdfs_section") {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(
+                            onClick = {
+                                isPdfSectionVisible = true
+                                showAllPdfs = false
+                                context.getSharedPreferences(PDF_SECTION_PREFERENCES, android.content.Context.MODE_PRIVATE).edit().putBoolean(KEY_PDF_SECTION_VISIBLE, true).apply()
+                            },
+                            modifier = Modifier.testTag("pdf_show_section")
                         ) {
-                            Icon(Icons.Default.FindInPage, contentDescription = null, tint = VibeSyncCrimsonPrimary, modifier = Modifier.size(36.dp))
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(stringResource(R.string.automatic_pdf_discovery), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                            Text(
-                                stringResource(R.string.scan_storage_invitation),
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Button(
-                                onClick = { viewModel.triggerScanRequest() },
-                                colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
-                            ) {
-                                Text(stringResource(R.string.scan_device_storage))
-                            }
+                            Icon(Icons.Default.PictureAsPdf, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.pdfs_show_section))
                         }
                     }
                 }
             } else {
-                items(uiState.discoveredPdfs) { pdf ->
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { onNavigateToViewer(pdf.uri) },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = VibeSyncCrimsonPrimary, modifier = Modifier.size(32.dp))
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(pdf.name, fontWeight = FontWeight.SemiBold, maxLines = 1, fontSize = 13.sp)
-                                Text(
-                                    stringResource(R.string.modified_date, pdf.sizeFormatted, pdf.formattedDate),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                item(key = "pdf_section_header") {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                stringResource(if (uiState.isFolderScanResult) R.string.pdfs_in_selected_folder else R.string.pdf_recent_heading),
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                if (uiState.discoveredPdfs.isEmpty()) stringResource(R.string.pdfs_indexed_count, 0)
+                                else stringResource(R.string.pdfs_showing_count, visiblePdfs.size, uiState.discoveredPdfs.size),
+                                fontSize = 11.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (uiState.isScanning) {
+                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = VibeSyncCrimsonPrimary)
+                        } else {
+                            IconButton(onClick = { viewModel.refreshCurrentSource() }) {
+                                Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.rescan), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        IconButton(
+                            onClick = {
+                                isPdfSectionVisible = false
+                                showAllPdfs = false
+                                context.getSharedPreferences(PDF_SECTION_PREFERENCES, android.content.Context.MODE_PRIVATE).edit().putBoolean(KEY_PDF_SECTION_VISIBLE, false).apply()
+                            },
+                            modifier = Modifier.testTag("pdf_section_close")
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.pdfs_hide_section), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+
+                if (uiState.discoveredPdfs.isEmpty() && !uiState.isScanning) {
+                    item(key = "pdf_discovery_empty_state") {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        ) {
+                            Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                                Icon(Icons.Default.FindInPage, contentDescription = null, tint = VibeSyncCrimsonPrimary, modifier = Modifier.size(36.dp))
+                                Spacer(Modifier.height(8.dp))
+                                Text(stringResource(R.string.automatic_pdf_discovery), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text(stringResource(R.string.scan_storage_invitation), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(Modifier.height(12.dp))
+                                Button(onClick = { viewModel.triggerScanRequest() }, colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)) {
+                                    Text(stringResource(R.string.scan_device_storage))
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    items(items = visiblePdfs, key = { pdf -> pdf.uri.toString() }) { pdf ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth().clickable { onNavigateToViewer(pdf.uri) },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                        ) {
+                            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.PictureAsPdf, contentDescription = null, tint = VibeSyncCrimsonPrimary, modifier = Modifier.size(32.dp))
+                                Spacer(Modifier.width(12.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(pdf.name, fontWeight = FontWeight.SemiBold, maxLines = 1, fontSize = 13.sp)
+                                    Text(stringResource(R.string.modified_date, pdf.sizeFormatted, pdf.formattedDate), style = MaterialTheme.typography.bodyMedium, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                                Icon(Icons.Default.ChevronRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                    if (uiState.discoveredPdfs.size > 10) {
+                        item(key = "pdf_show_all_toggle") {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                                TextButton(onClick = { showAllPdfs = !showAllPdfs }, modifier = Modifier.testTag("pdf_show_all_toggle")) {
+                                    Text(if (showAllPdfs) stringResource(R.string.pdfs_show_less) else stringResource(R.string.pdfs_show_all, uiState.discoveredPdfs.size))
+                                }
+                            }
                         }
                     }
                 }
@@ -490,25 +526,54 @@ fun DashboardScreen(
             onDismissRequest = { showLanguageDialog = false },
             title = { Text(stringResource(R.string.select_language)) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 480.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
                     val languageOptions = listOf(
                         "" to stringResource(R.string.language_system),
                         "en" to stringResource(R.string.language_english),
                         "es" to stringResource(R.string.language_spanish),
-                        "zh-CN" to stringResource(R.string.language_chinese),
-                        "hi" to stringResource(R.string.language_hindi),
-                        "ar" to stringResource(R.string.language_arabic),
-                        "bn" to stringResource(R.string.language_bengali),
-                        "pt" to stringResource(R.string.language_portuguese),
-                        "ru" to stringResource(R.string.language_russian),
-                        "ja" to stringResource(R.string.language_japanese),
                         "fr" to stringResource(R.string.language_french),
                         "de" to stringResource(R.string.language_german),
-                        "id" to stringResource(R.string.language_indonesian),
-                        "ur" to stringResource(R.string.language_urdu),
-                        "tr" to stringResource(R.string.language_turkish),
+                        "it" to stringResource(R.string.language_italian),
+                        "pt" to stringResource(R.string.language_portuguese),
+                        "ru" to stringResource(R.string.language_russian),
+                        "ar" to stringResource(R.string.language_arabic),
+                        "ja" to stringResource(R.string.language_japanese),
                         "ko" to stringResource(R.string.language_korean),
-                        "it" to stringResource(R.string.language_italian)
+                        "zh-CN" to stringResource(R.string.language_chinese),
+                        "zh-TW" to stringResource(R.string.language_chinese_traditional),
+                        "id" to stringResource(R.string.language_indonesian),
+                        "tr" to stringResource(R.string.language_turkish),
+                        "hi" to stringResource(R.string.language_hindi),
+                        "bn" to stringResource(R.string.language_bengali),
+                        "ur" to stringResource(R.string.language_urdu),
+                        "vi" to stringResource(R.string.language_vietnamese),
+                        "ta" to stringResource(R.string.language_tamil),
+                        "te" to stringResource(R.string.language_telugu),
+                        "kn" to stringResource(R.string.language_kannada),
+                        "mr" to stringResource(R.string.language_marathi),
+                        "gu" to stringResource(R.string.language_gujarati),
+                        "he" to stringResource(R.string.language_hebrew),
+                        "th" to stringResource(R.string.language_thai),
+                        "fil" to stringResource(R.string.language_filipino),
+                        "nl" to stringResource(R.string.language_dutch),
+                        "pl" to stringResource(R.string.language_polish),
+                        "uk" to stringResource(R.string.language_ukrainian),
+                        "fa" to stringResource(R.string.language_persian),
+                        "sw" to stringResource(R.string.language_swahili),
+                        "pa" to stringResource(R.string.language_punjabi),
+                        "ml" to stringResource(R.string.language_malayalam),
+                        "ne" to stringResource(R.string.language_nepali),
+                        "si" to stringResource(R.string.language_sinhala),
+                        "ro" to stringResource(R.string.language_romanian),
+                        "el" to stringResource(R.string.language_greek),
+                        "cs" to stringResource(R.string.language_czech),
+                        "hu" to stringResource(R.string.language_hungarian),
+                        "sv" to stringResource(R.string.language_swedish)
                     )
                     languageOptions.forEach { (languageTag, label) ->
                         TextButton(
@@ -606,7 +671,8 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 380.dp),
+                        .heightIn(max = 380.dp)
+                        .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Surface(
@@ -623,85 +689,65 @@ fun DashboardScreen(
                             Text(stringResource(R.string.device_zero_cloud_transit), fontWeight = FontWeight.Bold, color = Color(0xFFECFDF5), fontSize = 12.sp)
                         }
                     }
-
                     Text(
                         stringResource(R.string.document_processing_policy),
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-
                     Text(
                         stringResource(R.string.signature_storage_policy),
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-
                     Text(
                         stringResource(R.string.ads_collection_policy),
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                }
-            },
-            confirmButton = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    TextButton(
-                        onClick = {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_PUBLIC_INFO_URL))
-                                )
-                            }
-                        }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("privacy_legal_links"),
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(stringResource(R.string.public_info))
-                    }
-                    TextButton(
-                        onClick = {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_PRIVACY_URL))
-                                )
-                            }
-                        }
-                    ) {
-                        Text(stringResource(R.string.privacy_policy))
-                    }
-                    TextButton(
-                        onClick = {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_LICENSE_URL))
-                                )
-                            }
-                        }
-                    ) {
-                        Text(stringResource(R.string.license_copyright))
-                    }
-                    TextButton(
-                        onClick = {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_TERMS_URL))
-                                )
-                            }
-                        }
-                    ) {
-                        Text(stringResource(R.string.terms_of_use))
+                        TextButton(
+                            onClick = {
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_PUBLIC_INFO_URL))) }
+                            },
+                            modifier = Modifier.testTag("privacy_public_info")
+                        ) { Text(stringResource(R.string.public_info)) }
+                        TextButton(
+                            onClick = {
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_PRIVACY_URL))) }
+                            },
+                            modifier = Modifier.testTag("privacy_policy_link")
+                        ) { Text(stringResource(R.string.privacy_policy)) }
+                        TextButton(
+                            onClick = {
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_LICENSE_URL))) }
+                            },
+                            modifier = Modifier.testTag("privacy_license_link")
+                        ) { Text(stringResource(R.string.license_copyright)) }
+                        TextButton(
+                            onClick = {
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_TERMS_URL))) }
+                            },
+                            modifier = Modifier.testTag("privacy_terms_link")
+                        ) { Text(stringResource(R.string.terms_of_use)) }
                     }
                 }
             },
+            confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { showPrivacyDialog = false }) {
-                    Text(stringResource(R.string.close))
-                }
+                TextButton(
+                    onClick = { showPrivacyDialog = false },
+                    modifier = Modifier.testTag("privacy_close_button")
+                ) { Text(stringResource(R.string.close)) }
             }
         )
     }

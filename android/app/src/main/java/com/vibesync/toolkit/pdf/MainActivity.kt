@@ -173,23 +173,91 @@ class MainActivity : AppCompatActivity() {
             ActivityResultContracts.StartIntentSenderForResult()
         ) { result ->
             val scanResult = scannerManager.parseResult(result.resultCode, result.data)
-            scanResult?.pdfUri?.let { scannedPdfUri ->
-                Toast.makeText(this, getString(R.string.document_scanned_page_count, scanResult.pageCount), Toast.LENGTH_LONG).show()
+            scanResult?.let { completedScan ->
+                completedScan.pdfUri?.let { scannedPdfUri ->
+                Toast.makeText(this, getString(R.string.document_scanned_page_count, completedScan.pageCount), Toast.LENGTH_LONG).show()
                 lifecycleScope.launch(Dispatchers.IO) {
-                    val watermarkedFile = UriUtils.createExportCacheFile(this@MainActivity, "VibeSync_Scanned_Document")
-                    val watermarkResult = toolkitEngine.watermarkPdf(
-                        sourceUri = scannedPdfUri,
-                        watermarkText = "VibeSync All in ONE PDF Suite",
-                        outputFile = watermarkedFile
-                    )
+                    // Scans are user documents, not disposable exports: keep them in app-private
+                    // persistent storage rather than cacheDir so they survive cache eviction.
+                    val scanDirectory = File(filesDir, "scans")
+                    val savedFile: File? = try {
+                        if (!scanDirectory.exists() && !scanDirectory.mkdirs()) {
+                            throw java.io.IOException("Unable to create the saved scans directory.")
+                        }
+                        if (!scanDirectory.isDirectory) {
+                            throw java.io.IOException("The saved scans path is not a directory.")
+                        }
+
+                        val timestamp = System.currentTimeMillis()
+                        val baseName = "Scan_$timestamp"
+                        var finalFile = File(scanDirectory, "$baseName.pdf")
+                        var suffix = 1
+                        while (finalFile.exists()) {
+                            finalFile = File(scanDirectory, "${baseName}_${suffix++}.pdf")
+                        }
+                        val temporaryFile = File.createTempFile("scan_work_", ".pdf", scanDirectory)
+                        val watermarkResult = toolkitEngine.watermarkPdf(
+                            sourceUri = scannedPdfUri,
+                            watermarkText = getString(R.string.pdf_watermark_text),
+                            outputFile = temporaryFile
+                        )
+                        watermarkResult.fold(
+                            onSuccess = { output ->
+                                if (output.isFile && output.length() > 0L && output.renameTo(finalFile)) {
+                                    // Preserve ML Kit's original page images alongside the PDF. They
+                                    // are copied byte-for-byte (not resized or recompressed) for future
+                                    // page export/reprocessing workflows.
+                                    val copiedPageFiles = mutableListOf<File>()
+                                    try {
+                                        completedScan.pageImageUris.forEachIndexed { index, pageUri ->
+                                            val pageFile = File(
+                                                scanDirectory,
+                                                "${baseName}_page_${index + 1}.jpg"
+                                            )
+                                            copiedPageFiles.add(pageFile)
+                                            contentResolver.openInputStream(pageUri)?.use { input ->
+                                                pageFile.outputStream().use { outputStream ->
+                                                    input.copyTo(outputStream)
+                                                }
+                                            } ?: throw java.io.IOException("Unable to read scanned page ${index + 1}.")
+                                            if (!pageFile.isFile || pageFile.length() == 0L) {
+                                                throw java.io.IOException("Scanned page ${index + 1} was empty.")
+                                            }
+                                        }
+                                    } catch (pageError: Exception) {
+                                        copiedPageFiles.forEach { it.delete() }
+                                        Log.w(TAG, "PDF saved, but original page images could not all be retained.", pageError)
+                                    }
+                                    finalFile
+                                } else {
+                                    output.delete()
+                                    null
+                                }
+                            },
+                            onFailure = {
+                                temporaryFile.delete()
+                                null
+                            }
+                        )
+                    } catch (error: Exception) {
+                        Log.e(TAG, "Failed to save scanned PDF to persistent storage", error)
+                        null
+                    }
+
                     launch(Dispatchers.Main) {
-                        watermarkResult.onSuccess {
-                            pendingPdfUriState.value = Uri.fromFile(watermarkedFile)
+                        if (savedFile != null) {
+                            pendingPdfUriState.value = Uri.fromFile(savedFile)
+                            dashboardViewModel.refreshRecentDocuments()
                             recordSuccessfulPdfOperation()
-                        }.onFailure {
-                            Toast.makeText(this@MainActivity, getString(R.string.error_watermark_scanned_pdf), Toast.LENGTH_LONG).show()
+                        } else {
+                            Toast.makeText(
+                                this@MainActivity,
+                                getString(R.string.error_watermark_scanned_pdf),
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
                     }
+                }
                 }
             }
         }
@@ -437,7 +505,7 @@ class MainActivity : AppCompatActivity() {
             val output = UriUtils.createExportCacheFile(this@MainActivity, "VibeSync_Viewed_Document")
             val result = toolkitEngine.watermarkPdf(
                 sourceUri = sourceUri,
-                watermarkText = "VibeSync All in ONE PDF Suite",
+                watermarkText = getString(R.string.pdf_watermark_text),
                 outputFile = output
             )
             launch(Dispatchers.Main) {
@@ -563,44 +631,51 @@ class MainActivity : AppCompatActivity() {
         val action = intent.action
         val type = intent.type
 
-        if ((Intent.ACTION_VIEW == action || Intent.ACTION_SEND == action) && type != null) {
-            if ("application/pdf" == type) {
-                return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                    intent.data ?: intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
-                } else {
-                    @Suppress("DEPRECATION")
-                    intent.data ?: intent.getParcelableExtra(Intent.EXTRA_STREAM)
-                }
+        val incomingUri = if (
+            (Intent.ACTION_VIEW == action || Intent.ACTION_SEND == action) &&
+            type == "application/pdf"
+        ) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.data ?: intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.data ?: intent.getParcelableExtra(Intent.EXTRA_STREAM)
+            }
+        } else {
+            intent.data
+        }
+
+        // ACTION_VIEW/ACTION_SEND usually grant temporary access. Retain it only when the sender
+        // explicitly marked the content URI grant as persistable; otherwise the renderer promptly
+        // copies the stream into app-private cache while the temporary grant is active.
+        if (
+            incomingUri?.scheme == "content" &&
+            intent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0 &&
+            intent.flags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION != 0
+        ) {
+            val persisted = UriUtils.persistReadPermission(this, incomingUri)
+            if (!persisted) {
+                Log.w(TAG, "Incoming PDF URI did not permit persistent read access; staging it from the active grant.")
+            } else {
+                Log.i(TAG, "Persisted read access for incoming PDF content URI.")
             }
         }
-        return intent.data
+        return incomingUri
     }
 
     private fun checkAndRequestPermissions() {
-        val permissionsToRequest = mutableListOf<String>()
+        // This legacy path is reached only on Android 10 and earlier, where the
+        // device-wide PDF discovery feature still uses READ_EXTERNAL_STORAGE.
+        // Image selection must use the system Photo Picker and never requests
+        // broad photo/video library access.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            // Android 14+
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
-                permissionsToRequest.add(Manifest.permission.READ_MEDIA_IMAGES)
-            }
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED) != PackageManager.PERMISSION_GRANTED) {
-                permissionsToRequest.add(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
-            }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            // Android 13
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_MEDIA_IMAGES) != PackageManager.PERMISSION_GRANTED) {
-                permissionsToRequest.add(Manifest.permission.READ_MEDIA_IMAGES)
-            }
-        } else {
-            // Android 12 and below
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                permissionsToRequest.add(Manifest.permission.READ_EXTERNAL_STORAGE)
-            }
-        }
-
-        if (permissionsToRequest.isNotEmpty()) {
-            permissionLauncher.launch(permissionsToRequest.toTypedArray())
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            permissionLauncher.launch(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE))
         }
     }
 

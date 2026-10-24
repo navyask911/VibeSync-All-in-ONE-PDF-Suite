@@ -1,6 +1,8 @@
 package com.vibesync.toolkit.pdf.presentation.dashboard
 
 import android.app.Application
+import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
 import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -89,7 +91,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             try {
                 val pdfs = scanner.scanDevicePdfs()
                 _uiState.value = _uiState.value.copy(
-                    discoveredPdfs = pdfs,
+                    discoveredPdfs = normalizeDiscoveredPdfs(pdfs),
                     isScanning = false,
                     isFolderScanResult = false
                 )
@@ -125,7 +127,7 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
             try {
                 val pdfs = folderScanner.scanFolder(treeUri)
                 _uiState.value = _uiState.value.copy(
-                    discoveredPdfs = pdfs,
+                    discoveredPdfs = normalizeDiscoveredPdfs(pdfs),
                     isScanning = false,
                     isFolderScanResult = true,
                     message = getApplication<Application>().getString(
@@ -155,24 +157,49 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    /**
+     * Deduplicate by URI and use the available modification timestamp for deterministic newest-first ordering.
+     * Access timestamps are not reliably exposed by MediaStore or SAF providers.
+     */
+    private fun normalizeDiscoveredPdfs(pdfs: List<DiscoveredPdf>): List<DiscoveredPdf> =
+        pdfs.distinctBy { it.uri.toString() }
+            .sortedWith(compareByDescending<DiscoveredPdf> { it.lastModified }.thenBy { it.name }.thenBy { it.uri.toString() })
+
+    /** Refreshes the recent list after a scan is committed to persistent storage. */
+    fun refreshRecentDocuments() = loadRecentDocuments()
+
     private fun loadRecentDocuments() {
         viewModelScope.launch {
             val list = withContext(Dispatchers.IO) {
-                val pdfDir = java.io.File(getApplication<Application>().cacheDir, "pdf_cache")
-                if (!pdfDir.exists()) emptyList() else {
-                    (pdfDir.listFiles { _, name -> name.endsWith(".pdf", ignoreCase = true) }
-                        ?: emptyArray())
-                        .sortedByDescending { it.lastModified() }
-                        .take(5)
-                        .map { file ->
-                            DocumentMetadata(
-                                fileName = file.name,
-                                uriString = Uri.fromFile(file).toString(),
-                                pageCount = 1,
-                                fileSize = file.length()
-                            )
-                        }
-                }
+                val app = getApplication<Application>()
+                val persistentScanDir = java.io.File(app.filesDir, "scans")
+                val exportCacheDir = java.io.File(app.cacheDir, "pdf_cache")
+                val savedScans = persistentScanDir.listFiles { _, name ->
+                    name.endsWith(".pdf", ignoreCase = true)
+                } ?: emptyArray()
+                val cachedPdfs = exportCacheDir.listFiles { _, name ->
+                    name.endsWith(".pdf", ignoreCase = true)
+                } ?: emptyArray()
+
+                // Keep every saved scan discoverable; only cache exports are capped because
+                // cache files are disposable and are not the user's permanent library.
+                (savedScans.asList() + cachedPdfs.asList().sortedByDescending { it.lastModified() }.take(5))
+                    .filter { it.isFile && it.length() > 0L }
+                    .distinctBy { it.absolutePath }
+                    .sortedByDescending { it.lastModified() }
+                    .map { file ->
+                        val pageCount = runCatching {
+                            ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+                                PdfRenderer(descriptor).use { renderer -> renderer.pageCount }
+                            }
+                        }.getOrDefault(1)
+                        DocumentMetadata(
+                            fileName = file.name,
+                            uriString = Uri.fromFile(file).toString(),
+                            pageCount = pageCount,
+                            fileSize = file.length()
+                        )
+                    }
             }
             _uiState.value = _uiState.value.copy(recentDocuments = list)
         }
