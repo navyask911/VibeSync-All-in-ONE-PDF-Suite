@@ -1,7 +1,11 @@
 package com.vibesync.toolkit.pdf
 
 import android.net.Uri
+import android.view.View
+import android.view.ViewGroup
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
@@ -29,11 +33,9 @@ class ResolutionProfileSelectorTest {
     @Test
     fun selectorShowsFourOptionsAndPersistsSelectionInRtlLayout() {
         ResolutionProfilePrefs(composeRule.activity).write(ResolutionProfile.STANDARD)
-        composeRule.setContent {
-            VibeSyncPdfTheme {
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                    ResolutionProfilePreferencePanel(testTag = "resolution_profile_test_panel")
-                }
+        setTestContent {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                ResolutionProfilePreferencePanel(testTag = "resolution_profile_test_panel")
             }
         }
         composeRule.onAllNodesWithTag("resolution_profile_SMALLEST").assertCountEquals(1)
@@ -45,11 +47,9 @@ class ResolutionProfileSelectorTest {
         composeRule.onNodeWithTag("resolution_profile_LARGEST").assertIsSelected()
         assertEquals(ResolutionProfile.LARGEST, ResolutionProfilePrefs(composeRule.activity).read())
 
-        composeRule.setContent {
-            VibeSyncPdfTheme {
-                CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
-                    ResolutionProfilePreferencePanel(testTag = "resolution_profile_test_panel")
-                }
+        setTestContent {
+            CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
+                ResolutionProfilePreferencePanel(testTag = "resolution_profile_test_panel")
             }
         }
         composeRule.onNodeWithTag("resolution_profile_LARGEST").assertIsSelected()
@@ -57,10 +57,8 @@ class ResolutionProfileSelectorTest {
 
     @Test
     fun compressionScreenShowsPersistedProfileSelector() {
-        composeRule.setContent {
-            VibeSyncPdfTheme {
-                PdfQuickActionScreen("compress", Uri.parse("file:///tmp/resolution-profile-test.pdf"), {}, {})
-            }
+        setTestContent {
+            PdfQuickActionScreen("compress", Uri.parse("file:///tmp/resolution-profile-test.pdf"), {}, {})
         }
         composeRule.onNodeWithTag("resolution_profile_compression_selector").assertIsDisplayed()
         composeRule.onNodeWithTag("resolution_profile_STANDARD").assertIsDisplayed()
@@ -68,8 +66,8 @@ class ResolutionProfileSelectorTest {
 
     @Test
     fun imagesToPdfScreenShowsPersistedProfileSelector() {
-        composeRule.setContent {
-            VibeSyncPdfTheme { ConvertImagesScreen(onNavigateBack = {}, onSuccess = {}) }
+        setTestContent {
+            ConvertImagesScreen(onNavigateBack = {}, onSuccess = {})
         }
         composeRule.onNodeWithTag("resolution_profile_images_to_pdf_selector").assertIsDisplayed()
         composeRule.onNodeWithTag("resolution_profile_STANDARD").assertIsDisplayed()
@@ -89,5 +87,33 @@ class ResolutionProfileSelectorTest {
         }
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("resolution_profile_export_selector").assertIsDisplayed()
+    }
+
+    /**
+     * MainActivity already owns the Activity's Compose content. Replace that ComposeView's
+     * content for isolated screen tests instead of asking ComposeTestRule to install a second
+     * content root, which throws "has already set content" on this Activity.
+     */
+    private fun setTestContent(content: @Composable () -> Unit) {
+        composeRule.activity.runOnUiThread {
+            val composeView = findComposeView(composeRule.activity.window.decorView)
+                ?: error("MainActivity ComposeView was not found")
+            composeView.setContent {
+                VibeSyncPdfTheme {
+                    content()
+                }
+            }
+        }
+        composeRule.waitForIdle()
+    }
+
+    private fun findComposeView(view: View): ComposeView? {
+        if (view is ComposeView) return view
+        if (view is ViewGroup) {
+            for (index in 0 until view.childCount) {
+                findComposeView(view.getChildAt(index))?.let { return it }
+            }
+        }
+        return null
     }
 }
