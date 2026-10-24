@@ -2,6 +2,7 @@ package com.vibesync.toolkit.pdf.presentation.scanner
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Matrix
 import android.graphics.Rect
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
@@ -151,12 +152,18 @@ class ScannerHistoryRepository(private val scansDirectory: File) {
                             .toInt().coerceAtLeast(1)
                         Bitmap.createBitmap(targetWidth, targetHeight, Bitmap.Config.ARGB_8888).also { bitmap ->
                             bitmap.eraseColor(android.graphics.Color.WHITE)
-                            page.render(
-                                bitmap,
-                                Rect(0, 0, targetWidth, targetHeight),
-                                null,
-                                PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY
+                            val pageMatrix = Matrix().apply {
+                            postScale(
+                                targetWidth.toFloat() / page.width.toFloat().coerceAtLeast(1f),
+                                targetHeight.toFloat() / page.height.toFloat().coerceAtLeast(1f)
                             )
+                        }
+                        page.render(
+                            bitmap,
+                            Rect(0, 0, targetWidth, targetHeight),
+                            pageMatrix,
+                            PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY
+                        )
                         }
                     }
                 }
@@ -195,7 +202,13 @@ class ScannerHistoryRepository(private val scansDirectory: File) {
                             val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
                             try {
                                 bitmap.eraseColor(android.graphics.Color.WHITE)
-                                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                val pageMatrix = Matrix().apply {
+                                    postScale(
+                                        width.toFloat() / page.width.toFloat().coerceAtLeast(1f),
+                                        height.toFloat() / page.height.toFloat().coerceAtLeast(1f)
+                                    )
+                                }
+                                page.render(bitmap, Rect(0, 0, width, height), pageMatrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                                 val output = File.createTempFile(
                                     safePrefix + "_p" + (pageIndex + 1) + "_",
                                     ".jpg",
