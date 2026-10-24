@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -168,6 +169,10 @@ fun BatchScanScreen(
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("scan_settings_prefs", 0) }
     var selectedFilterName by remember { androidx.compose.runtime.mutableStateOf(prefs.getString(BatchScanViewModel.KEY_FILTER_ID, "") ?: "") }
+    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+    val selectedFilter = selectedFilterName.takeIf { it.isNotBlank() }?.let {
+        runCatching { FilterId.valueOf(it) }.getOrNull()
+    }
 
     LaunchedEffect(state.savedFile) {
         state.savedFile?.let { file ->
@@ -176,10 +181,11 @@ fun BatchScanScreen(
         }
     }
     LaunchedEffect(state.messageRes) {
-        state.messageRes?.let { /* displayed inline for accessibility */ }
+        state.messageRes?.let { snackbarHostState.showSnackbar(context.getString(it)) }
     }
 
     androidx.compose.material3.Scaffold(
+        snackbarHost = { androidx.compose.material3.SnackbarHost(snackbarHostState) },
         topBar = {
             androidx.compose.material3.TopAppBar(
                 title = { Text(stringResource(R.string.batch_scan_title), fontWeight = FontWeight.Bold) },
@@ -205,6 +211,34 @@ fun BatchScanScreen(
                     onCheckedChange = viewModel::setBatchModeEnabled,
                     modifier = Modifier.testTag("batch_mode_toggle")
                 )
+            }
+            Text(stringResource(R.string.scan_filter_title), style = MaterialTheme.typography.titleSmall)
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                FilterId.values().forEach { filterId ->
+                    FilterChip(
+                        selected = selectedFilter == filterId,
+                        onClick = {
+                            selectedFilterName = filterId.name
+                            prefs.edit().putString(BatchScanViewModel.KEY_FILTER_ID, filterId.name).apply()
+                        },
+                        label = { Text(stringResource(filterId.labelRes)) },
+                        modifier = Modifier.testTag("batch_filter_\u0024{filterId.name}")
+                    )
+                }
+                if (selectedFilter != null) {
+                    FilterChip(
+                        selected = false,
+                        onClick = {
+                            selectedFilterName = ""
+                            prefs.edit().remove(BatchScanViewModel.KEY_FILTER_ID).apply()
+                        },
+                        label = { Text(stringResource(R.string.signature_clear_action)) },
+                        modifier = Modifier.testTag("batch_filter_clear")
+                    )
+                }
             }
             androidx.compose.material3.OutlinedButton(
                 onClick = { viewModel.requestCapture(); onStartCapture() },
