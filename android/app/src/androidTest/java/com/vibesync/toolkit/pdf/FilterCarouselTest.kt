@@ -68,7 +68,7 @@ class FilterCarouselTest {
                 )
             }
         }
-        composeRule.onNodeWithTag("filter_carousel_thumbnail_BW").assertIsDisplayed()
+        composeRule.onNodeWithTag("filter_carousel").assertIsDisplayed()
         composeRule.onNodeWithTag("filter_carousel_progress_BW").assertExists()
         composeRule.onNodeWithTag("filter_carousel_progress_indicator").assertExists()
     }
