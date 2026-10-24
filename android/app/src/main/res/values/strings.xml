@@ -1,4 +1,5 @@
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <!-- The base strings are the fallback for newly exposed partial locales; established full translations are checked by android_quality.yml. -->
     <string name="app_name">VibeSync All in ONE PDF Suite</string>
     <string name="title_dashboard">VibeSync PDF Hub</string>
     <string name="title_viewer">VibeSync Viewer</string>
