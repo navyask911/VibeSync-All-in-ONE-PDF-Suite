@@ -447,8 +447,10 @@ class MainActivity : AppCompatActivity() {
                                             result.onSuccess { renamedFile ->
                                                 val oldRoute = "viewer/" + encodeUriRoute(decodedUri)
                                                 val newRoute = "viewer/" + encodeUriRoute(Uri.fromFile(renamedFile))
+                                                // Remove the old URI route before opening the renamed file;
+                                                // otherwise Back could reopen the now-missing original path.
+                                                navController.popBackStack()
                                                 navController.navigate(newRoute) {
-                                                    popUpTo(oldRoute) { inclusive = true }
                                                     launchSingleTop = true
                                                 }
                                             }.onFailure { error ->
