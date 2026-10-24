@@ -38,6 +38,11 @@ import com.tom_roush.pdfbox.pdmodel.interactive.form.PDTextField
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import java.io.IOException
+import com.vibesync.toolkit.pdf.data.pdf.filters.FilterEngine
+import com.vibesync.toolkit.pdf.data.pdf.filters.FilterId
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -286,6 +291,116 @@ class PdfBoxToolkitEngine(private val context: Context) {
             Result.failure(e)
         } finally {
             runCatching { documentToClose?.close() }
+        }
+    }
+
+    /**
+     * Compiles captured page rasters in their requested order. Only one decoded/transformed
+     * bitmap is held at a time; the output is written to a sibling temporary file and published
+     * only after PDFBox has closed and saved the complete document.
+     */
+    suspend fun assembleBatchPages(
+        pageFiles: List<File>,
+        outputFile: File,
+        profile: ResolutionProfile,
+        filterId: FilterId? = null,
+        onProgress: (Float) -> Unit = {}
+    ): Result<PdfBatchAssemblyResult> = withContext(Dispatchers.IO) {
+        var document: PDDocument? = null
+        var temporaryOutput: File? = null
+        try {
+            require(pageFiles.isNotEmpty()) { context.getString(R.string.batch_no_pages) }
+            val memoryLimit = Runtime.getRuntime().maxMemory() / 4L
+            var estimatedBytes = 0L
+            pageFiles.forEach { file ->
+                currentCoroutineContext().ensureActive()
+                require(file.isFile && file.length() > 0L) { context.getString(R.string.batch_page_missing) }
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(file.absolutePath, bounds)
+                require(bounds.outWidth > 0 && bounds.outHeight > 0) { context.getString(R.string.batch_page_decode_failed) }
+                val pageBytes = bounds.outWidth.toLong() * bounds.outHeight.toLong() * 4L
+                if (pageBytes > memoryLimit || estimatedBytes > memoryLimit - pageBytes) {
+                    throw IOException(context.getString(R.string.batch_memory_limit))
+                }
+                estimatedBytes += pageBytes
+            }
+
+            val parent = outputFile.parentFile ?: context.cacheDir
+            if (!parent.exists() && !parent.mkdirs()) throw IOException("Could not create output directory.")
+            temporaryOutput = File.createTempFile("batch_compile_", ".pdf", parent)
+            document = PDDocument()
+            val filterEngine = if (filterId == null) null else FilterEngine()
+            var fellBack = false
+
+            pageFiles.forEachIndexed { index, file ->
+                currentCoroutineContext().ensureActive()
+                var bitmap: Bitmap? = BitmapFactory.decodeFile(file.absolutePath)
+                    ?: throw IOException(context.getString(R.string.batch_page_decode_failed))
+                try {
+                    val source = requireNotNull(bitmap)
+                    val spec = profile.spec(Runtime.getRuntime().maxMemory(), source.width, source.height)
+                    fellBack = fellBack || spec.fellBack
+                    val scaled = spec.scaleBitmap(source)
+                    if (scaled !== source) source.recycle()
+                    bitmap = scaled
+
+                    val selectedFilterEngine = filterEngine
+                    if (filterId != null && selectedFilterEngine != null) {
+                        val working = requireNotNull(bitmap)
+                        val pixels = IntArray(working.width * working.height)
+                        working.getPixels(pixels, 0, working.width, 0, 0, working.width, working.height)
+                        val filteredPixels = selectedFilterEngine.apply(filterId, pixels, working.width, working.height)
+                        val filtered = Bitmap.createBitmap(working.width, working.height, Bitmap.Config.ARGB_8888)
+                        filtered.setPixels(filteredPixels, 0, filtered.width, 0, 0, filtered.width, filtered.height)
+                        working.recycle()
+                        bitmap = filtered
+                    }
+
+                    val page = PDPage(PDRectangle.A4)
+                    requireNotNull(document).addPage(page)
+                    val image = LosslessFactory.createFromImage(requireNotNull(document), requireNotNull(bitmap))
+                    val margin = 36f
+                    val availableWidth = PDRectangle.A4.width - margin * 2f
+                    val availableHeight = PDRectangle.A4.height - margin * 2f
+                    val scale = minOf(
+                        availableWidth / requireNotNull(bitmap).width.toFloat(),
+                        availableHeight / requireNotNull(bitmap).height.toFloat()
+                    )
+                    val drawWidth = requireNotNull(bitmap).width * scale
+                    val drawHeight = requireNotNull(bitmap).height * scale
+                    val x = margin + (availableWidth - drawWidth) / 2f
+                    val y = margin + (availableHeight - drawHeight) / 2f
+                    PDPageContentStream(requireNotNull(document), page).use { stream ->
+                        stream.drawImage(image, x, y, drawWidth, drawHeight)
+                    }
+                } finally {
+                    bitmap?.let { if (!it.isRecycled) it.recycle() }
+                }
+                onProgress((index + 1).toFloat() / pageFiles.size.toFloat())
+            }
+
+            currentCoroutineContext().ensureActive()
+            requireNotNull(document).save(requireNotNull(temporaryOutput))
+            document.close()
+            document = null
+            currentCoroutineContext().ensureActive()
+            if (outputFile.exists() && !outputFile.delete()) throw IOException("Could not replace the previous batch PDF.")
+            if (!requireNotNull(temporaryOutput).renameTo(outputFile)) {
+                requireNotNull(temporaryOutput).copyTo(outputFile, overwrite = true)
+                requireNotNull(temporaryOutput).delete()
+            }
+            Result.success(PdfBatchAssemblyResult(outputFile, pageFiles.size, fellBack))
+        } catch (cancelled: CancellationException) {
+            temporaryOutput?.delete()
+            outputFile.delete()
+            throw cancelled
+        } catch (error: Exception) {
+            temporaryOutput?.delete()
+            outputFile.delete()
+            Log.e(TAG, "Failed to assemble captured pages", error)
+            Result.failure(error)
+        } finally {
+            runCatching { document?.close() }
         }
     }
 
@@ -787,3 +902,6 @@ class PdfBoxToolkitEngine(private val context: Context) {
         private const val WATERMARK_METADATA_VALUE = "true"
     }
 }
+
+/** Result details for the batch PDF compiler. */
+data class PdfBatchAssemblyResult(val file: File, val pageCount: Int, val fellBack: Boolean)
