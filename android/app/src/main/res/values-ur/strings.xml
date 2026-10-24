@@ -217,4 +217,26 @@
     <string name="pdfs_show_less">کم دکھائیں</string>
     <string name="pdfs_show_section">PDF دکھائیں</string>
     <string name="pdfs_hide_section">PDF فہرست کا حصہ چھپائیں</string>
+    <string name="scan_history_title">اسکین کی تاریخ</string>
+    <string name="scan_history_subtitle">محفوظ اسکین دیکھیں، نام بدلیں، شیئر کریں یا حذف کریں</string>
+    <string name="scan_empty_title">ابھی کوئی اسکین نہیں</string>
+    <string name="scan_empty_body">آپ کے اسکین اسی ڈیوائس پر محفوظ رہتے ہیں۔ تاریخ بنانے کے لیے نیا اسکین شروع کریں۔</string>
+    <string name="scan_new">نیا اسکین</string>
+    <string name="scan_page_count">%1$d صفحات</string>
+    <string name="scan_scanned_at">اسکین کیا گیا %1$s</string>
+    <string name="scan_action_menu">اسکین کے اختیارات</string>
+    <string name="scan_share_images">تصاویر کے طور پر شیئر کریں (JPEG)</string>
+    <string name="scan_save_downloads">ڈاؤن لوڈز / ڈیوائس میں محفوظ کریں</string>
+    <string name="scan_rename">نام تبدیل کریں</string>
+    <string name="scan_delete">اسکین حذف کریں</string>
+    <string name="scan_delete_title">یہ اسکین حذف کریں؟</string>
+    <string name="scan_delete_message">%1$s اور اس کی محفوظ صفحہ تصاویر حذف کریں؟ اسے واپس نہیں کیا جا سکتا۔</string>
+    <string name="scan_rename_title">اسکین کا نام تبدیل کریں</string>
+    <string name="scan_name_label">دستاویز کا نام</string>
+    <string name="scan_rename_success">اسکین کا نام بدل دیا گیا</string>
+    <string name="scan_delete_success">اسکین حذف ہو گیا</string>
+    <string name="scan_save_success">اسکین منتخب جگہ پر محفوظ ہو گیا</string>
+    <string name="scan_save_failed">اسکین منتخب جگہ پر محفوظ نہیں ہو سکا</string>
+    <string name="scan_images_unavailable">اسکین کی JPEG تصاویر تیار نہیں ہو سکیں</string>
+    <string name="scan_operation_failed">یہ عمل مکمل نہیں ہو سکا۔ دوبارہ کوشش کریں۔</string>
 </resources>
