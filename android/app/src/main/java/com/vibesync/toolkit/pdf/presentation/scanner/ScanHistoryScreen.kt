@@ -1,6 +1,7 @@
 package com.vibesync.toolkit.pdf.presentation.scanner
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -91,7 +92,8 @@ fun ScanHistoryScreen(
     onShareImages: (File) -> Unit,
     onSaveToDownloads: (File) -> Unit,
     onNavigateToEditor: (Uri) -> Unit = {},
-    onNavigateToPdfTool: (String, Uri) -> Unit = { _, _ -> }
+    onNavigateToPdfTool: (String, Uri) -> Unit = { _, _ -> },
+    onSplitBook: (Uri) -> Unit = {}
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsState()
@@ -181,6 +183,7 @@ fun ScanHistoryScreen(
                             onSaveToDownloads = { onSaveToDownloads(scan.file) },
                             onEdit = { onNavigateToEditor(Uri.fromFile(scan.file)) },
                             onNavigateToPdfTool = { route -> onNavigateToPdfTool(route, Uri.fromFile(scan.file)) },
+                            onSplitBook = onSplitBook,
                             onRename = { file, name ->
                                 viewModel.renameScan(file, name) { result ->
                                     scope.launch {
@@ -222,6 +225,7 @@ private fun ScanHistoryCard(
     onSaveToDownloads: () -> Unit,
     onEdit: () -> Unit,
     onNavigateToPdfTool: (String) -> Unit,
+    onSplitBook: (Uri) -> Unit,
     onRename: (File, String) -> Unit,
     onDelete: (File) -> Unit
 ) {
@@ -231,6 +235,14 @@ private fun ScanHistoryCard(
     var requestedName by rememberSaveable(entry.file.absolutePath) { mutableStateOf(entry.file.nameWithoutExtension) }
     val preview by produceState<Bitmap?>(initialValue = null, key1 = entry.file.absolutePath, key2 = entry.file.lastModified()) {
         value = withContext(Dispatchers.IO) { repository.loadThumbnail(entry.file) }
+    }
+    val firstPageImage = remember(entry.file.absolutePath) { repository.pageImageFiles(entry.file).firstOrNull() }
+    val firstPageIsLandscape by produceState(initialValue = false, key1 = firstPageImage) {
+        value = withContext(Dispatchers.IO) {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            firstPageImage?.let { BitmapFactory.decodeFile(it.absolutePath, bounds) }
+            bounds.outWidth > bounds.outHeight && bounds.outWidth > 0
+        }
     }
     // Never recycle a preview from composition disposal: Compose can still reference its ImageBitmap.
     Card(
@@ -295,6 +307,12 @@ private fun ScanHistoryCard(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
+                if (firstPageIsLandscape && firstPageImage != null) {
+                    TextButton(
+                        onClick = { onSplitBook(Uri.fromFile(firstPageImage)) },
+                        modifier = Modifier.fillMaxWidth().testTag("split_book_${entry.file.name}")
+                    ) { Text(stringResource(R.string.book_split_action)) }
+                }
             }
         }
     }

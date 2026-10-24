@@ -178,7 +178,7 @@ fun BookSplitScreen(
                     busy = true
                     error = null
                     scope.launch {
-                        val file = withContext(Dispatchers.IO) {
+                        val result = runCatching { withContext(Dispatchers.IO) {
                             val split = BookSplitter.split(bitmap, gutter)
                             val work = File(context.cacheDir, "book_split_${System.nanoTime()}").apply { mkdirs() }
                             val inputFiles = mutableListOf<File>()
@@ -201,8 +201,8 @@ fun BookSplitScreen(
                             } finally {
                                 work.deleteRecursively()
                             }
-                        }
-                        if (file.isSuccess) onSuccess(file.getOrThrow())
+                        } }
+                        if (result.isSuccess) onSuccess(result.getOrThrow())
                         else { error = R.string.book_split_failed; busy = false }
                     }
                 })

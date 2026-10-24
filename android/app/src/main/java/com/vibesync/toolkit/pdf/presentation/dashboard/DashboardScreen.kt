@@ -169,7 +169,11 @@ fun DashboardScreen(
             ToolItem(context.getString(R.string.tool_merge_documents), context.getString(R.string.tool_merge_documents_subtitle), Icons.Default.MergeType, "merge", Color(0xFF8E0000)),
             ToolItem(context.getString(R.string.tool_images_to_pdf), context.getString(R.string.tool_images_to_pdf_subtitle), Icons.Default.AddPhotoAlternate, "convert", Color(0xFFB71C1C)),
             ToolItem(context.getString(R.string.tool_extract_images), context.getString(R.string.tool_extract_images_subtitle), Icons.Default.Image, "extract", Color(0xFFE53935)),
-            ToolItem(context.getString(R.string.tool_encrypt_protect), context.getString(R.string.tool_encrypt_protect_subtitle), Icons.Default.Lock, "encrypt", Color(0xFF5F0000))
+            ToolItem(context.getString(R.string.tool_encrypt_protect), context.getString(R.string.tool_encrypt_protect_subtitle), Icons.Default.Lock, "encrypt", Color(0xFF5F0000)),
+            ToolItem(context.getString(R.string.tool_batch_scan), context.getString(R.string.tool_batch_scan_subtitle), Icons.Default.DocumentScanner, "batch_scan", VibeSyncCrimsonPrimary),
+            ToolItem(context.getString(R.string.tool_book_split), context.getString(R.string.tool_book_split_subtitle), Icons.Default.MenuBook, "book_split", VibeSyncRubyAccent),
+            ToolItem(context.getString(R.string.tool_id_card), context.getString(R.string.tool_id_card_subtitle), Icons.Default.Badge, "id_card", Color(0xFFC62828)),
+            ToolItem(context.getString(R.string.tool_id_photo), context.getString(R.string.tool_id_photo_subtitle), Icons.Default.Portrait, "id_photo", Color(0xFF8E0000))
         )
     }
 

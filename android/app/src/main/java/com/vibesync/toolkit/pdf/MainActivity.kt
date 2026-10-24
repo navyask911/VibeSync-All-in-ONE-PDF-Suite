@@ -81,6 +81,12 @@ import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
 import com.vibesync.toolkit.pdf.presentation.editor.PdfEditorScreen
 import com.vibesync.toolkit.pdf.presentation.monetization.AdMobManager
 import com.vibesync.toolkit.pdf.presentation.scanner.DocumentScannerManager
+import com.vibesync.toolkit.pdf.presentation.scanner.BatchScanViewModel
+import com.vibesync.toolkit.pdf.presentation.scanner.BatchScanScreen
+import com.vibesync.toolkit.pdf.presentation.scanner.BookSplitEntryScreen
+import com.vibesync.toolkit.pdf.presentation.scanner.BookSplitScreen
+import com.vibesync.toolkit.pdf.presentation.tools.IdCardComposerScreen
+import com.vibesync.toolkit.pdf.presentation.tools.IdPhotoMakerScreen
 import com.vibesync.toolkit.pdf.presentation.settings.ResolutionProfilePreferencePanel
 import com.vibesync.toolkit.pdf.presentation.scanner.ScanHistoryScreen
 import com.vibesync.toolkit.pdf.presentation.scanner.ScannerHistoryRepository
@@ -152,6 +158,7 @@ class MainActivity : AppCompatActivity() {
     private val viewerViewModel: PdfViewerViewModel by viewModels()
     private val editorViewModel: EditorViewModel by viewModels()
     private val scannerHistoryViewModel: ScannerHistoryViewModel by viewModels()
+    private val batchScanViewModel: BatchScanViewModel by viewModels()
     private val scannerHistoryRepository by lazy { ScannerHistoryRepository(File(filesDir, "scans")) }
     private val toolkitEngine by lazy { PdfBoxToolkitEngine(applicationContext) }
 
@@ -196,6 +203,9 @@ class MainActivity : AppCompatActivity() {
             ActivityResultContracts.StartIntentSenderForResult()
         ) { result ->
             val scanResult = scannerManager.parseResult(result.resultCode, result.data)
+            if (batchScanViewModel.handleCaptureResult(result.resultCode, scanResult?.pageImageUris.orEmpty())) {
+                return@registerForActivityResult
+            }
             scanResult?.let { completedScan ->
                 completedScan.pdfUri?.let { scannedPdfUri ->
                 Toast.makeText(this, getString(R.string.document_scanned_page_count, completedScan.pageCount), Toast.LENGTH_LONG).show()
@@ -453,8 +463,56 @@ class MainActivity : AppCompatActivity() {
                                 onShareImages = { file -> shareScanImages(file) },
                                 onSaveToDownloads = { file -> saveScanToDownloads(file) },
                                 onNavigateToEditor = { uri -> navController.navigate("editor/${encodeUriRoute(uri)}") },
-                                onNavigateToPdfTool = { route, uri -> navController.navigate("$route/${encodeUriRoute(uri)}") }
+                                onNavigateToPdfTool = { route, uri -> navController.navigate("$route/${encodeUriRoute(uri)}") },
+                                onSplitBook = { imageUri -> navController.navigate("book_split/${encodeUriRoute(imageUri)}") }
                             )
+                        }
+
+                        composable("batch_scan") {
+                            BatchScanScreen(
+                                viewModel = batchScanViewModel,
+                                onNavigateBack = { navController.popBackStack() },
+                                onStartCapture = {
+                                    scannerManager.startBatchScan(scannerLauncher) { error ->
+                                        Toast.makeText(this@MainActivity, getString(R.string.error_scanner, error.message ?: ""), Toast.LENGTH_LONG).show()
+                                    }
+                                },
+                                onOpenPdf = { file ->
+                                    scannerHistoryViewModel.refresh()
+                                    dashboardViewModel.refreshRecentDocuments()
+                                    navController.navigate("viewer/${encodeUriRoute(Uri.fromFile(file))}")
+                                }
+                            )
+                        }
+
+                        composable("book_split") {
+                            BookSplitEntryScreen(
+                                onNavigateBack = { navController.popBackStack() },
+                                onChooseImage = { uri -> navController.navigate("book_split/${encodeUriRoute(uri)}") }
+                            )
+                        }
+
+                        composable(
+                            route = "book_split/{encodedUri}",
+                            arguments = listOf(navArgument("encodedUri") { type = NavType.StringType })
+                        ) { entry ->
+                            val imageUri = decodeUriRoute(entry.arguments?.getString("encodedUri") ?: "")
+                            BookSplitScreen(
+                                imageUri = imageUri,
+                                onNavigateBack = { navController.popBackStack() },
+                                onSuccess = { file ->
+                                    scannerHistoryViewModel.refresh()
+                                    navController.navigate("viewer/${encodeUriRoute(Uri.fromFile(file))}")
+                                }
+                            )
+                        }
+
+                        composable("id_card") {
+                            IdCardComposerScreen(onNavigateBack = { navController.popBackStack() })
+                        }
+
+                        composable("id_photo") {
+                            IdPhotoMakerScreen(onNavigateBack = { navController.popBackStack() })
                         }
 
                         // Full-Screen System PDF Viewer

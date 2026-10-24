@@ -148,12 +148,12 @@ fun IdCardComposerScreen(
                     val back = backBitmap ?: return@Button
                     busy = true
                     scope.launch {
-                        val file = withContext(Dispatchers.IO) {
+                        val result = runCatching { withContext(Dispatchers.IO) {
                             val output = File.createTempFile("id_card_", ".pdf", context.cacheDir)
                             IdCardComposer.compose(front, back, output).getOrThrow()
-                        }
-                        if (file.isSuccess) {
-                            pendingFile = file.getOrThrow()
+                        } }
+                        if (result.isSuccess) {
+                            pendingFile = result.getOrThrow()
                             saveLauncher.launch("ID_Card_${System.currentTimeMillis()}.pdf")
                         } else {
                             message = R.string.id_card_save_failed
