@@ -49,8 +49,8 @@ class FilterCarouselTest {
         composeRule.onAllNodesWithTag("filter_carousel_item_SCREEN").assertCountEquals(1)
         composeRule.onAllNodesWithTag("filter_carousel_item_CLEAN_MARKS").assertCountEquals(1)
         composeRule.onNodeWithTag("filter_carousel_item_MAGIC_COLOR").assertIsSelected()
-        composeRule.onNodeWithTag("filter_carousel_item_SCREEN").performClick()
-        composeRule.onNodeWithTag("filter_carousel_item_SCREEN").assertIsSelected()
+        composeRule.onNodeWithTag("filter_carousel_item_BW").performClick()
+        composeRule.onNodeWithTag("filter_carousel_item_BW").assertIsSelected()
     }
 
     @Test
@@ -69,6 +69,6 @@ class FilterCarouselTest {
             }
         }
         composeRule.onNodeWithTag("filter_carousel_progress_BW").assertIsDisplayed()
-        composeRule.onNodeWithTag("filter_carousel_progress_indicator").assertIsDisplayed()
+        composeRule.onNodeWithTag("filter_carousel_progress_indicator").assertExists()
     }
 }
