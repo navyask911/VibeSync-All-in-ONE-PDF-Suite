@@ -239,4 +239,18 @@
     <string name="scan_save_failed">无法将扫描保存到所选位置</string>
     <string name="scan_images_unavailable">无法为此扫描准备 JPEG 图像</string>
     <string name="scan_operation_failed">无法完成此扫描操作，请重试。</string>
+
+    <!-- PDF document context actions -->
+    <string name="document_actions_title">文档操作</string>
+    <string name="action_open_view_pdf">打开 / 查看 PDF</string>
+    <string name="action_share_jpg_images">分享为 JPG 图片</string>
+    <string name="action_compress_pdf">压缩 PDF</string>
+    <string name="action_watermark_pdf">为 PDF 添加水印</string>
+    <string name="rename_document_title">重命名文档</string>
+    <string name="rename_document_hint">文档名称</string>
+    <string name="delete_document_title">删除文档？</string>
+    <string name="delete_document_message">要从此设备删除 %1$s 吗？此操作无法撤销。</string>
+    <string name="document_rename_success">文档已重命名。</string>
+    <string name="document_delete_success">文档已删除。</string>
+    <string name="document_action_failed">无法完成此文档操作，请重试。</string>
 </resources>

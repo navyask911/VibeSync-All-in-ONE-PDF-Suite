@@ -239,4 +239,18 @@
     <string name="scan_save_failed">تعذر حفظ المسح في الموقع المحدد</string>
     <string name="scan_images_unavailable">تعذر تجهيز صور JPEG لهذا المسح</string>
     <string name="scan_operation_failed">تعذر إكمال هذا الإجراء. حاول مرة أخرى.</string>
+
+    <!-- PDF document context actions -->
+    <string name="document_actions_title">إجراءات المستند</string>
+    <string name="action_open_view_pdf">فتح / عرض PDF</string>
+    <string name="action_share_jpg_images">مشاركة كصور JPG</string>
+    <string name="action_compress_pdf">ضغط PDF</string>
+    <string name="action_watermark_pdf">إضافة علامة مائية إلى PDF</string>
+    <string name="rename_document_title">إعادة تسمية المستند</string>
+    <string name="rename_document_hint">اسم المستند</string>
+    <string name="delete_document_title">هل تريد حذف المستند؟</string>
+    <string name="delete_document_message">هل تريد حذف %1$s من هذا الجهاز؟ لا يمكن التراجع عن ذلك.</string>
+    <string name="document_rename_success">تمت إعادة تسمية المستند.</string>
+    <string name="document_delete_success">تم حذف المستند.</string>
+    <string name="document_action_failed">تعذّر إكمال إجراء المستند. حاول مرة أخرى.</string>
 </resources>

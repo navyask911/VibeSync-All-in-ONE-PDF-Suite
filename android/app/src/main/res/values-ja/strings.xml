@@ -239,4 +239,18 @@
     <string name="scan_save_failed">選択した場所にスキャンを保存できませんでした</string>
     <string name="scan_images_unavailable">このスキャンの JPEG 画像を準備できませんでした</string>
     <string name="scan_operation_failed">操作を完了できませんでした。もう一度お試しください。</string>
+
+    <!-- PDF document context actions -->
+    <string name="document_actions_title">ドキュメントの操作</string>
+    <string name="action_open_view_pdf">PDFを開く / 表示</string>
+    <string name="action_share_jpg_images">JPG画像として共有</string>
+    <string name="action_compress_pdf">PDFを圧縮</string>
+    <string name="action_watermark_pdf">PDFに透かしを追加</string>
+    <string name="rename_document_title">ドキュメント名を変更</string>
+    <string name="rename_document_hint">ドキュメント名</string>
+    <string name="delete_document_title">ドキュメントを削除しますか？</string>
+    <string name="delete_document_message">このデバイスから %1$s を削除しますか？この操作は元に戻せません。</string>
+    <string name="document_rename_success">ドキュメント名を変更しました。</string>
+    <string name="document_delete_success">ドキュメントを削除しました。</string>
+    <string name="document_action_failed">ドキュメントの操作を完了できませんでした。もう一度お試しください。</string>
 </resources>

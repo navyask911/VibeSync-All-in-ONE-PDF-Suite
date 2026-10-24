@@ -249,4 +249,18 @@
     <string name="scan_save_failed">Scan konnte am ausgewählten Ort nicht gespeichert werden</string>
     <string name="scan_images_unavailable">JPEG-Bilder für diesen Scan konnten nicht erstellt werden</string>
     <string name="scan_operation_failed">Diese Aktion konnte nicht abgeschlossen werden. Bitte erneut versuchen.</string>
+
+    <!-- PDF document context actions -->
+    <string name="document_actions_title">Dokumentaktionen</string>
+    <string name="action_open_view_pdf">PDF öffnen / anzeigen</string>
+    <string name="action_share_jpg_images">Als JPG-Bilder teilen</string>
+    <string name="action_compress_pdf">PDF komprimieren</string>
+    <string name="action_watermark_pdf">PDF mit Wasserzeichen versehen</string>
+    <string name="rename_document_title">Dokument umbenennen</string>
+    <string name="rename_document_hint">Dokumentname</string>
+    <string name="delete_document_title">Dokument löschen?</string>
+    <string name="delete_document_message">%1$s von diesem Gerät löschen? Dieser Vorgang kann nicht rückgängig gemacht werden.</string>
+    <string name="document_rename_success">Dokument umbenannt.</string>
+    <string name="document_delete_success">Dokument gelöscht.</string>
+    <string name="document_action_failed">Die Dokumentaktion konnte nicht abgeschlossen werden. Bitte erneut versuchen.</string>
 </resources>

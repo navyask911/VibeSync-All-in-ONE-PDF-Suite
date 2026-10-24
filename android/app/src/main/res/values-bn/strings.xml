@@ -239,4 +239,18 @@
     <string name="scan_save_failed">নির্বাচিত স্থানে স্ক্যান সংরক্ষণ করা যায়নি</string>
     <string name="scan_images_unavailable">এই স্ক্যানের JPEG ছবি প্রস্তুত করা যায়নি</string>
     <string name="scan_operation_failed">এই কাজটি সম্পূর্ণ করা যায়নি। আবার চেষ্টা করুন।</string>
+
+    <!-- PDF document context actions -->
+    <string name="document_actions_title">ডকুমেন্টের কাজ</string>
+    <string name="action_open_view_pdf">PDF খুলুন / দেখুন</string>
+    <string name="action_share_jpg_images">JPG ছবি হিসেবে শেয়ার করুন</string>
+    <string name="action_compress_pdf">PDF সংকুচিত করুন</string>
+    <string name="action_watermark_pdf">PDF-এ ওয়াটারমার্ক দিন</string>
+    <string name="rename_document_title">ডকুমেন্টের নাম পরিবর্তন করুন</string>
+    <string name="rename_document_hint">ডকুমেন্টের নাম</string>
+    <string name="delete_document_title">ডকুমেন্ট মুছবেন?</string>
+    <string name="delete_document_message">এই ডিভাইস থেকে %1$s মুছবেন? এটি আর ফিরিয়ে আনা যাবে না।</string>
+    <string name="document_rename_success">ডকুমেন্টের নাম পরিবর্তন হয়েছে।</string>
+    <string name="document_delete_success">ডকুমেন্ট মুছে ফেলা হয়েছে।</string>
+    <string name="document_action_failed">ডকুমেন্টের কাজ সম্পন্ন করা যায়নি। আবার চেষ্টা করুন।</string>
 </resources>

@@ -239,4 +239,18 @@
     <string name="scan_save_failed">اسکین منتخب جگہ پر محفوظ نہیں ہو سکا</string>
     <string name="scan_images_unavailable">اسکین کی JPEG تصاویر تیار نہیں ہو سکیں</string>
     <string name="scan_operation_failed">یہ عمل مکمل نہیں ہو سکا۔ دوبارہ کوشش کریں۔</string>
+
+    <!-- PDF document context actions -->
+    <string name="document_actions_title">دستاویز کے اعمال</string>
+    <string name="action_open_view_pdf">PDF کھولیں / دیکھیں</string>
+    <string name="action_share_jpg_images">JPG تصاویر کے طور پر شیئر کریں</string>
+    <string name="action_compress_pdf">PDF کمپریس کریں</string>
+    <string name="action_watermark_pdf">PDF پر واٹرمارک لگائیں</string>
+    <string name="rename_document_title">دستاویز کا نام تبدیل کریں</string>
+    <string name="rename_document_hint">دستاویز کا نام</string>
+    <string name="delete_document_title">دستاویز حذف کریں؟</string>
+    <string name="delete_document_message">اس ڈیوائس سے %1$s حذف کریں؟ یہ عمل واپس نہیں ہو سکتا۔</string>
+    <string name="document_rename_success">دستاویز کا نام تبدیل ہوگیا۔</string>
+    <string name="document_delete_success">دستاویز حذف ہوگئی۔</string>
+    <string name="document_action_failed">دستاویز کا عمل مکمل نہیں ہوسکا۔ دوبارہ کوشش کریں۔</string>
 </resources>
