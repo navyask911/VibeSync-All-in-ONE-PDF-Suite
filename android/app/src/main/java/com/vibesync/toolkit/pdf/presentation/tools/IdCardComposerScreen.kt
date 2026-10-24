@@ -7,6 +7,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -39,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -132,6 +135,33 @@ fun IdCardComposerScreen(
                             Icon(Icons.Default.Flip, contentDescription = null); Text(stringResource(R.string.id_card_pick_back))
                         }
                     }
+                }
+            }
+            Card(
+                modifier = Modifier.fillMaxWidth().aspectRatio(595f / 842f).testTag("id_card_layout_preview"),
+                colors = CardDefaults.cardColors(containerColor = Color.White)
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp, vertical = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    if (frontBitmap != null) {
+                        Image(
+                            bitmap = frontBitmap!!.asImageBitmap(),
+                            contentDescription = stringResource(R.string.id_card_front),
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else Spacer(Modifier.weight(1f).fillMaxWidth())
+                    if (backBitmap != null) {
+                        Image(
+                            bitmap = backBitmap!!.asImageBitmap(),
+                            contentDescription = stringResource(R.string.id_card_back),
+                            modifier = Modifier.weight(1f).fillMaxWidth(),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else Spacer(Modifier.weight(1f).fillMaxWidth())
                 }
             }
             Text(
