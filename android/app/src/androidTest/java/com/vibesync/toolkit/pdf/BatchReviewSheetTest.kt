@@ -50,8 +50,7 @@ class BatchReviewSheetTest {
                 },
                 onDeletePage = { id -> pages.removeAll { it.id == id } },
                 onAddPages = {},
-                onCompile = {},
-                modifier = androidx.compose.ui.Modifier
+                onCompile = {}
             )
         }
         composeRule.onNodeWithTag("batch_page_count").assertIsDisplayed()
