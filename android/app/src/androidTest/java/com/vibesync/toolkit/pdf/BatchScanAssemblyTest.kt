@@ -14,6 +14,9 @@ import com.vibesync.toolkit.pdf.data.pdf.ResolutionProfile
 import com.vibesync.toolkit.pdf.data.pdf.ResolutionProfilePrefs
 import com.vibesync.toolkit.pdf.data.pdf.PdfBatchAssemblyResult
 import com.vibesync.toolkit.pdf.presentation.scanner.BatchScanViewModel
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -77,6 +80,27 @@ class BatchScanAssemblyTest {
                 12_000
             )
             assertTrue("The LARGEST tier must signal its STANDARD fallback.", fallback.fellBack)
+
+            // Cancel after one page has entered the temporary PDF. Neither the final target nor
+            // the sibling temporary compilation file may survive cooperative cancellation.
+            val cancelledPdf = File(work, "cancelled-batch.pdf")
+            lateinit var compileJob: Job
+            compileJob = launch(start = CoroutineStart.LAZY) {
+                engine.assembleBatchPages(
+                    listOf(pageRed, pageGreen),
+                    cancelledPdf,
+                    ResolutionProfile.STANDARD,
+                    onProgress = { progress -> if (progress >= 0.5f) compileJob.cancel() }
+                )
+            }
+            compileJob.start()
+            compileJob.join()
+            assertTrue("Compilation job should have observed cancellation.", compileJob.isCancelled)
+            assertFalse("A partial destination PDF must not remain.", cancelledPdf.exists())
+            assertTrue(
+                "Temporary compile files must be cleaned up.",
+                work.listFiles().orEmpty().none { it.name.startsWith("batch_compile_") }
+            )
         } finally {
             if (hadToggle) originalPrefs.edit().putBoolean(BatchScanViewModel.KEY_BATCH_ENABLED, previousToggle).apply()
             else originalPrefs.edit().remove(BatchScanViewModel.KEY_BATCH_ENABLED).apply()
