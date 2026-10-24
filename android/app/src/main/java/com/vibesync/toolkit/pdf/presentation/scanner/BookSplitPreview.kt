@@ -89,10 +89,11 @@ fun BookSplitPreview(
                     }
                 }
             )
+            val dividerColor = MaterialTheme.colorScheme.primary
             Canvas(modifier = Modifier.fillMaxSize()) {
                 val x = size.width * gutter / source.width.toFloat()
                 drawLine(
-                    color = MaterialTheme.colorScheme.primary,
+                    color = dividerColor,
                     start = Offset(x, 0f),
                     end = Offset(x, size.height),
                     strokeWidth = 3.dp.toPx()
