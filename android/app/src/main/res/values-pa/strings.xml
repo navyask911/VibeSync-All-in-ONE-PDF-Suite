@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">HD ਆਟੋ</string>
     <string name="resolution_profile_hd_auto_description">ਡਿਵਾਈਸ ਅਨੁਸਾਰ ਗੁਣਵੱਤਾ</string>
     <string name="resolution_profile_memory_fallback">ਮੂਲ ਰੈਜ਼ੋਲਿਊਸ਼ਨ ਨੇ ਮੈਮੋਰੀ ਸੀਮਾ ਪਾਰ ਕੀਤੀ; ਮਿਆਰੀ ਚੁਣਿਆ ਗਿਆ।</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">ਸਕੈਨ ਫਿਲਟਰ</string>
+    <string name="scan_filter_magic_color">ਮੈਜਿਕ ਰੰਗ</string>
+    <string name="scan_filter_bw">ਕਾਲਾ-ਚਿੱਟਾ</string>
+    <string name="scan_filter_lighten">ਹਲਕਾ ਕਰੋ</string>
+    <string name="scan_filter_no_shadow">ਪਰਛਾਵੇਂ ਹਟਾਓ</string>
+    <string name="scan_filter_screen">ਸਕ੍ਰੀਨ ਮੋਇਰੇ</string>
+    <string name="scan_filter_clean_marks">ਨਿਸ਼ਾਨ ਸਾਫ਼ ਕਰੋ</string>
 </resources>

@@ -284,4 +284,13 @@
     <string name="resolution_profile_hd_auto">HD Auto</string>
     <string name="resolution_profile_hd_auto_description">Quality chosen for this device</string>
     <string name="resolution_profile_memory_fallback">Largest exceeded the memory limit; Standard was selected.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">Scan filters</string>
+    <string name="scan_filter_magic_color">Magic Color</string>
+    <string name="scan_filter_bw">Black &amp; White</string>
+    <string name="scan_filter_lighten">Lighten</string>
+    <string name="scan_filter_no_shadow">No Shadow</string>
+    <string name="scan_filter_screen">Screen / Moiré</string>
+    <string name="scan_filter_clean_marks">Clean Marks</string>
 </resources>

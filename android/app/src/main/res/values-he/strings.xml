@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">HD אוטומטי</string>
     <string name="resolution_profile_hd_auto_description">איכות מותאמת למכשיר</string>
     <string name="resolution_profile_memory_fallback">הרזולוציה המקורית חרגה ממגבלת הזיכרון; נבחרה הרגילה.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">מסנני סריקה</string>
+    <string name="scan_filter_magic_color">צבע קסם</string>
+    <string name="scan_filter_bw">שחור-לבן</string>
+    <string name="scan_filter_lighten">הבהרה</string>
+    <string name="scan_filter_no_shadow">הסרת צללים</string>
+    <string name="scan_filter_screen">מוארה מסך</string>
+    <string name="scan_filter_clean_marks">ניקוי סימנים</string>
 </resources>

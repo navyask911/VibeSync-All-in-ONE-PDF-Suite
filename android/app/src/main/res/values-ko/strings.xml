@@ -265,4 +265,13 @@
     <string name="resolution_profile_hd_auto">HD 자동</string>
     <string name="resolution_profile_hd_auto_description">기기에 맞춘 품질</string>
     <string name="resolution_profile_memory_fallback">기본 해상도가 메모리 한도를 초과하여 표준을 선택했습니다.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">스캔 필터</string>
+    <string name="scan_filter_magic_color">매직 컬러</string>
+    <string name="scan_filter_bw">흑백</string>
+    <string name="scan_filter_lighten">밝게</string>
+    <string name="scan_filter_no_shadow">그림자 제거</string>
+    <string name="scan_filter_screen">화면 모아레</string>
+    <string name="scan_filter_clean_marks">표시 지우기</string>
 </resources>

@@ -275,4 +275,13 @@
     <string name="resolution_profile_hd_auto">HD automatique</string>
     <string name="resolution_profile_hd_auto_description">Qualité adaptée à l’appareil</string>
     <string name="resolution_profile_memory_fallback">La résolution native dépasse la mémoire disponible ; Standard a été sélectionné.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">Filtres de numérisation</string>
+    <string name="scan_filter_magic_color">Couleur magique</string>
+    <string name="scan_filter_bw">Noir et blanc</string>
+    <string name="scan_filter_lighten">Éclaircir</string>
+    <string name="scan_filter_no_shadow">Supprimer les ombres</string>
+    <string name="scan_filter_screen">Moiré d’écran</string>
+    <string name="scan_filter_clean_marks">Nettoyer les marques</string>
 </resources>

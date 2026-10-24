@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">HD ಸ್ವಯಂ</string>
     <string name="resolution_profile_hd_auto_description">ಸಾಧನಕ್ಕೆ ಹೊಂದುವ ಗುಣಮಟ್ಟ</string>
     <string name="resolution_profile_memory_fallback">ಸ್ಥಳೀಯ ರೆಸಲ್ಯೂಶನ್ ಮೆಮೊರಿ ಮಿತಿಯನ್ನು ಮೀರಿದೆ; ಪ್ರಮಾಣಿತ ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">ಸ್ಕ್ಯಾನ್ ಫಿಲ್ಟರ್‌ಗಳು</string>
+    <string name="scan_filter_magic_color">ಮ್ಯಾಜಿಕ್ ಬಣ್ಣ</string>
+    <string name="scan_filter_bw">ಕಪ್ಪು-ಬಿಳುಪು</string>
+    <string name="scan_filter_lighten">ಬೆಳಗಿಸಿ</string>
+    <string name="scan_filter_no_shadow">ನೆರಳು ತೆಗೆದುಹಾಕಿ</string>
+    <string name="scan_filter_screen">ಪರದೆ ಮೋಯರೆ</string>
+    <string name="scan_filter_clean_marks">ಗುರುತುಗಳನ್ನು ಸ್ವಚ್ಛಗೊಳಿಸಿ</string>
 </resources>

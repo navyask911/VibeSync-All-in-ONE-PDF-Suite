@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">Automatyczne HD</string>
     <string name="resolution_profile_hd_auto_description">Jakość dobrana do urządzenia</string>
     <string name="resolution_profile_memory_fallback">Natywna rozdzielczość przekroczyła limit pamięci; wybrano standard.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">Filtry skanowania</string>
+    <string name="scan_filter_magic_color">Magiczny kolor</string>
+    <string name="scan_filter_bw">Czarno-biały</string>
+    <string name="scan_filter_lighten">Rozjaśnij</string>
+    <string name="scan_filter_no_shadow">Usuń cienie</string>
+    <string name="scan_filter_screen">Mora ekranowe</string>
+    <string name="scan_filter_clean_marks">Usuń ślady</string>
 </resources>

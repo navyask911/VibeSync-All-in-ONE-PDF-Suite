@@ -265,4 +265,13 @@
     <string name="resolution_profile_hd_auto">স্বয়ংক্রিয় HD</string>
     <string name="resolution_profile_hd_auto_description">এই ডিভাইস অনুযায়ী গুণমান</string>
     <string name="resolution_profile_memory_fallback">সর্বোচ্চ রেজোলিউশন মেমরি সীমা ছাড়িয়েছে; স্ট্যান্ডার্ড বেছে নেওয়া হয়েছে।</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">স্ক্যান ফিল্টার</string>
+    <string name="scan_filter_magic_color">ম্যাজিক কালার</string>
+    <string name="scan_filter_bw">সাদা-কালো</string>
+    <string name="scan_filter_lighten">উজ্জ্বল করুন</string>
+    <string name="scan_filter_no_shadow">ছায়া অপসারণ</string>
+    <string name="scan_filter_screen">স্ক্রিন মোয়ার</string>
+    <string name="scan_filter_clean_marks">দাগ পরিষ্কার</string>
 </resources>

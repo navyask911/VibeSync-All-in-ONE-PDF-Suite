@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">HD automaticky</string>
     <string name="resolution_profile_hd_auto_description">Kvalita podle zařízení</string>
     <string name="resolution_profile_memory_fallback">Nativní rozlišení překročilo limit paměti; byl zvolen standard.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">Filtry skenování</string>
+    <string name="scan_filter_magic_color">Kouzelné barvy</string>
+    <string name="scan_filter_bw">Černobíle</string>
+    <string name="scan_filter_lighten">Zesvětlit</string>
+    <string name="scan_filter_no_shadow">Odstranit stíny</string>
+    <string name="scan_filter_screen">Moaré obrazovky</string>
+    <string name="scan_filter_clean_marks">Vyčistit značky</string>
 </resources>

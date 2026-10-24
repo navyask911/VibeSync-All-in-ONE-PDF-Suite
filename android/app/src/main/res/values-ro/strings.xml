@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">HD automat</string>
     <string name="resolution_profile_hd_auto_description">Calitate adaptată dispozitivului</string>
     <string name="resolution_profile_memory_fallback">Rezoluția nativă a depășit limita de memorie; a fost selectat Standard.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">Filtre de scanare</string>
+    <string name="scan_filter_magic_color">Culoare magică</string>
+    <string name="scan_filter_bw">Alb-negru</string>
+    <string name="scan_filter_lighten">Luminare</string>
+    <string name="scan_filter_no_shadow">Elimină umbrele</string>
+    <string name="scan_filter_screen">Moiré de ecran</string>
+    <string name="scan_filter_clean_marks">Curăță marcajele</string>
 </resources>

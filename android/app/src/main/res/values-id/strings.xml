@@ -265,4 +265,13 @@
     <string name="resolution_profile_hd_auto">HD Otomatis</string>
     <string name="resolution_profile_hd_auto_description">Kualitas sesuai perangkat</string>
     <string name="resolution_profile_memory_fallback">Resolusi asli melampaui batas memori; Standar dipilih.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">Filter Pindai</string>
+    <string name="scan_filter_magic_color">Warna Ajaib</string>
+    <string name="scan_filter_bw">Hitam Putih</string>
+    <string name="scan_filter_lighten">Terangkan</string>
+    <string name="scan_filter_no_shadow">Hapus Bayangan</string>
+    <string name="scan_filter_screen">Moiré Layar</string>
+    <string name="scan_filter_clean_marks">Bersihkan Tanda</string>
 </resources>

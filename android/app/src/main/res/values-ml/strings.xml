@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">HD ഓട്ടോ</string>
     <string name="resolution_profile_hd_auto_description">ഉപകരണത്തിന് അനുയോജ്യമായ ഗുണനിലവാരം</string>
     <string name="resolution_profile_memory_fallback">നേറ്റീവ് റെസല്യൂഷൻ മെമ്മറി പരിധി കടന്നു; സ്റ്റാൻഡേർഡ് തിരഞ്ഞെടുത്തു.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">സ്കാൻ ഫിൽട്ടറുകൾ</string>
+    <string name="scan_filter_magic_color">മാജിക് കളർ</string>
+    <string name="scan_filter_bw">കറുപ്പും വെളുപ്പും</string>
+    <string name="scan_filter_lighten">തെളിച്ചം കൂട്ടുക</string>
+    <string name="scan_filter_no_shadow">നിഴൽ നീക്കുക</string>
+    <string name="scan_filter_screen">സ്ക്രീൻ മൊയ്റേ</string>
+    <string name="scan_filter_clean_marks">അടയാളങ്ങൾ നീക്കുക</string>
 </resources>

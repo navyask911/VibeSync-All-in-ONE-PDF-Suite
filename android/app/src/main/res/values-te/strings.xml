@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">ఆటో HD</string>
     <string name="resolution_profile_hd_auto_description">పరికరానికి తగిన నాణ్యత</string>
     <string name="resolution_profile_memory_fallback">స్థానిక రిజల్యూషన్ మెమరీ పరిమితిని మించింది; ప్రామాణికం ఎంచుకోబడింది.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">స్కాన్ ఫిల్టర్‌లు</string>
+    <string name="scan_filter_magic_color">మ్యాజిక్ రంగు</string>
+    <string name="scan_filter_bw">నలుపు తెలుపు</string>
+    <string name="scan_filter_lighten">వెలిగించు</string>
+    <string name="scan_filter_no_shadow">నీడలను తొలగించు</string>
+    <string name="scan_filter_screen">స్క్రీన్ మొయిరే</string>
+    <string name="scan_filter_clean_marks">గుర్తులను శుభ్రం చేయి</string>
 </resources>

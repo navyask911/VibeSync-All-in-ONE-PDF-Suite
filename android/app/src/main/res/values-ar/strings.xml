@@ -265,4 +265,13 @@
     <string name="resolution_profile_hd_auto">HD تلقائي</string>
     <string name="resolution_profile_hd_auto_description">جودة مناسبة لهذا الجهاز</string>
     <string name="resolution_profile_memory_fallback">تجاوزت الدقة الأصلية حد الذاكرة؛ تم اختيار القياسي.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">مرشحات المسح</string>
+    <string name="scan_filter_magic_color">ألوان سحرية</string>
+    <string name="scan_filter_bw">أبيض وأسود</string>
+    <string name="scan_filter_lighten">تفتيح</string>
+    <string name="scan_filter_no_shadow">إزالة الظلال</string>
+    <string name="scan_filter_screen">تموّج الشاشة</string>
+    <string name="scan_filter_clean_marks">تنظيف العلامات</string>
 </resources>

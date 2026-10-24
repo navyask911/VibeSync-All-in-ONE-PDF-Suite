@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">自動 HD</string>
     <string name="resolution_profile_hd_auto_description">依裝置選擇品質</string>
     <string name="resolution_profile_memory_fallback">原生解析度超出記憶體限制；已選擇標準。</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">掃描濾鏡</string>
+    <string name="scan_filter_magic_color">魔法色彩</string>
+    <string name="scan_filter_bw">黑白</string>
+    <string name="scan_filter_lighten">提亮</string>
+    <string name="scan_filter_no_shadow">去除陰影</string>
+    <string name="scan_filter_screen">螢幕摩爾紋</string>
+    <string name="scan_filter_clean_marks">清除標記</string>
 </resources>

@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">Αυτόματο HD</string>
     <string name="resolution_profile_hd_auto_description">Ποιότητα ανάλογα με τη συσκευή</string>
     <string name="resolution_profile_memory_fallback">Η εγγενής ανάλυση υπερέβη το όριο μνήμης· επιλέχθηκε η τυπική.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">Φίλτρα σάρωσης</string>
+    <string name="scan_filter_magic_color">Μαγικό χρώμα</string>
+    <string name="scan_filter_bw">Ασπρόμαυρο</string>
+    <string name="scan_filter_lighten">Φωτισμός</string>
+    <string name="scan_filter_no_shadow">Αφαίρεση σκιών</string>
+    <string name="scan_filter_screen">Μοτίβο οθόνης</string>
+    <string name="scan_filter_clean_marks">Καθαρισμός σημαδιών</string>
 </resources>

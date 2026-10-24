@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">HD Kiotomatiki</string>
     <string name="resolution_profile_hd_auto_description">Ubora kulingana na kifaa</string>
     <string name="resolution_profile_memory_fallback">Ubora wa asili umezidi kikomo cha kumbukumbu; Kawaida imechaguliwa.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">Vichujio vya skani</string>
+    <string name="scan_filter_magic_color">Rangi ya ajabu</string>
+    <string name="scan_filter_bw">Nyeusi na nyeupe</string>
+    <string name="scan_filter_lighten">Angaza</string>
+    <string name="scan_filter_no_shadow">Ondoa vivuli</string>
+    <string name="scan_filter_screen">Moiré ya skrini</string>
+    <string name="scan_filter_clean_marks">Safisha alama</string>
 </resources>

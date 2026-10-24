@@ -275,4 +275,13 @@
     <string name="resolution_profile_hd_auto">Авто HD</string>
     <string name="resolution_profile_hd_auto_description">Качество с учётом устройства</string>
     <string name="resolution_profile_memory_fallback">Исходное разрешение превысило лимит памяти; выбрано стандартное.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">Фильтры сканирования</string>
+    <string name="scan_filter_magic_color">Волшебный цвет</string>
+    <string name="scan_filter_bw">Чёрно-белый</string>
+    <string name="scan_filter_lighten">Осветлить</string>
+    <string name="scan_filter_no_shadow">Удалить тени</string>
+    <string name="scan_filter_screen">Экранное муаре</string>
+    <string name="scan_filter_clean_marks">Очистить пометки</string>
 </resources>

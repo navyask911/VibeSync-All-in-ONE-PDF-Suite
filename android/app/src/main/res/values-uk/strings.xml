@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">Авто HD</string>
     <string name="resolution_profile_hd_auto_description">Якість відповідно до пристрою</string>
     <string name="resolution_profile_memory_fallback">Вихідна роздільна здатність перевищила ліміт пам’яті; вибрано стандартну.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">Фільтри сканування</string>
+    <string name="scan_filter_magic_color">Чарівний колір</string>
+    <string name="scan_filter_bw">Чорно-білий</string>
+    <string name="scan_filter_lighten">Освітлити</string>
+    <string name="scan_filter_no_shadow">Прибрати тіні</string>
+    <string name="scan_filter_screen">Екранне муаре</string>
+    <string name="scan_filter_clean_marks">Очистити позначки</string>
 </resources>

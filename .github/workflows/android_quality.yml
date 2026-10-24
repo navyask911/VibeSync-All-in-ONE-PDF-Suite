@@ -111,6 +111,16 @@ jobs:
               "resolution_profile_hd_auto_description",
               "resolution_profile_memory_fallback",
           ]
+          required_filter_keys = [
+              "scan_filter_title",
+              "scan_filter_magic_color",
+              "scan_filter_bw",
+              "scan_filter_lighten",
+              "scan_filter_no_shadow",
+              "scan_filter_screen",
+              "scan_filter_clean_marks",
+          ]
+          required_scan_keys = required_profile_keys + required_filter_keys
           all_string_files = sorted(root.glob("values*/strings.xml"))
           if root / "values/strings.xml" not in all_string_files:
               sys.exit("Base strings.xml was not found by the all-locale audit.")
@@ -128,7 +138,7 @@ jobs:
                   if name in items:
                       sys.exit(f"{locale}: duplicate string ID: {name}")
                   items[name] = "".join(node.itertext())
-              for name in required_profile_keys:
+              for name in required_scan_keys:
                   if name not in items:
                       sys.exit(f"{locale}: missing required profile string: {name}")
                   if name not in base_items:
@@ -137,7 +147,7 @@ jobs:
                   target_args = sorted(re.findall(r"%(?:[0-9]+\$)?[a-zA-Z]", items[name]))
                   if source_args != target_args:
                       sys.exit(f"{locale}: placeholders differ for {name}: {source_args} != {target_args}")
-          print(f"All-locale resource audit passed: {len(required_profile_keys)} profile keys across {len(all_string_files)} strings.xml files.")
+          print(f"All-locale resource audit passed: {len(required_profile_keys)} profile keys and {len(required_filter_keys)} filter keys across {len(all_string_files)} strings.xml files.")
           PY
 
       - name: Set up JDK 17

@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">HD tự động</string>
     <string name="resolution_profile_hd_auto_description">Chất lượng theo thiết bị</string>
     <string name="resolution_profile_memory_fallback">Độ phân giải gốc vượt giới hạn bộ nhớ; đã chọn Tiêu chuẩn.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">Bộ lọc quét</string>
+    <string name="scan_filter_magic_color">Màu kỳ diệu</string>
+    <string name="scan_filter_bw">Đen trắng</string>
+    <string name="scan_filter_lighten">Làm sáng</string>
+    <string name="scan_filter_no_shadow">Xóa bóng</string>
+    <string name="scan_filter_screen">Moiré màn hình</string>
+    <string name="scan_filter_clean_marks">Xóa dấu</string>
 </resources>

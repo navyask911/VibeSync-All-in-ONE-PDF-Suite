@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">HD automatisch</string>
     <string name="resolution_profile_hd_auto_description">Kwaliteit afgestemd op apparaat</string>
     <string name="resolution_profile_memory_fallback">De native resolutie overschreed de geheugenlimiet; Standaard is gekozen.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">Scanfilters</string>
+    <string name="scan_filter_magic_color">Magische kleur</string>
+    <string name="scan_filter_bw">Zwart-wit</string>
+    <string name="scan_filter_lighten">Lichter maken</string>
+    <string name="scan_filter_no_shadow">Schaduwen verwijderen</string>
+    <string name="scan_filter_screen">Schermmoiré</string>
+    <string name="scan_filter_clean_marks">Markeringen wissen</string>
 </resources>

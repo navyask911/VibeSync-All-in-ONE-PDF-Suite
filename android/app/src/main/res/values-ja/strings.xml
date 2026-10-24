@@ -265,4 +265,13 @@
     <string name="resolution_profile_hd_auto">HD 自動</string>
     <string name="resolution_profile_hd_auto_description">端末に合わせた品質</string>
     <string name="resolution_profile_memory_fallback">ネイティブ解像度がメモリ上限を超えたため、標準を選択しました。</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">スキャンフィルター</string>
+    <string name="scan_filter_magic_color">マジックカラー</string>
+    <string name="scan_filter_bw">白黒</string>
+    <string name="scan_filter_lighten">明るくする</string>
+    <string name="scan_filter_no_shadow">影を除去</string>
+    <string name="scan_filter_screen">画面モアレ</string>
+    <string name="scan_filter_clean_marks">マークを消去</string>
 </resources>

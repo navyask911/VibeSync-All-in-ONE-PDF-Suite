@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">HD automatiskt</string>
     <string name="resolution_profile_hd_auto_description">Kvalitet anpassad till enheten</string>
     <string name="resolution_profile_memory_fallback">Den ursprungliga upplösningen överskred minnesgränsen; Standard valdes.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">Skanningsfilter</string>
+    <string name="scan_filter_magic_color">Magisk färg</string>
+    <string name="scan_filter_bw">Svartvitt</string>
+    <string name="scan_filter_lighten">Ljusare</string>
+    <string name="scan_filter_no_shadow">Ta bort skuggor</string>
+    <string name="scan_filter_screen">Skärmmoré</string>
+    <string name="scan_filter_clean_marks">Rensa markeringar</string>
 </resources>

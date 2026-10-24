@@ -265,4 +265,13 @@
     <string name="resolution_profile_hd_auto">خودکار HD</string>
     <string name="resolution_profile_hd_auto_description">آلے کے مطابق معیار</string>
     <string name="resolution_profile_memory_fallback">اصل ریزولوشن میموری کی حد سے بڑھ گیا؛ معیاری منتخب کیا گیا۔</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">اسکین فلٹرز</string>
+    <string name="scan_filter_magic_color">جادوئی رنگ</string>
+    <string name="scan_filter_bw">سیاہ و سفید</string>
+    <string name="scan_filter_lighten">روشن کریں</string>
+    <string name="scan_filter_no_shadow">سائے ہٹائیں</string>
+    <string name="scan_filter_screen">اسکرین موئیرے</string>
+    <string name="scan_filter_clean_marks">نشانات صاف کریں</string>
 </resources>

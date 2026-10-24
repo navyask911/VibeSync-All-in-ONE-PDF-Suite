@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">HD อัตโนมัติ</string>
     <string name="resolution_profile_hd_auto_description">คุณภาพตามอุปกรณ์</string>
     <string name="resolution_profile_memory_fallback">ความละเอียดต้นฉบับเกินขีดจำกัดหน่วยความจำ จึงเลือกมาตรฐาน</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">ตัวกรองการสแกน</string>
+    <string name="scan_filter_magic_color">สีมหัศจรรย์</string>
+    <string name="scan_filter_bw">ขาวดำ</string>
+    <string name="scan_filter_lighten">เพิ่มความสว่าง</string>
+    <string name="scan_filter_no_shadow">ลบเงา</string>
+    <string name="scan_filter_screen">มัวเรบนหน้าจอ</string>
+    <string name="scan_filter_clean_marks">ลบรอย</string>
 </resources>

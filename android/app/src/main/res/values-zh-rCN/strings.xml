@@ -265,4 +265,13 @@
     <string name="resolution_profile_hd_auto">自动 HD</string>
     <string name="resolution_profile_hd_auto_description">根据设备选择质量</string>
     <string name="resolution_profile_memory_fallback">原生分辨率超出内存限制；已选择标准。</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">扫描滤镜</string>
+    <string name="scan_filter_magic_color">魔法色彩</string>
+    <string name="scan_filter_bw">黑白</string>
+    <string name="scan_filter_lighten">提亮</string>
+    <string name="scan_filter_no_shadow">去除阴影</string>
+    <string name="scan_filter_screen">屏幕摩尔纹</string>
+    <string name="scan_filter_clean_marks">清除标记</string>
 </resources>

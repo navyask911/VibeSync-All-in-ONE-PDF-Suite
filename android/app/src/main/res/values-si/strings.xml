@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">ස්වයංක්‍රීය HD</string>
     <string name="resolution_profile_hd_auto_description">උපාංගයට ගැළපෙන ගුණාත්මකභාවය</string>
     <string name="resolution_profile_memory_fallback">මුල් විභේදනය මතක සීමාව ඉක්මවීය; සම්මතය තෝරා ඇත.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">ස්කෑන් පෙරහන්</string>
+    <string name="scan_filter_magic_color">මැජික් වර්ණය</string>
+    <string name="scan_filter_bw">කළු සහ සුදු</string>
+    <string name="scan_filter_lighten">ආලෝකමත් කරන්න</string>
+    <string name="scan_filter_no_shadow">සෙවණැලි ඉවත් කරන්න</string>
+    <string name="scan_filter_screen">තිර මොයාරේ</string>
+    <string name="scan_filter_clean_marks">සලකුණු පිරිසිදු කරන්න</string>
 </resources>

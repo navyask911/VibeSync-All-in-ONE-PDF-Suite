@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">Awtomatikong HD</string>
     <string name="resolution_profile_hd_auto_description">Kalidad ayon sa device</string>
     <string name="resolution_profile_memory_fallback">Lumampas sa limitasyon ng memory ang native na resolusyon; Standard ang pinili.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">Mga Filter ng Scan</string>
+    <string name="scan_filter_magic_color">Magic Color</string>
+    <string name="scan_filter_bw">Itim at Puti</string>
+    <string name="scan_filter_lighten">Liwanagin</string>
+    <string name="scan_filter_no_shadow">Alisin ang Anino</string>
+    <string name="scan_filter_screen">Screen Moiré</string>
+    <string name="scan_filter_clean_marks">Linisin ang Marka</string>
 </resources>

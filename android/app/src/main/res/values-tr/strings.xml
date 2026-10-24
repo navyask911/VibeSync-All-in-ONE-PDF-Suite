@@ -265,4 +265,13 @@
     <string name="resolution_profile_hd_auto">Otomatik HD</string>
     <string name="resolution_profile_hd_auto_description">Cihaza uygun kalite</string>
     <string name="resolution_profile_memory_fallback">Yerel çözünürlük bellek sınırını aştı; Standart seçildi.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">Tarama filtreleri</string>
+    <string name="scan_filter_magic_color">Sihirli Renk</string>
+    <string name="scan_filter_bw">Siyah Beyaz</string>
+    <string name="scan_filter_lighten">Aydınlat</string>
+    <string name="scan_filter_no_shadow">Gölgeleri Kaldır</string>
+    <string name="scan_filter_screen">Ekran Moiré</string>
+    <string name="scan_filter_clean_marks">İşaretleri Temizle</string>
 </resources>

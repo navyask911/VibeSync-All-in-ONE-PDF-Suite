@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">தானியங்கி HD</string>
     <string name="resolution_profile_hd_auto_description">சாதனத்திற்கேற்ற தரம்</string>
     <string name="resolution_profile_memory_fallback">அசல் தெளிவுத்திறன் நினைவக வரம்பை மீறியது; தரநிலை தேர்ந்தெடுக்கப்பட்டது.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">ஸ்கேன் வடிகட்டிகள்</string>
+    <string name="scan_filter_magic_color">மேஜிக் நிறம்</string>
+    <string name="scan_filter_bw">கருப்பு வெள்ளை</string>
+    <string name="scan_filter_lighten">ஒளிரச் செய்</string>
+    <string name="scan_filter_no_shadow">நிழல்களை நீக்கு</string>
+    <string name="scan_filter_screen">திரை மொய்ரே</string>
+    <string name="scan_filter_clean_marks">குறிகளை சுத்தம் செய்</string>
 </resources>

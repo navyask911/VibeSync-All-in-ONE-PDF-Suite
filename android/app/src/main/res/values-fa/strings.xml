@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">HD خودکار</string>
     <string name="resolution_profile_hd_auto_description">کیفیت متناسب با دستگاه</string>
     <string name="resolution_profile_memory_fallback">وضوح اصلی از حد حافظه فراتر رفت؛ استاندارد انتخاب شد.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">فیلترهای اسکن</string>
+    <string name="scan_filter_magic_color">رنگ جادویی</string>
+    <string name="scan_filter_bw">سیاه‌وسفید</string>
+    <string name="scan_filter_lighten">روشن‌تر کردن</string>
+    <string name="scan_filter_no_shadow">حذف سایه</string>
+    <string name="scan_filter_screen">موآره صفحه</string>
+    <string name="scan_filter_clean_marks">پاک‌سازی علامت‌ها</string>
 </resources>

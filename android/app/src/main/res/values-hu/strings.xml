@@ -15,4 +15,13 @@
     <string name="resolution_profile_hd_auto">Automatikus HD</string>
     <string name="resolution_profile_hd_auto_description">Eszközhöz igazított minőség</string>
     <string name="resolution_profile_memory_fallback">A natív felbontás túllépte a memóriakorlátot; a normál beállítás lett kiválasztva.</string>
+
+    <!-- On-device scan filters -->
+    <string name="scan_filter_title">Szkennerszűrők</string>
+    <string name="scan_filter_magic_color">Mágikus szín</string>
+    <string name="scan_filter_bw">Fekete-fehér</string>
+    <string name="scan_filter_lighten">Világosítás</string>
+    <string name="scan_filter_no_shadow">Árnyékok eltávolítása</string>
+    <string name="scan_filter_screen">Képernyő-moiré</string>
+    <string name="scan_filter_clean_marks">Jelölések tisztítása</string>
 </resources>
