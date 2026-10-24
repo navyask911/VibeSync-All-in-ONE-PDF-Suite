@@ -3,4 +3,16 @@
     <!-- Other common UI strings deliberately fall back to the default locale until fully translated. -->
     <string name="pdf_watermark_text">Procesat pe dispozitiv cu VibeSync PDF Suite</string>
     <string name="pdf_brand_watermark">Procesat pe dispozitiv cu VibeSync PDF Suite</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">Rezoluție de export</string>
+    <string name="resolution_profile_smallest">Cea mai mică</string>
+    <string name="resolution_profile_smallest_description">Fișier mai mic • 150 dpi</string>
+    <string name="resolution_profile_standard">Standard</string>
+    <string name="resolution_profile_standard_description">A4 • 300 dpi</string>
+    <string name="resolution_profile_largest">Cea mai mare</string>
+    <string name="resolution_profile_largest_description">Rezoluție nativă • detalii excelente</string>
+    <string name="resolution_profile_hd_auto">HD automat</string>
+    <string name="resolution_profile_hd_auto_description">Calitate adaptată dispozitivului</string>
+    <string name="resolution_profile_memory_fallback">Rezoluția nativă a depășit limita de memorie; a fost selectat Standard.</string>
 </resources>

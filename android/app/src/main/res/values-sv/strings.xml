@@ -3,4 +3,16 @@
     <!-- Other common UI strings deliberately fall back to the default locale until fully translated. -->
     <string name="pdf_watermark_text">Bearbetad på enheten med VibeSync PDF Suite</string>
     <string name="pdf_brand_watermark">Bearbetad på enheten med VibeSync PDF Suite</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">Exportupplösning</string>
+    <string name="resolution_profile_smallest">Minsta</string>
+    <string name="resolution_profile_smallest_description">Mindre fil • 150 dpi</string>
+    <string name="resolution_profile_standard">Standard</string>
+    <string name="resolution_profile_standard_description">A4 • 300 dpi</string>
+    <string name="resolution_profile_largest">Största</string>
+    <string name="resolution_profile_largest_description">Ursprunglig upplösning • bäst detalj</string>
+    <string name="resolution_profile_hd_auto">HD automatiskt</string>
+    <string name="resolution_profile_hd_auto_description">Kvalitet anpassad till enheten</string>
+    <string name="resolution_profile_memory_fallback">Den ursprungliga upplösningen överskred minnesgränsen; Standard valdes.</string>
 </resources>

@@ -3,4 +3,16 @@
     <!-- Other common UI strings deliberately fall back to the default locale until fully translated. -->
     <string name="pdf_watermark_text">Επεξεργάστηκε στη συσκευή με το VibeSync PDF Suite</string>
     <string name="pdf_brand_watermark">Επεξεργάστηκε στη συσκευή με το VibeSync PDF Suite</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">Ανάλυση εξαγωγής</string>
+    <string name="resolution_profile_smallest">Μικρότερο</string>
+    <string name="resolution_profile_smallest_description">Μικρότερο αρχείο • 150 dpi</string>
+    <string name="resolution_profile_standard">Τυπικό</string>
+    <string name="resolution_profile_standard_description">A4 • 300 dpi</string>
+    <string name="resolution_profile_largest">Μεγαλύτερο</string>
+    <string name="resolution_profile_largest_description">Εγγενής ανάλυση • καλύτερη λεπτομέρεια</string>
+    <string name="resolution_profile_hd_auto">Αυτόματο HD</string>
+    <string name="resolution_profile_hd_auto_description">Ποιότητα ανάλογα με τη συσκευή</string>
+    <string name="resolution_profile_memory_fallback">Η εγγενής ανάλυση υπερέβη το όριο μνήμης· επιλέχθηκε η τυπική.</string>
 </resources>

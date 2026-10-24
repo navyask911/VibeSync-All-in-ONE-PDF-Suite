@@ -253,4 +253,16 @@
     <string name="document_rename_success">दस्तावेज़ का नाम बदल दिया गया।</string>
     <string name="document_delete_success">दस्तावेज़ हटा दिया गया।</string>
     <string name="document_action_failed">दस्तावेज़ कार्रवाई पूरी नहीं हो सकी। फिर कोशिश करें।</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">निर्यात रिज़ॉल्यूशन</string>
+    <string name="resolution_profile_smallest">सबसे छोटा</string>
+    <string name="resolution_profile_smallest_description">छोटी फ़ाइल • 150 dpi</string>
+    <string name="resolution_profile_standard">मानक</string>
+    <string name="resolution_profile_standard_description">A4 • 300 dpi</string>
+    <string name="resolution_profile_largest">सबसे बड़ा</string>
+    <string name="resolution_profile_largest_description">मूल रिज़ॉल्यूशन • बेहतर विवरण</string>
+    <string name="resolution_profile_hd_auto">HD ऑटो</string>
+    <string name="resolution_profile_hd_auto_description">डिवाइस के अनुसार गुणवत्ता</string>
+    <string name="resolution_profile_memory_fallback">मूल रिज़ॉल्यूशन ने मेमोरी सीमा पार की; मानक चुना गया।</string>
 </resources>

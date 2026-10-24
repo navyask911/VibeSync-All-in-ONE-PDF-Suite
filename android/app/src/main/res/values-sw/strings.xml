@@ -3,4 +3,16 @@
     <!-- Other common UI strings deliberately fall back to the default locale until fully translated. -->
     <string name="pdf_watermark_text">Imechakatwa kwenye kifaa kwa kutumia VibeSync PDF Suite</string>
     <string name="pdf_brand_watermark">Imechakatwa kwenye kifaa kwa kutumia VibeSync PDF Suite</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">Ubora wa mwonekano wa uhamishaji</string>
+    <string name="resolution_profile_smallest">Ndogo zaidi</string>
+    <string name="resolution_profile_smallest_description">Faili ndogo • 150 dpi</string>
+    <string name="resolution_profile_standard">Kawaida</string>
+    <string name="resolution_profile_standard_description">A4 • 300 dpi</string>
+    <string name="resolution_profile_largest">Kubwa zaidi</string>
+    <string name="resolution_profile_largest_description">Ubora wa asili • maelezo bora</string>
+    <string name="resolution_profile_hd_auto">HD Kiotomatiki</string>
+    <string name="resolution_profile_hd_auto_description">Ubora kulingana na kifaa</string>
+    <string name="resolution_profile_memory_fallback">Ubora wa asili umezidi kikomo cha kumbukumbu; Kawaida imechaguliwa.</string>
 </resources>

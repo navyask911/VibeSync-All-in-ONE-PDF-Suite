@@ -3,4 +3,16 @@
     <!-- Other common UI strings deliberately fall back to the default locale until fully translated. -->
     <string name="pdf_watermark_text">使用 VibeSync PDF Suite 在裝置上處理</string>
     <string name="pdf_brand_watermark">使用 VibeSync PDF Suite 在裝置上處理</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">匯出解析度</string>
+    <string name="resolution_profile_smallest">最小</string>
+    <string name="resolution_profile_smallest_description">較小的檔案 • 150 dpi</string>
+    <string name="resolution_profile_standard">標準</string>
+    <string name="resolution_profile_standard_description">A4 • 300 dpi</string>
+    <string name="resolution_profile_largest">最大</string>
+    <string name="resolution_profile_largest_description">原生解析度 • 最佳細節</string>
+    <string name="resolution_profile_hd_auto">自動 HD</string>
+    <string name="resolution_profile_hd_auto_description">依裝置選擇品質</string>
+    <string name="resolution_profile_memory_fallback">原生解析度超出記憶體限制；已選擇標準。</string>
 </resources>

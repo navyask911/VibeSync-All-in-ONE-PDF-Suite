@@ -24,11 +24,16 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.Bundle
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.Toast
 import java.io.File
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.activity.compose.setContent
+import androidx.compose.ui.platform.ComposeView
+import androidx.lifecycle.ViewTreeLifecycleOwner
+import androidx.lifecycle.ViewTreeViewModelStoreOwner
+import androidx.savedstate.ViewTreeSavedStateRegistryOwner
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -76,6 +81,7 @@ import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
 import com.vibesync.toolkit.pdf.presentation.editor.PdfEditorScreen
 import com.vibesync.toolkit.pdf.presentation.monetization.AdMobManager
 import com.vibesync.toolkit.pdf.presentation.scanner.DocumentScannerManager
+import com.vibesync.toolkit.pdf.presentation.settings.ResolutionProfilePreferencePanel
 import com.vibesync.toolkit.pdf.presentation.scanner.ScanHistoryScreen
 import com.vibesync.toolkit.pdf.presentation.scanner.ScannerHistoryRepository
 import com.vibesync.toolkit.pdf.presentation.scanner.ScannerHistoryViewModel
@@ -987,10 +993,37 @@ class MainActivity : AppCompatActivity() {
             setSingleLine(true)
         }
 
+        val dialogContent = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(input, LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            ))
+            if (mimeType == "application/pdf") {
+                val profileSelector = ComposeView(this@MainActivity).apply {
+                    ViewTreeLifecycleOwner.set(this, this@MainActivity)
+                    ViewTreeViewModelStoreOwner.set(this, this@MainActivity)
+                    ViewTreeSavedStateRegistryOwner.set(this, this@MainActivity)
+                    setContent {
+                        VibeSyncPdfTheme {
+                            ResolutionProfilePreferencePanel(
+                                modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                                testTag = "resolution_profile_export_selector"
+                            )
+                        }
+                    }
+                }
+                addView(profileSelector, LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    (156 * resources.displayMetrics.density).toInt()
+                ))
+            }
+        }
+
         android.app.AlertDialog.Builder(this)
             .setTitle(getString(R.string.output_name_dialog_title))
             .setMessage(getString(R.string.output_name_dialog_message))
-            .setView(input)
+            .setView(dialogContent)
             .setNegativeButton(getString(R.string.cancel), null)
             .setPositiveButton(getString(R.string.continue_label)) { _, _ ->
                 val requested = sanitizeOutputBaseName(input.text?.toString().orEmpty(), defaultName)

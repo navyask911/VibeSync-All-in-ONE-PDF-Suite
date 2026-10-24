@@ -3,4 +3,16 @@
     <!-- Other common UI strings deliberately fall back to the default locale until fully translated. -->
     <string name="pdf_watermark_text">Przetworzono na urządzeniu za pomocą VibeSync PDF Suite</string>
     <string name="pdf_brand_watermark">Przetworzono na urządzeniu za pomocą VibeSync PDF Suite</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">Rozdzielczość eksportu</string>
+    <string name="resolution_profile_smallest">Najmniejsza</string>
+    <string name="resolution_profile_smallest_description">Mniejszy plik • 150 dpi</string>
+    <string name="resolution_profile_standard">Standardowa</string>
+    <string name="resolution_profile_standard_description">A4 • 300 dpi</string>
+    <string name="resolution_profile_largest">Największa</string>
+    <string name="resolution_profile_largest_description">Natywna rozdzielczość • najlepsze szczegóły</string>
+    <string name="resolution_profile_hd_auto">Automatyczne HD</string>
+    <string name="resolution_profile_hd_auto_description">Jakość dobrana do urządzenia</string>
+    <string name="resolution_profile_memory_fallback">Natywna rozdzielczość przekroczyła limit pamięci; wybrano standard.</string>
 </resources>

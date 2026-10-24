@@ -3,4 +3,16 @@
     <!-- Other common UI strings deliberately fall back to the default locale until fully translated. -->
     <string name="pdf_watermark_text">Eszközön feldolgozva a VibeSync PDF Suite segítségével</string>
     <string name="pdf_brand_watermark">Eszközön feldolgozva a VibeSync PDF Suite segítségével</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">Exportfelbontás</string>
+    <string name="resolution_profile_smallest">Legkisebb</string>
+    <string name="resolution_profile_smallest_description">Kisebb fájl • 150 dpi</string>
+    <string name="resolution_profile_standard">Normál</string>
+    <string name="resolution_profile_standard_description">A4 • 300 dpi</string>
+    <string name="resolution_profile_largest">Legnagyobb</string>
+    <string name="resolution_profile_largest_description">Natív felbontás • legjobb részletek</string>
+    <string name="resolution_profile_hd_auto">Automatikus HD</string>
+    <string name="resolution_profile_hd_auto_description">Eszközhöz igazított minőség</string>
+    <string name="resolution_profile_memory_fallback">A natív felbontás túllépte a memóriakorlátot; a normál beállítás lett kiválasztva.</string>
 </resources>

@@ -3,4 +3,16 @@
     <!-- Other common UI strings deliberately fall back to the default locale until fully translated. -->
     <string name="pdf_watermark_text">Pinroseso sa device gamit ang VibeSync PDF Suite</string>
     <string name="pdf_brand_watermark">Pinroseso sa device gamit ang VibeSync PDF Suite</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">Resolusyon ng export</string>
+    <string name="resolution_profile_smallest">Pinakamaliit</string>
+    <string name="resolution_profile_smallest_description">Mas maliit na file • 150 dpi</string>
+    <string name="resolution_profile_standard">Standard</string>
+    <string name="resolution_profile_standard_description">A4 • 300 dpi</string>
+    <string name="resolution_profile_largest">Pinakamalaki</string>
+    <string name="resolution_profile_largest_description">Native na resolusyon • pinakamalinaw</string>
+    <string name="resolution_profile_hd_auto">Awtomatikong HD</string>
+    <string name="resolution_profile_hd_auto_description">Kalidad ayon sa device</string>
+    <string name="resolution_profile_memory_fallback">Lumampas sa limitasyon ng memory ang native na resolusyon; Standard ang pinili.</string>
 </resources>

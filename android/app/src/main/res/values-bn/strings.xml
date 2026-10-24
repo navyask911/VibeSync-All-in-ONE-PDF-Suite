@@ -253,4 +253,16 @@
     <string name="document_rename_success">ডকুমেন্টের নাম পরিবর্তন হয়েছে।</string>
     <string name="document_delete_success">ডকুমেন্ট মুছে ফেলা হয়েছে।</string>
     <string name="document_action_failed">ডকুমেন্টের কাজ সম্পন্ন করা যায়নি। আবার চেষ্টা করুন।</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">রপ্তানির রেজোলিউশন</string>
+    <string name="resolution_profile_smallest">সবচেয়ে ছোট</string>
+    <string name="resolution_profile_smallest_description">ছোট ফাইল • ১৫০ dpi</string>
+    <string name="resolution_profile_standard">স্ট্যান্ডার্ড</string>
+    <string name="resolution_profile_standard_description">A4 • ৩০০ dpi</string>
+    <string name="resolution_profile_largest">সবচেয়ে বড়</string>
+    <string name="resolution_profile_largest_description">নেটিভ রেজোলিউশন • সেরা বিবরণ</string>
+    <string name="resolution_profile_hd_auto">স্বয়ংক্রিয় HD</string>
+    <string name="resolution_profile_hd_auto_description">এই ডিভাইস অনুযায়ী গুণমান</string>
+    <string name="resolution_profile_memory_fallback">সর্বোচ্চ রেজোলিউশন মেমরি সীমা ছাড়িয়েছে; স্ট্যান্ডার্ড বেছে নেওয়া হয়েছে।</string>
 </resources>

@@ -95,7 +95,49 @@ jobs:
                   target_args = sorted(re.findall(r"%(?:[0-9]+\$)?[a-zA-Z]", items[name]))
                   if source_args != target_args:
                       sys.exit(f"{locale}: placeholders differ for {name}: {source_args} != {target_args}")
-          print(f"Localization resource audit passed: {len(baseline)} keys across {len(buckets)} locales.")
+          print(f"Localization resource audit passed: {len(baseline)} keys across {len(buckets)} established locales.")
+
+          # Partial locales rely on base-resource fallbacks for existing keys. Require all new
+          # profile keys, unique IDs and matching placeholders in every shipped strings bucket.
+          required_profile_keys = [
+              "resolution_profile_title",
+              "resolution_profile_smallest",
+              "resolution_profile_smallest_description",
+              "resolution_profile_standard",
+              "resolution_profile_standard_description",
+              "resolution_profile_largest",
+              "resolution_profile_largest_description",
+              "resolution_profile_hd_auto",
+              "resolution_profile_hd_auto_description",
+              "resolution_profile_memory_fallback",
+          ]
+          all_string_files = sorted(root.glob("values*/strings.xml"))
+          if root / "values/strings.xml" not in all_string_files:
+              sys.exit("Base strings.xml was not found by the all-locale audit.")
+          if len(all_string_files) != 40:
+              sys.exit(f"Expected 40 strings.xml files, found {len(all_string_files)}: {[str(p) for p in all_string_files]}")
+
+          base_nodes = ET.parse(root / "values/strings.xml").getroot().findall("string")
+          base_items = {node.attrib["name"]: "".join(node.itertext()) for node in base_nodes}
+          for path in all_string_files:
+              locale = path.parent.name
+              nodes = ET.parse(path).getroot().findall("string")
+              items = {}
+              for node in nodes:
+                  name = node.attrib["name"]
+                  if name in items:
+                      sys.exit(f"{locale}: duplicate string ID: {name}")
+                  items[name] = "".join(node.itertext())
+              for name in required_profile_keys:
+                  if name not in items:
+                      sys.exit(f"{locale}: missing required profile string: {name}")
+                  if name not in base_items:
+                      sys.exit(f"default: required profile string missing: {name}")
+                  source_args = sorted(re.findall(r"%(?:[0-9]+\$)?[a-zA-Z]", base_items[name]))
+                  target_args = sorted(re.findall(r"%(?:[0-9]+\$)?[a-zA-Z]", items[name]))
+                  if source_args != target_args:
+                      sys.exit(f"{locale}: placeholders differ for {name}: {source_args} != {target_args}")
+          print(f"All-locale resource audit passed: {len(required_profile_keys)} profile keys across {len(all_string_files)} strings.xml files.")
           PY
 
       - name: Set up JDK 17

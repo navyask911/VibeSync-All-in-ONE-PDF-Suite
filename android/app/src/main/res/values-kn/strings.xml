@@ -3,4 +3,16 @@
     <!-- Other common UI strings deliberately fall back to the default locale until fully translated. -->
     <string name="pdf_watermark_text">VibeSync PDF Suite ಮೂಲಕ ಸಾಧನದಲ್ಲೇ ಪ್ರಕ್ರಿಯೆಗೊಳಿಸಲಾಗಿದೆ</string>
     <string name="pdf_brand_watermark">VibeSync PDF Suite ಮೂಲಕ ಸಾಧನದಲ್ಲೇ ಪ್ರಕ್ರಿಯೆಗೊಳಿಸಲಾಗಿದೆ</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">ರಫ್ತು ರೆಸಲ್ಯೂಶನ್</string>
+    <string name="resolution_profile_smallest">ಅತ್ಯಂತ ಚಿಕ್ಕದು</string>
+    <string name="resolution_profile_smallest_description">ಚಿಕ್ಕ ಫೈಲ್ • 150 dpi</string>
+    <string name="resolution_profile_standard">ಪ್ರಮಾಣಿತ</string>
+    <string name="resolution_profile_standard_description">A4 • 300 dpi</string>
+    <string name="resolution_profile_largest">ಅತ್ಯಂತ ದೊಡ್ಡದು</string>
+    <string name="resolution_profile_largest_description">ಸ್ಥಳೀಯ ರೆಸಲ್ಯೂಶನ್ • ಉತ್ತಮ ವಿವರ</string>
+    <string name="resolution_profile_hd_auto">HD ಸ್ವಯಂ</string>
+    <string name="resolution_profile_hd_auto_description">ಸಾಧನಕ್ಕೆ ಹೊಂದುವ ಗುಣಮಟ್ಟ</string>
+    <string name="resolution_profile_memory_fallback">ಸ್ಥಳೀಯ ರೆಸಲ್ಯೂಶನ್ ಮೆಮೊರಿ ಮಿತಿಯನ್ನು ಮೀರಿದೆ; ಪ್ರಮಾಣಿತ ಆಯ್ಕೆ ಮಾಡಲಾಗಿದೆ.</string>
 </resources>

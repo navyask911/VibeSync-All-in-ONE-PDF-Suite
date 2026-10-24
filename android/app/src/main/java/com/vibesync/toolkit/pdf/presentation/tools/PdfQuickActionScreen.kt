@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
+import com.vibesync.toolkit.pdf.presentation.settings.ResolutionProfilePreferencePanel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -89,6 +90,12 @@ fun PdfQuickActionScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(8.dp))
+            if (!isWatermark) {
+                ResolutionProfilePreferencePanel(
+                    modifier = Modifier.fillMaxWidth(),
+                    testTag = "resolution_profile_compression_selector"
+                )
+            }
             Button(
                 enabled = !processing,
                 modifier = Modifier.fillMaxWidth(),

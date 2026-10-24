@@ -3,4 +3,16 @@
     <!-- Other common UI strings deliberately fall back to the default locale until fully translated. -->
     <string name="pdf_watermark_text">ประมวลผลบนอุปกรณ์ด้วย VibeSync PDF Suite</string>
     <string name="pdf_brand_watermark">ประมวลผลบนอุปกรณ์ด้วย VibeSync PDF Suite</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">ความละเอียดส่งออก</string>
+    <string name="resolution_profile_smallest">เล็กที่สุด</string>
+    <string name="resolution_profile_smallest_description">ไฟล์เล็กลง • 150 dpi</string>
+    <string name="resolution_profile_standard">มาตรฐาน</string>
+    <string name="resolution_profile_standard_description">A4 • 300 dpi</string>
+    <string name="resolution_profile_largest">ใหญ่ที่สุด</string>
+    <string name="resolution_profile_largest_description">ความละเอียดต้นฉบับ • รายละเอียดสูงสุด</string>
+    <string name="resolution_profile_hd_auto">HD อัตโนมัติ</string>
+    <string name="resolution_profile_hd_auto_description">คุณภาพตามอุปกรณ์</string>
+    <string name="resolution_profile_memory_fallback">ความละเอียดต้นฉบับเกินขีดจำกัดหน่วยความจำ จึงเลือกมาตรฐาน</string>
 </resources>

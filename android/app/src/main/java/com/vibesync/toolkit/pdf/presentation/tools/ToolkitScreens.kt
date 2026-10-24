@@ -32,6 +32,7 @@ import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.presentation.common.rememberUriDisplayName
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
+import com.vibesync.toolkit.pdf.presentation.settings.ResolutionProfilePreferencePanel
 import com.vibesync.toolkit.pdf.presentation.monetization.AdMobManager
 import kotlinx.coroutines.launch
 import java.io.File
@@ -487,6 +488,11 @@ fun ConvertImagesScreen(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            ResolutionProfilePreferencePanel(
+                modifier = Modifier.fillMaxWidth(),
+                testTag = "resolution_profile_images_to_pdf_selector"
+            )
+
             Button(
                 onClick = { imagePicker.launch(arrayOf("image/*")) },
                 enabled = !isConverting,

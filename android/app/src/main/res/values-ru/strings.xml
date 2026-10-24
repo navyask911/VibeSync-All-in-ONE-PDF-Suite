@@ -263,4 +263,16 @@
     <string name="document_rename_success">Документ переименован.</string>
     <string name="document_delete_success">Документ удалён.</string>
     <string name="document_action_failed">Не удалось выполнить действие с документом. Повторите попытку.</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">Разрешение экспорта</string>
+    <string name="resolution_profile_smallest">Минимальное</string>
+    <string name="resolution_profile_smallest_description">Файл меньше • 150 dpi</string>
+    <string name="resolution_profile_standard">Стандартное</string>
+    <string name="resolution_profile_standard_description">A4 • 300 dpi</string>
+    <string name="resolution_profile_largest">Максимальное</string>
+    <string name="resolution_profile_largest_description">Исходное разрешение • максимум деталей</string>
+    <string name="resolution_profile_hd_auto">Авто HD</string>
+    <string name="resolution_profile_hd_auto_description">Качество с учётом устройства</string>
+    <string name="resolution_profile_memory_fallback">Исходное разрешение превысило лимит памяти; выбрано стандартное.</string>
 </resources>

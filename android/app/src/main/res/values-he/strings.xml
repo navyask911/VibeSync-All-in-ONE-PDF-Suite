@@ -3,4 +3,16 @@
     <!-- Other common UI strings deliberately fall back to the default locale until fully translated. -->
     <string name="pdf_watermark_text">עובד במכשיר באמצעות VibeSync PDF Suite</string>
     <string name="pdf_brand_watermark">עובד במכשיר באמצעות VibeSync PDF Suite</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">רזולוציית ייצוא</string>
+    <string name="resolution_profile_smallest">הקטנה ביותר</string>
+    <string name="resolution_profile_smallest_description">קובץ קטן יותר • 150 dpi</string>
+    <string name="resolution_profile_standard">רגילה</string>
+    <string name="resolution_profile_standard_description">A4 • 300 dpi</string>
+    <string name="resolution_profile_largest">הגדולה ביותר</string>
+    <string name="resolution_profile_largest_description">רזולוציה מקורית • פירוט מיטבי</string>
+    <string name="resolution_profile_hd_auto">HD אוטומטי</string>
+    <string name="resolution_profile_hd_auto_description">איכות מותאמת למכשיר</string>
+    <string name="resolution_profile_memory_fallback">הרזולוציה המקורית חרגה ממגבלת הזיכרון; נבחרה הרגילה.</string>
 </resources>

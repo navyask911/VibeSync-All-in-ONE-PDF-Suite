@@ -3,4 +3,16 @@
     <!-- Other common UI strings deliberately fall back to the default locale until fully translated. -->
     <string name="pdf_watermark_text">پردازش‌شده روی دستگاه با VibeSync PDF Suite</string>
     <string name="pdf_brand_watermark">پردازش‌شده روی دستگاه با VibeSync PDF Suite</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">وضوح خروجی</string>
+    <string name="resolution_profile_smallest">کوچک‌ترین</string>
+    <string name="resolution_profile_smallest_description">فایل کوچک‌تر • ۱۵۰ dpi</string>
+    <string name="resolution_profile_standard">استاندارد</string>
+    <string name="resolution_profile_standard_description">A4 • ۳۰۰ dpi</string>
+    <string name="resolution_profile_largest">بزرگ‌ترین</string>
+    <string name="resolution_profile_largest_description">وضوح اصلی • جزئیات بهتر</string>
+    <string name="resolution_profile_hd_auto">HD خودکار</string>
+    <string name="resolution_profile_hd_auto_description">کیفیت متناسب با دستگاه</string>
+    <string name="resolution_profile_memory_fallback">وضوح اصلی از حد حافظه فراتر رفت؛ استاندارد انتخاب شد.</string>
 </resources>

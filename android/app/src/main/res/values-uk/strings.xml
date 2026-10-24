@@ -3,4 +3,16 @@
     <!-- Other common UI strings deliberately fall back to the default locale until fully translated. -->
     <string name="pdf_watermark_text">Оброблено на пристрої за допомогою VibeSync PDF Suite</string>
     <string name="pdf_brand_watermark">Оброблено на пристрої за допомогою VibeSync PDF Suite</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">Роздільна здатність експорту</string>
+    <string name="resolution_profile_smallest">Найменша</string>
+    <string name="resolution_profile_smallest_description">Менший файл • 150 dpi</string>
+    <string name="resolution_profile_standard">Стандартна</string>
+    <string name="resolution_profile_standard_description">A4 • 300 dpi</string>
+    <string name="resolution_profile_largest">Найбільша</string>
+    <string name="resolution_profile_largest_description">Вихідна роздільна здатність • найкращі деталі</string>
+    <string name="resolution_profile_hd_auto">Авто HD</string>
+    <string name="resolution_profile_hd_auto_description">Якість відповідно до пристрою</string>
+    <string name="resolution_profile_memory_fallback">Вихідна роздільна здатність перевищила ліміт пам’яті; вибрано стандартну.</string>
 </resources>

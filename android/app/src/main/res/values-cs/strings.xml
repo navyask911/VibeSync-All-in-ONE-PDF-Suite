@@ -3,4 +3,16 @@
     <!-- Other common UI strings deliberately fall back to the default locale until fully translated. -->
     <string name="pdf_watermark_text">Zpracováno v zařízení pomocí VibeSync PDF Suite</string>
     <string name="pdf_brand_watermark">Zpracováno v zařízení pomocí VibeSync PDF Suite</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">Rozlišení exportu</string>
+    <string name="resolution_profile_smallest">Nejmenší</string>
+    <string name="resolution_profile_smallest_description">Menší soubor • 150 dpi</string>
+    <string name="resolution_profile_standard">Standardní</string>
+    <string name="resolution_profile_standard_description">A4 • 300 dpi</string>
+    <string name="resolution_profile_largest">Největší</string>
+    <string name="resolution_profile_largest_description">Nativní rozlišení • nejlepší detaily</string>
+    <string name="resolution_profile_hd_auto">HD automaticky</string>
+    <string name="resolution_profile_hd_auto_description">Kvalita podle zařízení</string>
+    <string name="resolution_profile_memory_fallback">Nativní rozlišení překročilo limit paměti; byl zvolen standard.</string>
 </resources>

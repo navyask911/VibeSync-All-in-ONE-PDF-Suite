@@ -253,4 +253,16 @@
     <string name="document_rename_success">Documento renomeado.</string>
     <string name="document_delete_success">Documento excluído.</string>
     <string name="document_action_failed">Não foi possível concluir esta ação. Tente novamente.</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">Resolução de exportação</string>
+    <string name="resolution_profile_smallest">Menor</string>
+    <string name="resolution_profile_smallest_description">Arquivo menor • 150 dpi</string>
+    <string name="resolution_profile_standard">Padrão</string>
+    <string name="resolution_profile_standard_description">A4 • 300 dpi</string>
+    <string name="resolution_profile_largest">Maior</string>
+    <string name="resolution_profile_largest_description">Resolução nativa • melhores detalhes</string>
+    <string name="resolution_profile_hd_auto">HD automático</string>
+    <string name="resolution_profile_hd_auto_description">Qualidade adaptada ao dispositivo</string>
+    <string name="resolution_profile_memory_fallback">A resolução nativa excedeu o limite de memória; Padrão foi selecionado.</string>
 </resources>

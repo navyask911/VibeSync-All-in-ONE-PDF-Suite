@@ -3,4 +3,16 @@
     <!-- Other common UI strings deliberately fall back to the default locale until fully translated. -->
     <string name="pdf_watermark_text">Được xử lý trên thiết bị bằng VibeSync PDF Suite</string>
     <string name="pdf_brand_watermark">Được xử lý trên thiết bị bằng VibeSync PDF Suite</string>
+
+    <!-- Resolution profile selector -->
+    <string name="resolution_profile_title">Độ phân giải xuất</string>
+    <string name="resolution_profile_smallest">Nhỏ nhất</string>
+    <string name="resolution_profile_smallest_description">Tệp nhỏ hơn • 150 dpi</string>
+    <string name="resolution_profile_standard">Tiêu chuẩn</string>
+    <string name="resolution_profile_standard_description">A4 • 300 dpi</string>
+    <string name="resolution_profile_largest">Lớn nhất</string>
+    <string name="resolution_profile_largest_description">Độ phân giải gốc • chi tiết tốt nhất</string>
+    <string name="resolution_profile_hd_auto">HD tự động</string>
+    <string name="resolution_profile_hd_auto_description">Chất lượng theo thiết bị</string>
+    <string name="resolution_profile_memory_fallback">Độ phân giải gốc vượt giới hạn bộ nhớ; đã chọn Tiêu chuẩn.</string>
 </resources>
