@@ -212,4 +212,67 @@ jobs:
           script: |
             gradle wrapper --gradle-version 8.13 --distribution-type bin
             chmod +x gradlew
-            ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace
+            set -o pipefail
+            ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace 2>&1 | tee connected-debug-android-test.log
+
+      - name: Verify connected test completion against JUnit reports
+        if: always()
+        working-directory: android
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import re
+          import sys
+          import xml.etree.ElementTree as ET
+
+          log_path = pathlib.Path("connected-debug-android-test.log")
+          if not log_path.is_file():
+              sys.exit("Instrumented test console log is missing; completion cannot be verified.")
+
+          log = log_path.read_text(encoding="utf-8", errors="replace")
+          starts = re.findall(r"Starting (\\d+) tests on", log)
+          finishes = re.findall(r"Finished (\\d+) tests on", log)
+          if not starts:
+              sys.exit("No 'Starting N tests' line was captured from connectedDebugAndroidTest.")
+          if not finishes:
+              sys.exit("No 'Finished N tests' line was captured from connectedDebugAndroidTest.")
+          if len(set(starts)) != 1 or len(set(finishes)) != 1:
+              sys.exit(f"Inconsistent start/finish counts in test log: starts={starts}, finishes={finishes}.")
+
+          started = int(starts[-1])
+          finished = int(finishes[-1])
+          report_dir = pathlib.Path("app/build/outputs/androidTest-results/connected/debug")
+          report_files = sorted(report_dir.rglob("*.xml")) if report_dir.exists() else []
+          if not report_files:
+              sys.exit(f"No connected Android JUnit XML reports found under {report_dir}.")
+
+          test_cases = []
+          for path in report_files:
+              try:
+                  root = ET.parse(path).getroot()
+              except ET.ParseError as exc:
+                  sys.exit(f"Could not parse instrumented test report {path}: {exc}")
+              test_cases.extend(root.findall(".//testcase") if root.tag != "testcase" else [root])
+
+          if not test_cases:
+              sys.exit("Connected Android JUnit XML reports contain no test cases.")
+
+          skipped = sum(1 for case in test_cases if case.find("skipped") is not None)
+          failed = sum(
+              len(case.findall("failure")) + len(case.findall("error"))
+              for case in test_cases
+          )
+          actual = len(test_cases)
+          print(f"Tests {actual}/{started} completed. ({skipped} skipped) ({failed} failed)")
+
+          if started != finished:
+              sys.exit(f"Connected test start/finish mismatch: started={started}, finished={finished}.")
+          if actual != started:
+              sys.exit(f"JUnit report count ({actual}) does not match the instrumented start count ({started}).")
+          if skipped != 0:
+              sys.exit(f"Instrumented test report contains {skipped} skipped test(s).")
+          if failed != 0:
+              sys.exit(f"Instrumented test report contains {failed} failed/error test(s).")
+          print(f"Verified {actual} connected Android test cases against JUnit XML; 0 skipped, 0 failed.")
+          PY
