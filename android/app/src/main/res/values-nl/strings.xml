@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<resources xmlns:tools="http://schemas.android.com/tools" tools:ignore="MissingTranslation">
+    <!-- Other common UI strings deliberately fall back to the default locale until fully translated. -->
     <string name="pdf_watermark_text">Verwerkt op het apparaat met VibeSync PDF Suite</string>
     <string name="pdf_brand_watermark">Verwerkt op het apparaat met VibeSync PDF Suite</string>
 </resources>
