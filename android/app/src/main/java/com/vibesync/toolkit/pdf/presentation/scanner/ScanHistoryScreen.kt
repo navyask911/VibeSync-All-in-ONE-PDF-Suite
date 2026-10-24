@@ -246,7 +246,7 @@ private fun ScanHistoryCard(
                         .fillMaxWidth()
                         .aspectRatio(0.78f)
                         .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                        .clickable(onClick = onOpen)
+                        .combinedClickable(onClick = onOpen, onLongClick = { showActionsSheet = true })
                         .testTag("scan_thumbnail_" + entry.file.name),
                     contentAlignment = Alignment.Center
                 ) {
@@ -277,7 +277,7 @@ private fun ScanHistoryCard(
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.clickable(onClick = onOpen).testTag("scan_name_" + entry.file.name)
+                    modifier = Modifier.combinedClickable(onClick = onOpen, onLongClick = { showActionsSheet = true }).testTag("scan_name_" + entry.file.name)
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(

@@ -64,19 +64,21 @@ fun PdfDocumentActionsSheet(
     onDelete: () -> Unit,
     onSaveToDownloads: (() -> Unit)? = null
 ) {
-    val actions = buildList {
-        add(PdfDocumentActionItem(stringResource(R.string.action_open_view_pdf), "open", Icons.Default.PictureAsPdf, onClick = onOpen))
-        add(PdfDocumentActionItem(stringResource(R.string.edit_sign_action), "edit", Icons.Default.Draw, onClick = onEdit))
-        add(PdfDocumentActionItem(stringResource(R.string.scan_rename), "rename", Icons.Default.DriveFileRenameOutline, onClick = onRename))
-        add(PdfDocumentActionItem(stringResource(R.string.share_pdf), "share_pdf", Icons.Default.Share, onClick = onSharePdf))
-        add(PdfDocumentActionItem(stringResource(R.string.action_share_jpg_images), "share_images", Icons.Default.Image, onClick = onShareImages))
-        if (onSaveToDownloads != null) add(PdfDocumentActionItem(stringResource(R.string.scan_save_downloads), "save_downloads", Icons.Default.PictureAsPdf, onClick = onSaveToDownloads))
-        add(PdfDocumentActionItem(stringResource(R.string.tool_split_document), "split", Icons.Default.CallSplit, onClick = onSplit))
-        add(PdfDocumentActionItem(stringResource(R.string.action_compress_pdf), "compress", Icons.Default.Tune, onClick = onCompress))
-        add(PdfDocumentActionItem(stringResource(R.string.action_watermark_pdf), "watermark", Icons.Default.Brush, onClick = onWatermark))
-        add(PdfDocumentActionItem(stringResource(R.string.title_encrypt), "encrypt", Icons.Default.Lock, onClick = onEncrypt))
-        add(PdfDocumentActionItem(stringResource(R.string.scan_delete), "delete", Icons.Default.DeleteOutline, destructive = true, onClick = onDelete))
-    }
+    val actions = listOf(
+        PdfDocumentActionItem(stringResource(R.string.action_open_view_pdf), "open", Icons.Default.PictureAsPdf, onClick = onOpen),
+        PdfDocumentActionItem(stringResource(R.string.edit_sign_action), "edit", Icons.Default.Draw, onClick = onEdit),
+        PdfDocumentActionItem(stringResource(R.string.scan_rename), "rename", Icons.Default.DriveFileRenameOutline, onClick = onRename),
+        PdfDocumentActionItem(stringResource(R.string.share_pdf), "share_pdf", Icons.Default.Share, onClick = onSharePdf),
+        PdfDocumentActionItem(stringResource(R.string.action_share_jpg_images), "share_images", Icons.Default.Image, onClick = onShareImages)
+    ) + (onSaveToDownloads?.let {
+        listOf(PdfDocumentActionItem(stringResource(R.string.scan_save_downloads), "save_downloads", Icons.Default.PictureAsPdf, onClick = it))
+    } ?: emptyList()) + listOf(
+        PdfDocumentActionItem(stringResource(R.string.tool_split_document), "split", Icons.Default.CallSplit, onClick = onSplit),
+        PdfDocumentActionItem(stringResource(R.string.action_compress_pdf), "compress", Icons.Default.Tune, onClick = onCompress),
+        PdfDocumentActionItem(stringResource(R.string.action_watermark_pdf), "watermark", Icons.Default.Brush, onClick = onWatermark),
+        PdfDocumentActionItem(stringResource(R.string.title_encrypt), "encrypt", Icons.Default.Lock, onClick = onEncrypt),
+        PdfDocumentActionItem(stringResource(R.string.scan_delete), "delete", Icons.Default.DeleteOutline, destructive = true, onClick = onDelete)
+    )
 
     ModalBottomSheet(onDismissRequest = onDismissRequest) {
         Column(

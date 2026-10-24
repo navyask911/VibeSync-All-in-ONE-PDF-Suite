@@ -230,6 +230,12 @@ class DashboardViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
+    fun removeRecentDocument(uri: Uri) {
+        _uiState.value = _uiState.value.copy(
+            recentDocuments = _uiState.value.recentDocuments.filterNot { it.uriString == uri.toString() }
+        )
+    }
+
     fun clearMessage() {
         _uiState.value = _uiState.value.copy(message = null)
     }

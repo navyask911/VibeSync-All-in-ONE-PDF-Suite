@@ -43,13 +43,14 @@ import java.io.File
 @Composable
 fun SplitScreen(
     onNavigateBack: () -> Unit,
-    onSuccess: (List<File>) -> Unit
+    onSuccess: (List<File>) -> Unit,
+    initialUri: Uri? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val engine = remember { PdfBoxToolkitEngine(context) }
 
-    var selectedUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedUri by remember(initialUri) { mutableStateOf(initialUri) }
     var intervalsInput by remember { mutableStateOf("1-2, 3") }
     var isProcessing by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -318,13 +319,14 @@ fun MergeScreen(
 @Composable
 fun EncryptScreen(
     onNavigateBack: () -> Unit,
-    onSuccess: (File) -> Unit
+    onSuccess: (File) -> Unit,
+    initialUri: Uri? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val engine = remember { PdfBoxToolkitEngine(context) }
 
-    var selectedUri by remember { mutableStateOf<Uri?>(null) }
+    var selectedUri by remember(initialUri) { mutableStateOf(initialUri) }
     var password by rememberSaveable { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var passwordVisible by rememberSaveable { mutableStateOf(false) }

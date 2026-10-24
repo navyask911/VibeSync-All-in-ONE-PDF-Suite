@@ -45,8 +45,9 @@ class PdfRendererEngineInstrumentedTest {
                 cache.clear()
                 assertTrue("Every bitmap already leased by UI remains valid.", leases.all { !it.bitmap.isRecycled })
             }
+            val renderedBitmaps = leases.map { it.bitmap }
             leases.forEach { it.close() }
-            assertTrue("Leased bitmaps remain valid after rapid cache clear/reload cycles.", leases.all { !it.bitmap.isRecycled })
+            assertTrue("Leased bitmaps remain valid after rapid cache clear/reload cycles.", renderedBitmaps.all { !it.isRecycled })
         } finally {
             leases.forEach { runCatching { it.close() } }
             engine.closeDocumentSafely()

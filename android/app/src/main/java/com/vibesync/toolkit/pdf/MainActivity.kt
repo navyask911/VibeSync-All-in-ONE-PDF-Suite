@@ -4,16 +4,24 @@ import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.ClipData
+import android.content.ContentValues
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.provider.Settings
+import android.provider.DocumentsContract
+import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.graphics.Bitmap
+import android.graphics.Matrix
+import android.graphics.Rect
+import android.graphics.pdf.PdfRenderer
 import android.os.Build
+import android.os.ParcelFileDescriptor
 import android.os.Bundle
 import android.widget.EditText
 import android.widget.Toast
@@ -75,6 +83,7 @@ import com.vibesync.toolkit.pdf.presentation.tools.ConvertImagesScreen
 import com.vibesync.toolkit.pdf.presentation.tools.EncryptScreen
 import com.vibesync.toolkit.pdf.presentation.tools.ExtractImagesScreen
 import com.vibesync.toolkit.pdf.presentation.tools.MergeScreen
+import com.vibesync.toolkit.pdf.presentation.tools.PdfQuickActionScreen
 import com.vibesync.toolkit.pdf.presentation.tools.SplitScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
@@ -406,6 +415,13 @@ class MainActivity : AppCompatActivity() {
                                         LocaleListCompat.forLanguageTags(languageTag)
                                     }
                                     AppCompatDelegate.setApplicationLocales(locales)
+                                },
+                                onSharePdfDocument = { uri -> shareDocumentPdf(uri) },
+                                onShareJpgImages = { uri -> shareDocumentAsJpgImages(uri) },
+                                onRenameDocument = { uri, name -> renamePdfDocument(uri, name) },
+                                onDeleteDocument = { uri -> deletePdfDocument(uri) },
+                                onNavigateToPdfTool = { route, uri ->
+                                    navController.navigate("$route/${encodeUriRoute(uri)}")
                                 }
                             )
                         }
@@ -429,7 +445,9 @@ class MainActivity : AppCompatActivity() {
                                 },
                                 onSharePdf = { file -> shareScanPdf(file) },
                                 onShareImages = { file -> shareScanImages(file) },
-                                onSaveToDownloads = { file -> saveScanToDownloads(file) }
+                                onSaveToDownloads = { file -> saveScanToDownloads(file) },
+                                onNavigateToEditor = { uri -> navController.navigate("editor/${encodeUriRoute(uri)}") },
+                                onNavigateToPdfTool = { route, uri -> navController.navigate("$route/${encodeUriRoute(uri)}") }
                             )
                         }
 
@@ -518,6 +536,23 @@ class MainActivity : AppCompatActivity() {
                             )
                         }
 
+                        // Quick-launch Split with the selected PDF pre-populated.
+                        composable(
+                            route = "split/{encodedUri}",
+                            arguments = listOf(navArgument("encodedUri") { type = NavType.StringType })
+                        ) { entry ->
+                            val initialUri = decodeUriRoute(entry.arguments?.getString("encodedUri") ?: "")
+                            SplitScreen(
+                                onNavigateBack = { navController.popBackStack() },
+                                initialUri = initialUri,
+                                onSuccess = { files ->
+                                    recordSuccessfulPdfOperation()
+                                    shareFiles(files, "application/pdf", "VibeSync_Split_Document")
+                                    navController.popBackStack()
+                                }
+                            )
+                        }
+
                         // Toolkit Screen: Split
                         composable("split") {
                             SplitScreen(
@@ -542,6 +577,23 @@ class MainActivity : AppCompatActivity() {
                             )
                         }
 
+                        // Quick-launch Encrypt with the selected PDF pre-populated.
+                        composable(
+                            route = "encrypt/{encodedUri}",
+                            arguments = listOf(navArgument("encodedUri") { type = NavType.StringType })
+                        ) { entry ->
+                            val initialUri = decodeUriRoute(entry.arguments?.getString("encodedUri") ?: "")
+                            EncryptScreen(
+                                onNavigateBack = { navController.popBackStack() },
+                                initialUri = initialUri,
+                                onSuccess = { encryptedFile ->
+                                    recordSuccessfulPdfOperation()
+                                    shareFiles(listOf(encryptedFile), "application/pdf", "VibeSync_Protected_Document")
+                                    navController.popBackStack()
+                                }
+                            )
+                        }
+
                         // Toolkit Screen: Encrypt
                         composable("encrypt") {
                             EncryptScreen(
@@ -549,6 +601,38 @@ class MainActivity : AppCompatActivity() {
                                 onSuccess = { encryptedFile ->
                                     recordSuccessfulPdfOperation()
                                     shareFiles(listOf(encryptedFile), "application/pdf", "VibeSync_Protected_Document")
+                                    navController.popBackStack()
+                                }
+                            )
+                        }
+
+                        composable(
+                            route = "compress/{encodedUri}",
+                            arguments = listOf(navArgument("encodedUri") { type = NavType.StringType })
+                        ) { entry ->
+                            PdfQuickActionScreen(
+                                mode = "compress",
+                                initialUri = decodeUriRoute(entry.arguments?.getString("encodedUri") ?: ""),
+                                onNavigateBack = { navController.popBackStack() },
+                                onSuccess = { output ->
+                                    recordSuccessfulPdfOperation()
+                                    shareFiles(listOf(output), "application/pdf", "VibeSync_Compressed_Document")
+                                    navController.popBackStack()
+                                }
+                            )
+                        }
+
+                        composable(
+                            route = "watermark/{encodedUri}",
+                            arguments = listOf(navArgument("encodedUri") { type = NavType.StringType })
+                        ) { entry ->
+                            PdfQuickActionScreen(
+                                mode = "watermark",
+                                initialUri = decodeUriRoute(entry.arguments?.getString("encodedUri") ?: ""),
+                                onNavigateBack = { navController.popBackStack() },
+                                onSuccess = { output ->
+                                    recordSuccessfulPdfOperation()
+                                    shareFiles(listOf(output), "application/pdf", "VibeSync_Watermarked_Document")
                                     navController.popBackStack()
                                 }
                             )
@@ -620,6 +704,185 @@ class MainActivity : AppCompatActivity() {
         }
         pendingScanExportFile = scanFile
         saveScanLauncher.launch(scanFile.name)
+    }
+
+    private fun shareDocumentPdf(uri: Uri) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val staged = runCatching {
+                UriUtils.copyUriToCacheFile(this@MainActivity, uri, "share_pdf")
+            }
+            withContext(Dispatchers.Main) {
+                staged.onSuccess { file -> shareFiles(listOf(file), "application/pdf", "VibeSync_Shared_Document") }
+                    .onFailure { error ->
+                        Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.document_action_failed), Toast.LENGTH_LONG).show()
+                    }
+            }
+        }
+    }
+
+    /** Render regular PDFs to print-quality JPEGs; these temporary bitmaps are never exposed to Compose. */
+    private fun shareDocumentAsJpgImages(uri: Uri) {
+        lifecycleScope.launch(Dispatchers.IO) {
+            val generated = mutableListOf<File>()
+            var staged: File? = null
+            val result = runCatching {
+                staged = UriUtils.copyUriToCacheFile(this@MainActivity, uri, "share_jpg")
+                val exportDir = File(cacheDir, "pdf_cache/document_jpg_exports")
+                if (!exportDir.exists() && !exportDir.mkdirs()) throw java.io.IOException("Could not prepare JPG exports.")
+                ParcelFileDescriptor.open(requireNotNull(staged), ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+                    PdfRenderer(descriptor).use { renderer ->
+                        require(renderer.pageCount > 0) { "The PDF contains no pages." }
+                        for (pageIndex in 0 until renderer.pageCount) {
+                            renderer.openPage(pageIndex).use { page ->
+                                val pointsArea = page.width.toDouble() * page.height.toDouble()
+                                val scale = minOf(
+                                    300f / 72f,
+                                    6000f / maxOf(page.width, page.height).toFloat(),
+                                    kotlin.math.sqrt(16_000_000.0 / pointsArea).toFloat()
+                                )
+                                val width = (page.width * scale).toInt().coerceAtLeast(1)
+                                val height = (page.height * scale).toInt().coerceAtLeast(1)
+                                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                                try {
+                                    bitmap.eraseColor(android.graphics.Color.WHITE)
+                                    val matrix = Matrix().apply {
+                                        postScale(width.toFloat() / page.width.toFloat().coerceAtLeast(1f), height.toFloat() / page.height.toFloat().coerceAtLeast(1f))
+                                    }
+                                    page.render(bitmap, Rect(0, 0, width, height), matrix, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
+                                    val output = UriUtils.createExportCacheFile(this@MainActivity, "document_page_${pageIndex + 1}", ".jpg")
+                                    java.io.FileOutputStream(output).use { stream ->
+                                        if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)) throw java.io.IOException("Could not encode page JPEG.")
+                                    }
+                                    generated += output
+                                } finally {
+                                    if (!bitmap.isRecycled) bitmap.recycle()
+                                }
+                            }
+                        }
+                    }
+                }
+                if (generated.isEmpty()) throw java.io.IOException("No page images were created.")
+                generated
+            }
+            staged?.delete()
+            withContext(Dispatchers.Main) {
+                result.onSuccess { shareFiles(it, "image/jpeg", "VibeSync_PDF_Pages") }
+                    .onFailure { error ->
+                        generated.forEach { it.delete() }
+                        Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.document_action_failed), Toast.LENGTH_LONG).show()
+                    }
+            }
+        }
+    }
+
+    private fun renamePdfDocument(uri: Uri, requestedName: String) {
+        if (scannerHistoryViewModel.isManagedScanUri(uri)) {
+            val file = scannerHistoryRepository.fileFromUri(uri)
+            if (file == null) {
+                Toast.makeText(this, getString(R.string.document_action_failed), Toast.LENGTH_LONG).show()
+                return
+            }
+            scannerHistoryViewModel.renameScan(file, requestedName) { result ->
+                runOnUiThread {
+                    result.onSuccess {
+                        Toast.makeText(this, getString(R.string.document_rename_success), Toast.LENGTH_SHORT).show()
+                        dashboardViewModel.removeRecentDocument(uri)
+                        dashboardViewModel.refreshCurrentSource()
+                        dashboardViewModel.refreshRecentDocuments()
+                    }.onFailure { error ->
+                        Toast.makeText(this, error.localizedMessage ?: getString(R.string.document_action_failed), Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            return
+        }
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                val safeName = requestedName.trim().removeSuffix(".pdf").removeSuffix(".PDF")
+                    .filter { it.isLetterOrDigit() || it.isWhitespace() || it in "-_()." }
+                    .replace(Regex("\\s+"), " ").trim(' ', '.', '_').take(80)
+                require(safeName.isNotBlank()) { getString(R.string.rename_document_hint) }
+                val newName = "$safeName.pdf"
+                when (uri.scheme) {
+                    "file" -> {
+                        val source = File(requireNotNull(uri.path))
+                        val destination = File(source.parentFile ?: filesDir, newName)
+                        require(source.isFile && (source.canonicalFile == destination.canonicalFile || !destination.exists())) { "A document with that name already exists." }
+                        if (source.canonicalFile != destination.canonicalFile && !source.renameTo(destination)) throw java.io.IOException("Could not rename the PDF.")
+                    }
+                    "content" -> {
+                        val updated = runCatching {
+                            contentResolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.DISPLAY_NAME, newName) }, null, null)
+                        }.getOrDefault(0)
+                        if (updated <= 0) {
+                            val renamed = runCatching { DocumentsContract.renameDocument(contentResolver, uri, newName) }.getOrNull()
+                            if (renamed == null) throw java.io.IOException("This document provider does not permit renaming this PDF.")
+                        }
+                    }
+                    else -> throw java.io.IOException("Unsupported document URI.")
+                }
+            }
+            withContext(Dispatchers.Main) {
+                result.onSuccess {
+                    Toast.makeText(this@MainActivity, getString(R.string.document_rename_success), Toast.LENGTH_SHORT).show()
+                    dashboardViewModel.removeRecentDocument(uri)
+                    dashboardViewModel.refreshCurrentSource()
+                }.onFailure { error ->
+                    Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.document_action_failed), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun deletePdfDocument(uri: Uri) {
+        if (scannerHistoryViewModel.isManagedScanUri(uri)) {
+            val file = scannerHistoryRepository.fileFromUri(uri)
+            if (file == null) {
+                Toast.makeText(this, getString(R.string.document_action_failed), Toast.LENGTH_LONG).show()
+                return
+            }
+            scannerHistoryViewModel.deleteScan(file) { result ->
+                runOnUiThread {
+                    result.onSuccess {
+                        Toast.makeText(this, getString(R.string.document_delete_success), Toast.LENGTH_SHORT).show()
+                        dashboardViewModel.removeRecentDocument(uri)
+                        dashboardViewModel.refreshCurrentSource()
+                        dashboardViewModel.refreshRecentDocuments()
+                    }.onFailure { error ->
+                        Toast.makeText(this, error.localizedMessage ?: getString(R.string.document_action_failed), Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+            return
+        }
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            val result = runCatching {
+                when (uri.scheme) {
+                    "file" -> {
+                        val file = File(requireNotNull(uri.path))
+                        if (!file.isFile || !file.delete()) throw java.io.IOException("Could not delete the PDF.")
+                    }
+                    "content" -> {
+                        val deleted = runCatching { contentResolver.delete(uri, null, null) > 0 }.getOrDefault(false)
+                        if (!deleted && !runCatching { DocumentsContract.deleteDocument(contentResolver, uri) }.getOrDefault(false)) {
+                            throw java.io.IOException("This document provider does not permit deleting this PDF.")
+                        }
+                    }
+                    else -> throw java.io.IOException("Unsupported document URI.")
+                }
+            }
+            withContext(Dispatchers.Main) {
+                result.onSuccess {
+                    Toast.makeText(this@MainActivity, getString(R.string.document_delete_success), Toast.LENGTH_SHORT).show()
+                    dashboardViewModel.removeRecentDocument(uri)
+                    dashboardViewModel.refreshCurrentSource()
+                }.onFailure { error ->
+                    Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.document_action_failed), Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     private fun shareScanPdf(scanFile: File) {
@@ -703,7 +966,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        val extension = if (mimeType == "image/png") ".png" else ".pdf"
+        val extension = when (mimeType) { "image/png" -> ".png"; "image/jpeg" -> ".jpg"; else -> ".pdf" }
         val defaultName = defaultBaseName.removeSuffix(".pdf").removeSuffix(".png")
         val input = EditText(this).apply {
             setText(defaultName)
