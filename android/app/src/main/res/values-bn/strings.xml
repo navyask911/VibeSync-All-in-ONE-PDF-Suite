@@ -217,4 +217,26 @@
     <string name="pdfs_show_less">কম দেখান</string>
     <string name="pdfs_show_section">PDF দেখান</string>
     <string name="pdfs_hide_section">PDF তালিকা বিভাগ লুকান</string>
+    <string name="scan_history_title">স্ক্যানের ইতিহাস</string>
+    <string name="scan_history_subtitle">সংরক্ষিত স্ক্যান দেখুন, নাম বদলান, শেয়ার করুন বা মুছুন</string>
+    <string name="scan_empty_title">এখনও কোনো স্ক্যান নেই</string>
+    <string name="scan_empty_body">আপনার স্ক্যান এই ডিভাইসেই সংরক্ষিত থাকে। ইতিহাস তৈরি করতে নতুন স্ক্যান শুরু করুন।</string>
+    <string name="scan_new">নতুন স্ক্যান</string>
+    <string name="scan_page_count">%1$d পৃষ্ঠা</string>
+    <string name="scan_scanned_at">স্ক্যান করা হয়েছে %1$s</string>
+    <string name="scan_action_menu">স্ক্যানের কাজ</string>
+    <string name="scan_share_images">ছবি হিসেবে শেয়ার করুন (JPEG)</string>
+    <string name="scan_save_downloads">ডাউনলোড / ডিভাইসে সংরক্ষণ করুন</string>
+    <string name="scan_rename">নাম বদলান</string>
+    <string name="scan_delete">স্ক্যান মুছুন</string>
+    <string name="scan_delete_title">এই স্ক্যান মুছবেন?</string>
+    <string name="scan_delete_message">%1$s এবং এর সংরক্ষিত পৃষ্ঠার ছবি মুছবেন? এটি ফেরানো যাবে না।</string>
+    <string name="scan_rename_title">স্ক্যানের নাম বদলান</string>
+    <string name="scan_name_label">নথির নাম</string>
+    <string name="scan_rename_success">স্ক্যানের নাম বদলানো হয়েছে</string>
+    <string name="scan_delete_success">স্ক্যান মুছে ফেলা হয়েছে</string>
+    <string name="scan_save_success">নির্বাচিত স্থানে স্ক্যান সংরক্ষিত হয়েছে</string>
+    <string name="scan_save_failed">নির্বাচিত স্থানে স্ক্যান সংরক্ষণ করা যায়নি</string>
+    <string name="scan_images_unavailable">এই স্ক্যানের JPEG ছবি প্রস্তুত করা যায়নি</string>
+    <string name="scan_operation_failed">এই কাজটি সম্পূর্ণ করা যায়নি। আবার চেষ্টা করুন।</string>
 </resources>

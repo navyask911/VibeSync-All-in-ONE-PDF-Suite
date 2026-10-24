@@ -217,4 +217,26 @@
     <string name="pdfs_show_less">عرض أقل</string>
     <string name="pdfs_show_section">إظهار ملفات PDF</string>
     <string name="pdfs_hide_section">إخفاء قسم قائمة PDF</string>
+    <string name="scan_history_title">سجل المسح</string>
+    <string name="scan_history_subtitle">تصفح عمليات المسح المحفوظة أو أعد تسميتها أو شاركها أو احذفها</string>
+    <string name="scan_empty_title">لا توجد عمليات مسح بعد</string>
+    <string name="scan_empty_body">تُحفظ عمليات المسح على هذا الجهاز. ابدأ مسحًا جديدًا لإنشاء السجل.</string>
+    <string name="scan_new">مسح جديد</string>
+    <string name="scan_page_count">%1$d صفحات</string>
+    <string name="scan_scanned_at">تم المسح %1$s</string>
+    <string name="scan_action_menu">إجراءات المسح</string>
+    <string name="scan_share_images">مشاركة كصور (JPEG)</string>
+    <string name="scan_save_downloads">حفظ في التنزيلات / الجهاز</string>
+    <string name="scan_rename">إعادة تسمية</string>
+    <string name="scan_delete">حذف المسح</string>
+    <string name="scan_delete_title">هل تريد حذف هذا المسح؟</string>
+    <string name="scan_delete_message">هل تريد حذف %1$s وصور الصفحات المحفوظة؟ لا يمكن التراجع عن ذلك.</string>
+    <string name="scan_rename_title">إعادة تسمية المسح</string>
+    <string name="scan_name_label">اسم المستند</string>
+    <string name="scan_rename_success">تمت إعادة تسمية المسح</string>
+    <string name="scan_delete_success">تم حذف المسح</string>
+    <string name="scan_save_success">تم حفظ المسح في الموقع المحدد</string>
+    <string name="scan_save_failed">تعذر حفظ المسح في الموقع المحدد</string>
+    <string name="scan_images_unavailable">تعذر تجهيز صور JPEG لهذا المسح</string>
+    <string name="scan_operation_failed">تعذر إكمال هذا الإجراء. حاول مرة أخرى.</string>
 </resources>
