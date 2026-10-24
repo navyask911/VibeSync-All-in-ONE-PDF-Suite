@@ -244,7 +244,7 @@
     <string name="document_actions_title">Belge işlemleri</string>
     <string name="action_open_view_pdf">PDF’yi aç / görüntüle</string>
     <string name="action_share_jpg_images">JPG görselleri olarak paylaş</string>
-    <string name="action_compress_pdf">PDF'yi sıkıştır</string>
+    <string name="action_compress_pdf">PDF’yi sıkıştır</string>
     <string name="action_watermark_pdf">PDF’ye filigran ekle</string>
     <string name="rename_document_title">Belgeyi yeniden adlandır</string>
     <string name="rename_document_hint">Belge adı</string>
