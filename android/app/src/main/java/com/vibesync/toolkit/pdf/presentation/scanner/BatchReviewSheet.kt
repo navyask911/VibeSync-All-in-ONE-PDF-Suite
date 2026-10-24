@@ -126,11 +126,19 @@ private fun BatchPageThumbnail(
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(8.dp)) {
             Box(
                 modifier = Modifier.size(88.dp, 112.dp)
-                    .pointerInput(page.id, index) {
+                    .pointerInput(page.id, index, pageCount) {
+                        var accumulatedDrag = 0f
                         detectDragGestures { change, dragAmount ->
                             change.consume()
-                            if (dragAmount.x < -12f) onMove(index, (index + 1).coerceAtMost(index + 1))
-                            if (dragAmount.x > 12f) onMove(index, (index - 1).coerceAtLeast(0))
+                            accumulatedDrag += dragAmount.x
+                            val threshold = size.width * 0.25f
+                            if (accumulatedDrag >= threshold) {
+                                onMove(index, (index + 1).coerceAtMost(pageCount - 1))
+                                accumulatedDrag = 0f
+                            } else if (accumulatedDrag <= -threshold) {
+                                onMove(index, (index - 1).coerceAtLeast(0))
+                                accumulatedDrag = 0f
+                            }
                         }
                     },
                 contentAlignment = Alignment.Center
