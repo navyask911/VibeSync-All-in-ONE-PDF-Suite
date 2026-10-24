@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -47,7 +48,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.width
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmap
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.data.pdf.filters.FilterId
@@ -109,7 +109,8 @@ private fun BatchPageThumbnail(
     page: BatchScanPage,
     index: Int,
     onDelete: () -> Unit,
-    onMove: (Int, Int) -> Unit
+    onMove: (Int, Int) -> Unit,
+    pageCount: Int
 ) {
     val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = page.id) {
         value = withContext(Dispatchers.IO) {
@@ -145,7 +146,7 @@ private fun BatchPageThumbnail(
                 IconButton(onClick = { onMove(index, (index - 1).coerceAtLeast(0)) }, enabled = index > 0, modifier = Modifier.testTag("batch_move_left_${index}")) {
                     Icon(Icons.Default.KeyboardArrowLeft, contentDescription = stringResource(R.string.batch_move_left))
                 }
-                IconButton(onClick = { onMove(index, (index + 1).coerceAtMost(index + 1)) }, enabled = true, modifier = Modifier.testTag("batch_move_right_${index}")) {
+                IconButton(onClick = { onMove(index, (index + 1).coerceAtMost(pageCount - 1)) }, enabled = index < pageCount - 1, modifier = Modifier.testTag("batch_move_right_${index}")) {
                     Icon(Icons.Default.KeyboardArrowRight, contentDescription = stringResource(R.string.batch_move_right))
                 }
                 IconButton(onClick = onDelete, modifier = Modifier.testTag("batch_delete_${index}")) {
