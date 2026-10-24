@@ -9,7 +9,10 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.fetchSemanticsNode
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.hasText
 import android.content.Context
@@ -31,6 +34,84 @@ import org.junit.Test
 class DashboardScreenTest {
     @get:Rule
     val composeTestRule = createComposeRule()
+
+    @Test
+    fun dashboardBrandBannerAndActionToolbarUseSeparateRows() {
+        val viewModel = mockk<DashboardViewModel>(relaxed = true)
+        every { viewModel.uiState } returns MutableStateFlow(DashboardUiState())
+        composeTestRule.setContent {
+            VibeSyncPdfTheme {
+                DashboardScreen(
+                    viewModel = viewModel,
+                    onNavigateToViewer = {},
+                    onNavigateToEditor = {},
+                    onNavigateToTool = {},
+                    onLaunchScanner = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag("dashboard_brand_banner").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("dashboard_brand_title").assertIsDisplayed()
+        composeTestRule.onNodeWithText("VibeSync All in ONE PDF Suite").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("dashboard_action_toolbar").assertIsDisplayed()
+        val brandBounds = composeTestRule.onNodeWithTag("dashboard_brand_banner").fetchSemanticsNode().boundsInRoot
+        val toolbarBounds = composeTestRule.onNodeWithTag("dashboard_action_toolbar").fetchSemanticsNode().boundsInRoot
+        assertTrue("Action icons must sit below the brand banner.", toolbarBounds.top >= brandBounds.bottom)
+    }
+
+    @Test
+    fun longPressPdfOpensActionsAndRenameShareDeleteAreReachable() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.getSharedPreferences("dashboard_pdf_section_preferences", Context.MODE_PRIVATE)
+            .edit().putBoolean("pdf_section_visible", true).commit()
+        val pdf = DiscoveredPdf(
+            id = 1L,
+            name = "sample_1.pdf",
+            uri = android.net.Uri.parse("content://test/documents/1.pdf"),
+            sizeBytes = 1024L,
+            sizeFormatted = "1 KB",
+            lastModified = 100L,
+            formattedDate = "Oct 24, 2026"
+        )
+        val viewModel = mockk<DashboardViewModel>(relaxed = true)
+        every { viewModel.uiState } returns MutableStateFlow(DashboardUiState(discoveredPdfs = listOf(pdf)))
+        var sharedUri: android.net.Uri? = null
+        var renamed: Pair<android.net.Uri, String>? = null
+        var deletedUri: android.net.Uri? = null
+
+        composeTestRule.setContent {
+            VibeSyncPdfTheme {
+                DashboardScreen(
+                    viewModel = viewModel,
+                    onNavigateToViewer = {},
+                    onNavigateToEditor = {},
+                    onNavigateToTool = {},
+                    onLaunchScanner = {},
+                    onSharePdfDocument = { sharedUri = it },
+                    onRenameDocument = { uri, name -> renamed = uri to name },
+                    onDeleteDocument = { deletedUri = it }
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("pdf_item_sample_1.pdf"))
+        composeTestRule.onNodeWithTag("pdf_item_sample_1.pdf").performTouchInput { longClick() }
+        composeTestRule.onNodeWithTag("document_action_share_pdf").performClick()
+        assertEquals(pdf.uri, sharedUri)
+
+        composeTestRule.onNodeWithTag("pdf_item_sample_1.pdf").performTouchInput { longClick() }
+        composeTestRule.onNodeWithTag("document_action_rename").performClick()
+        composeTestRule.onNodeWithTag("rename_document_field").performTextClearance()
+        composeTestRule.onNodeWithTag("rename_document_field").performTextInput("renamed_doc")
+        composeTestRule.onNodeWithTag("rename_document_confirm").performClick()
+        assertEquals(pdf.uri to "renamed_doc", renamed)
+
+        composeTestRule.onNodeWithTag("pdf_item_sample_1.pdf").performTouchInput { longClick() }
+        composeTestRule.onNodeWithTag("document_action_delete").performClick()
+        composeTestRule.onNodeWithTag("delete_document_confirm").performClick()
+        assertEquals(pdf.uri, deletedUri)
+    }
 
     @Test
     fun allToolkitCardsExposeExpectedRoutesAndPrivacyDialogOpens() {

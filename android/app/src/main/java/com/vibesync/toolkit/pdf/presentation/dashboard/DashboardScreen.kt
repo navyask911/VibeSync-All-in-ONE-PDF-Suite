@@ -89,7 +89,7 @@ fun DashboardScreen(
     var requestedDocumentName by remember { mutableStateOf("") }
     val visiblePdfs = remember(uiState.discoveredPdfs, showAllPdfs) { if (showAllPdfs) uiState.discoveredPdfs else uiState.discoveredPdfs.take(10) }
 
-    fun showDocumentActions(uri: Uri, name: String) {
+    fun openDocumentActions(uri: Uri, name: String) {
         selectedDocument = DashboardPdfTarget(uri, name)
         requestedDocumentName = name.removeSuffix(".pdf").removeSuffix(".PDF")
         showDocumentActions = true
@@ -479,7 +479,7 @@ fun DashboardScreen(
                                 .fillMaxWidth()
                                 .combinedClickable(
                                     onClick = { onNavigateToViewer(pdf.uri) },
-                                    onLongClick = { showDocumentActions(pdf.uri, pdf.name) }
+                                    onLongClick = { openDocumentActions(pdf.uri, pdf.name) }
                                 )
                                 .testTag("pdf_item_${pdf.name}"),
                             shape = RoundedCornerShape(12.dp),
@@ -493,7 +493,7 @@ fun DashboardScreen(
                                     Text(stringResource(R.string.modified_date, pdf.sizeFormatted, pdf.formattedDate), style = MaterialTheme.typography.bodyMedium, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 IconButton(
-                                    onClick = { showDocumentActions(pdf.uri, pdf.name) },
+                                    onClick = { openDocumentActions(pdf.uri, pdf.name) },
                                     modifier = Modifier.testTag("pdf_actions_${pdf.name}")
                                 ) {
                                     Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.document_actions_title))
@@ -531,7 +531,7 @@ fun DashboardScreen(
                             .fillMaxWidth()
                             .combinedClickable(
                                 onClick = { onNavigateToViewer(Uri.parse(doc.uriString)) },
-                                onLongClick = { showDocumentActions(Uri.parse(doc.uriString), doc.fileName) }
+                                onLongClick = { openDocumentActions(Uri.parse(doc.uriString), doc.fileName) }
                             )
                             .testTag("recent_pdf_item_${doc.fileName}"),
                         shape = RoundedCornerShape(12.dp),
@@ -555,7 +555,7 @@ fun DashboardScreen(
                                 )
                             }
                             IconButton(
-                                onClick = { showDocumentActions(Uri.parse(doc.uriString), doc.fileName) },
+                                onClick = { openDocumentActions(Uri.parse(doc.uriString), doc.fileName) },
                                 modifier = Modifier.testTag("recent_pdf_actions_${doc.fileName}")
                             ) {
                                 Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.document_actions_title))

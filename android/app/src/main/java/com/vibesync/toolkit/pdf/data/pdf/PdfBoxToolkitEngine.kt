@@ -400,8 +400,9 @@ class PdfBoxToolkitEngine(private val context: Context) {
     suspend fun compressPdf(sourceUri: Uri, outputFile: File): Result<File> = withContext(Dispatchers.IO) {
         var sourceFile: File? = null
         try {
-            sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "compress_src")
-            PDDocument.load(sourceFile).use { document ->
+            val stagedFile = UriUtils.copyUriToCacheFile(context, sourceUri, "compress_src")
+            sourceFile = stagedFile
+            PDDocument.load(stagedFile).use { document ->
                 require(document.numberOfPages > 0) { "The source PDF contains no pages." }
                 document.save(outputFile)
             }
