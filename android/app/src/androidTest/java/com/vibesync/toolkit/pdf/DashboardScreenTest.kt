@@ -9,7 +9,8 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
-import androidx.compose.ui.test.assertDoesNotExist
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.hasText
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
@@ -100,10 +101,10 @@ class DashboardScreenTest {
 
         composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasText("sample_1.pdf"))
         composeTestRule.onNodeWithText("sample_1.pdf").assertIsDisplayed()
-        composeTestRule.onNodeWithText("sample_11.pdf").assertDoesNotExist()
+        composeTestRule.onAllNodesWithText("sample_11.pdf").assertCountEquals(0)
         composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasText("sample_10.pdf"))
         composeTestRule.onNodeWithText("sample_10.pdf").assertIsDisplayed()
-        composeTestRule.onNodeWithText("sample_11.pdf").assertDoesNotExist()
+        composeTestRule.onAllNodesWithText("sample_11.pdf").assertCountEquals(0)
         composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("pdf_show_all_toggle"))
         composeTestRule.onNodeWithTag("pdf_show_all_toggle").assertIsDisplayed().performClick()
         composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasText("sample_11.pdf"))
@@ -111,7 +112,7 @@ class DashboardScreenTest {
 
         composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("pdf_show_all_toggle"))
         composeTestRule.onNodeWithTag("pdf_show_all_toggle").performClick()
-        composeTestRule.onNodeWithText("sample_11.pdf").assertDoesNotExist()
+        composeTestRule.onAllNodesWithText("sample_11.pdf").assertCountEquals(0)
 
         composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("pdf_section_close"))
         composeTestRule.onNodeWithTag("pdf_section_close").performClick()
