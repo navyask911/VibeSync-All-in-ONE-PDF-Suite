@@ -1,7 +1,6 @@
 package com.vibesync.toolkit.pdf.core.util
 
 import android.graphics.Bitmap
-import android.util.Log
 import androidx.collection.LruCache
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -9,8 +8,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  * Process-wide bounded cache for rendered PDF pages.
  *
  * A caller must hold a [BitmapLease] for every bitmap currently displayed or being handed to UI.
- * Evicted bitmaps are retired until the final lease is closed; this prevents LruCache from
- * recycling a bitmap in the interval between rendering and Compose committing a frame.
+ * Cached and evicted bitmaps are never explicitly recycled here. A Bitmap may have escaped to
+ * Compose in the current frame even after its cache entry is removed, so ordinary GC owns its lifetime.
  */
 class BitmapCache private constructor() {
 
@@ -20,7 +19,6 @@ class BitmapCache private constructor() {
         .toInt()
     private val cacheSizeKb = (maxMemoryKb / 8).coerceAtLeast(MIN_CACHE_KB)
     private val activeLeaseCounts = HashMap<String, Int>()
-    private val retiredBitmaps = HashMap<String, MutableList<Bitmap>>()
 
     private val memoryCache = object : LruCache<String, Bitmap>(cacheSizeKb) {
         override fun sizeOf(key: String, bitmap: Bitmap): Int =
@@ -32,14 +30,9 @@ class BitmapCache private constructor() {
             oldValue: Bitmap,
             newValue: Bitmap?
         ) {
-            if (oldValue === newValue) return
-            // Every access that can mutate LruCache is performed under cacheLock. JVM monitors
-            // are re-entrant, so this callback can safely examine lease counts under the same lock.
-            if ((activeLeaseCounts[key] ?: 0) > 0) {
-                retiredBitmaps.getOrPut(key) { mutableListOf() }.add(oldValue)
-            } else {
-                recycleSafely(oldValue)
-            }
+            // Never recycle from an LRU callback. Compose may still draw an ImageBitmap made from
+            // oldValue or animate a list item out after its cache entry has been evicted.
+            // Let GC reclaim the bitmap once all renderer/UI references become unreachable.
         }
     }
 
@@ -90,7 +83,7 @@ class BitmapCache private constructor() {
         synchronized(cacheLock) { memoryCache.remove(key) }
     }
 
-    /** Evict cached entries without recycling bitmaps that are still leased by a visible page. */
+    /** Evict cached entries without invalidating Bitmap references already held by Compose. */
     fun clear() {
         synchronized(cacheLock) {
             memoryCache.evictAll()
@@ -108,20 +101,11 @@ class BitmapCache private constructor() {
             return
         }
         activeLeaseCounts.remove(key)
-        retiredBitmaps.remove(key)?.forEach(::recycleSafely)
+        // Releasing a logical lease does not prove Compose has finished drawing its last frame.
     }
 
     private fun releaseLease(key: String) {
         synchronized(cacheLock) { release(key) }
-    }
-
-    private fun recycleSafely(bitmap: Bitmap) {
-        if (bitmap.isRecycled) return
-        try {
-            bitmap.recycle()
-        } catch (error: RuntimeException) {
-            Log.w(TAG, "Unable to recycle an evicted PDF page bitmap.", error)
-        }
     }
 
     /**

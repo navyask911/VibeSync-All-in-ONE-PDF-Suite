@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,8 +38,6 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -51,7 +50,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -73,6 +71,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vibesync.toolkit.pdf.R
+import com.vibesync.toolkit.pdf.presentation.common.PdfDocumentActionsSheet
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -89,7 +88,9 @@ fun ScanHistoryScreen(
     onOpenScan: (Uri) -> Unit,
     onSharePdf: (File) -> Unit,
     onShareImages: (File) -> Unit,
-    onSaveToDownloads: (File) -> Unit
+    onSaveToDownloads: (File) -> Unit,
+    onNavigateToEditor: (Uri) -> Unit = {},
+    onNavigateToPdfTool: (String, Uri) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsState()
@@ -177,6 +178,8 @@ fun ScanHistoryScreen(
                             onSharePdf = { onSharePdf(scan.file) },
                             onShareImages = { onShareImages(scan.file) },
                             onSaveToDownloads = { onSaveToDownloads(scan.file) },
+                            onEdit = { onNavigateToEditor(Uri.fromFile(scan.file)) },
+                            onNavigateToPdfTool = { route -> onNavigateToPdfTool(route, Uri.fromFile(scan.file)) },
                             onRename = { file, name ->
                                 viewModel.renameScan(file, name) { result ->
                                     scope.launch {
@@ -215,26 +218,24 @@ private fun ScanHistoryCard(
     onSharePdf: () -> Unit,
     onShareImages: () -> Unit,
     onSaveToDownloads: () -> Unit,
+    onEdit: () -> Unit,
+    onNavigateToPdfTool: (String) -> Unit,
     onRename: (File, String) -> Unit,
     onDelete: (File) -> Unit
 ) {
-    var actionMenuExpanded by rememberSaveable(entry.file.absolutePath) { mutableStateOf(false) }
+    var showActionsSheet by rememberSaveable(entry.file.absolutePath) { mutableStateOf(false) }
     var showRenameDialog by rememberSaveable(entry.file.absolutePath) { mutableStateOf(false) }
     var showDeleteDialog by rememberSaveable(entry.file.absolutePath) { mutableStateOf(false) }
     var requestedName by rememberSaveable(entry.file.absolutePath) { mutableStateOf(entry.file.nameWithoutExtension) }
     val preview by produceState<Bitmap?>(initialValue = null, key1 = entry.file.absolutePath, key2 = entry.file.lastModified()) {
         value = withContext(Dispatchers.IO) { repository.loadThumbnail(entry.file) }
     }
-    DisposableEffect(preview) {
-        onDispose {
-            preview?.let { bitmap ->
-                if (!bitmap.isRecycled) bitmap.recycle()
-            }
-        }
-    }
-
+    // Never recycle a preview from composition disposal: Compose can still reference its ImageBitmap.
     Card(
-        modifier = Modifier.fillMaxWidth().testTag("scan_item_" + entry.file.name),
+        modifier = Modifier
+            .fillMaxWidth()
+            .combinedClickable(onClick = onOpen, onLongClick = { showActionsSheet = true })
+            .testTag("scan_item_" + entry.file.name),
         shape = RoundedCornerShape(16.dp),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
@@ -249,9 +250,10 @@ private fun ScanHistoryCard(
                         .testTag("scan_thumbnail_" + entry.file.name),
                     contentAlignment = Alignment.Center
                 ) {
-                    if (preview != null) {
+                    val safePreview = preview?.takeUnless { it.isRecycled }
+                    if (safePreview != null && !safePreview.isRecycled) {
                         Image(
-                            bitmap = preview!!.asImageBitmap(),
+                            bitmap = safePreview.asImageBitmap(),
                             contentDescription = entry.file.name,
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
@@ -261,38 +263,12 @@ private fun ScanHistoryCard(
                     }
                 }
                 IconButton(
-                    onClick = { actionMenuExpanded = true },
+                    onClick = { showActionsSheet = true },
                     modifier = Modifier.align(Alignment.TopEnd).testTag("scan_actions_" + entry.file.name)
                 ) {
                     Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.scan_action_menu))
                 }
-                DropdownMenu(expanded = actionMenuExpanded, onDismissRequest = { actionMenuExpanded = false }) {
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.share_pdf)) },
-                        leadingIcon = { Icon(Icons.Default.PictureAsPdf, contentDescription = null) },
-                        onClick = { actionMenuExpanded = false; onSharePdf() }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.scan_share_images)) },
-                        leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
-                        onClick = { actionMenuExpanded = false; onShareImages() }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.scan_save_downloads)) },
-                        leadingIcon = { Icon(Icons.Default.SaveAlt, contentDescription = null) },
-                        onClick = { actionMenuExpanded = false; onSaveToDownloads() }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.scan_rename)) },
-                        leadingIcon = { Icon(Icons.Default.DriveFileRenameOutline, contentDescription = null) },
-                        onClick = { actionMenuExpanded = false; requestedName = entry.file.nameWithoutExtension; showRenameDialog = true }
-                    )
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.scan_delete)) },
-                        leadingIcon = { Icon(Icons.Default.DeleteOutline, contentDescription = null) },
-                        onClick = { actionMenuExpanded = false; showDeleteDialog = true }
-                    )
-                }
+
             }
 
             Column(Modifier.padding(12.dp)) {
@@ -319,6 +295,27 @@ private fun ScanHistoryCard(
                 )
             }
         }
+    }
+
+    if (showActionsSheet) {
+        PdfDocumentActionsSheet(
+            documentName = entry.file.name,
+            onDismissRequest = { showActionsSheet = false },
+            onOpen = onOpen,
+            onEdit = onEdit,
+            onRename = {
+                requestedName = entry.file.nameWithoutExtension
+                showRenameDialog = true
+            },
+            onSharePdf = onSharePdf,
+            onShareImages = onShareImages,
+            onSaveToDownloads = onSaveToDownloads,
+            onSplit = { onNavigateToPdfTool("split") },
+            onCompress = { onNavigateToPdfTool("compress") },
+            onWatermark = { onNavigateToPdfTool("watermark") },
+            onEncrypt = { onNavigateToPdfTool("encrypt") },
+            onDelete = { showDeleteDialog = true }
+        )
     }
 
     if (showRenameDialog) {
