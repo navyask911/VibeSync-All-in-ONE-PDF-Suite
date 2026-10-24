@@ -1,6 +1,7 @@
 package com.vibesync.toolkit.pdf.data.pdf
 
 import android.content.ContentValues
+import com.vibesync.toolkit.pdf.R
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
