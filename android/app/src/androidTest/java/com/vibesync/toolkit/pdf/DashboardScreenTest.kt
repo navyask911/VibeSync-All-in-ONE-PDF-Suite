@@ -66,6 +66,41 @@ class DashboardScreenTest {
 
         composeTestRule.onNodeWithContentDescription("Privacy & Terms").performClick()
         composeTestRule.onNodeWithText("Privacy & Data Safety Guarantee").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("privacy_legal_links").assertExists()
+        composeTestRule.onNodeWithTag("privacy_public_info").assertExists()
+        composeTestRule.onNodeWithTag("privacy_policy_link").assertExists()
+        composeTestRule.onNodeWithTag("privacy_license_link").assertExists()
+        composeTestRule.onNodeWithTag("privacy_terms_link").assertExists()
+        composeTestRule.onNodeWithTag("privacy_close_button").assertExists()
+    }
+
+    @Test
+    fun languagePickerIncludesWorldwideLocales() {
+        val viewModel = mockk<DashboardViewModel>(relaxed = true)
+        every { viewModel.uiState } returns MutableStateFlow(DashboardUiState())
+
+        composeTestRule.setContent {
+            VibeSyncPdfTheme {
+                DashboardScreen(
+                    viewModel = viewModel,
+                    onNavigateToViewer = {},
+                    onNavigateToEditor = {},
+                    onNavigateToTool = {},
+                    onLaunchScanner = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithContentDescription("Language").performClick()
+        composeTestRule.onNodeWithText("繁體中文").assertExists()
+        composeTestRule.onNodeWithText("Tiếng Việt").assertExists()
+        composeTestRule.onNodeWithText("தமிழ்").assertExists()
+        composeTestRule.onNodeWithText("తెలుగు").assertExists()
+        composeTestRule.onNodeWithText("ಕನ್ನಡ").assertExists()
+        composeTestRule.onNodeWithText("मराठी").assertExists()
+        composeTestRule.onNodeWithText("ગુજરાતી").assertExists()
+        composeTestRule.onNodeWithText("עברית").assertExists()
+        composeTestRule.onNodeWithText("ไทย").assertExists()
     }
 
     @Test

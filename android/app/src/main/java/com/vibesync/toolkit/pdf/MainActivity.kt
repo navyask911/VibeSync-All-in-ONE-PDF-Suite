@@ -198,7 +198,7 @@ class MainActivity : AppCompatActivity() {
                         val temporaryFile = File.createTempFile("scan_work_", ".pdf", scanDirectory)
                         val watermarkResult = toolkitEngine.watermarkPdf(
                             sourceUri = scannedPdfUri,
-                            watermarkText = "VibeSync All in ONE PDF Suite",
+                            watermarkText = getString(R.string.pdf_watermark_text),
                             outputFile = temporaryFile
                         )
                         watermarkResult.fold(
@@ -505,7 +505,7 @@ class MainActivity : AppCompatActivity() {
             val output = UriUtils.createExportCacheFile(this@MainActivity, "VibeSync_Viewed_Document")
             val result = toolkitEngine.watermarkPdf(
                 sourceUri = sourceUri,
-                watermarkText = "VibeSync All in ONE PDF Suite",
+                watermarkText = getString(R.string.pdf_watermark_text),
                 outputFile = output
             )
             launch(Dispatchers.Main) {

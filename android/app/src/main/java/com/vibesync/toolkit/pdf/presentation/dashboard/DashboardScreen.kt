@@ -27,6 +27,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.platform.testTag
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
@@ -155,8 +158,26 @@ fun DashboardScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.dashboard_subtitle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(
+                            stringResource(R.string.app_name),
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontSize = 20.sp,
+                                lineHeight = 22.sp,
+                                letterSpacing = (-0.2).sp
+                            ),
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            stringResource(R.string.dashboard_subtitle),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 12.sp,
+                            lineHeight = 15.sp
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -505,25 +526,54 @@ fun DashboardScreen(
             onDismissRequest = { showLanguageDialog = false },
             title = { Text(stringResource(R.string.select_language)) },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Column(
+                    modifier = Modifier
+                        .heightIn(max = 480.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
                     val languageOptions = listOf(
                         "" to stringResource(R.string.language_system),
                         "en" to stringResource(R.string.language_english),
                         "es" to stringResource(R.string.language_spanish),
-                        "zh-CN" to stringResource(R.string.language_chinese),
-                        "hi" to stringResource(R.string.language_hindi),
-                        "ar" to stringResource(R.string.language_arabic),
-                        "bn" to stringResource(R.string.language_bengali),
-                        "pt" to stringResource(R.string.language_portuguese),
-                        "ru" to stringResource(R.string.language_russian),
-                        "ja" to stringResource(R.string.language_japanese),
                         "fr" to stringResource(R.string.language_french),
                         "de" to stringResource(R.string.language_german),
-                        "id" to stringResource(R.string.language_indonesian),
-                        "ur" to stringResource(R.string.language_urdu),
-                        "tr" to stringResource(R.string.language_turkish),
+                        "it" to stringResource(R.string.language_italian),
+                        "pt" to stringResource(R.string.language_portuguese),
+                        "ru" to stringResource(R.string.language_russian),
+                        "ar" to stringResource(R.string.language_arabic),
+                        "ja" to stringResource(R.string.language_japanese),
                         "ko" to stringResource(R.string.language_korean),
-                        "it" to stringResource(R.string.language_italian)
+                        "zh-CN" to stringResource(R.string.language_chinese),
+                        "zh-TW" to stringResource(R.string.language_chinese_traditional),
+                        "id" to stringResource(R.string.language_indonesian),
+                        "tr" to stringResource(R.string.language_turkish),
+                        "hi" to stringResource(R.string.language_hindi),
+                        "bn" to stringResource(R.string.language_bengali),
+                        "ur" to stringResource(R.string.language_urdu),
+                        "vi" to stringResource(R.string.language_vietnamese),
+                        "ta" to stringResource(R.string.language_tamil),
+                        "te" to stringResource(R.string.language_telugu),
+                        "kn" to stringResource(R.string.language_kannada),
+                        "mr" to stringResource(R.string.language_marathi),
+                        "gu" to stringResource(R.string.language_gujarati),
+                        "he" to stringResource(R.string.language_hebrew),
+                        "th" to stringResource(R.string.language_thai),
+                        "fil" to stringResource(R.string.language_filipino),
+                        "nl" to stringResource(R.string.language_dutch),
+                        "pl" to stringResource(R.string.language_polish),
+                        "uk" to stringResource(R.string.language_ukrainian),
+                        "fa" to stringResource(R.string.language_persian),
+                        "sw" to stringResource(R.string.language_swahili),
+                        "pa" to stringResource(R.string.language_punjabi),
+                        "ml" to stringResource(R.string.language_malayalam),
+                        "ne" to stringResource(R.string.language_nepali),
+                        "si" to stringResource(R.string.language_sinhala),
+                        "ro" to stringResource(R.string.language_romanian),
+                        "el" to stringResource(R.string.language_greek),
+                        "cs" to stringResource(R.string.language_czech),
+                        "hu" to stringResource(R.string.language_hungarian),
+                        "sv" to stringResource(R.string.language_swedish)
                     )
                     languageOptions.forEach { (languageTag, label) ->
                         TextButton(
@@ -621,7 +671,8 @@ fun DashboardScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 380.dp),
+                        .heightIn(max = 380.dp)
+                        .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Surface(
@@ -638,86 +689,65 @@ fun DashboardScreen(
                             Text(stringResource(R.string.device_zero_cloud_transit), fontWeight = FontWeight.Bold, color = Color(0xFFECFDF5), fontSize = 12.sp)
                         }
                     }
-
                     Text(
                         stringResource(R.string.document_processing_policy),
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-
                     Text(
                         stringResource(R.string.signature_storage_policy),
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-
                     Text(
                         stringResource(R.string.ads_collection_policy),
                         fontSize = 12.sp,
                         lineHeight = 16.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                }
-            },
-            confirmButton = {
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.End,
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    TextButton(
-                        onClick = {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_PUBLIC_INFO_URL))
-                                )
-                            }
-                        }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("privacy_legal_links"),
+                        horizontalAlignment = Alignment.End,
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(stringResource(R.string.public_info))
-                    }
-                    TextButton(
-                        onClick = {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_PRIVACY_URL))
-                                )
-                            }
-                        }
-                    ) {
-                        Text(stringResource(R.string.privacy_policy))
-                    }
-                    TextButton(
-                        onClick = {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_LICENSE_URL))
-                                )
-                            }
-                        }
-                    ) {
-                        Text(stringResource(R.string.license_copyright))
-                    }
-                    TextButton(
-                        onClick = {
-                            runCatching {
-                                context.startActivity(
-                                    Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_TERMS_URL))
-                                )
-                            }
-                        }
-                    ) {
-                        Text(stringResource(R.string.terms_of_use))
+                        TextButton(
+                            onClick = {
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_PUBLIC_INFO_URL))) }
+                            },
+                            modifier = Modifier.testTag("privacy_public_info")
+                        ) { Text(stringResource(R.string.public_info)) }
+                        TextButton(
+                            onClick = {
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_PRIVACY_URL))) }
+                            },
+                            modifier = Modifier.testTag("privacy_policy_link")
+                        ) { Text(stringResource(R.string.privacy_policy)) }
+                        TextButton(
+                            onClick = {
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_LICENSE_URL))) }
+                            },
+                            modifier = Modifier.testTag("privacy_license_link")
+                        ) { Text(stringResource(R.string.license_copyright)) }
+                        TextButton(
+                            onClick = {
+                                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(VIBESYNC_TERMS_URL))) }
+                            },
+                            modifier = Modifier.testTag("privacy_terms_link")
+                        ) { Text(stringResource(R.string.terms_of_use)) }
                     }
                 }
             },
+            confirmButton = {},
             dismissButton = {
-                TextButton(onClick = { showPrivacyDialog = false }) {
-                    Text(stringResource(R.string.close))
-                }
+                TextButton(
+                    onClick = { showPrivacyDialog = false },
+                    modifier = Modifier.testTag("privacy_close_button")
+                ) { Text(stringResource(R.string.close)) }
             }
         )
     }
-}

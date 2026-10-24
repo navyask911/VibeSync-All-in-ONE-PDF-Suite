@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pdf_watermark_text">Przetworzono na urządzeniu za pomocą VibeSync PDF Suite</string>
+    <string name="pdf_brand_watermark">Przetworzono na urządzeniu za pomocą VibeSync PDF Suite</string>
+</resources>
