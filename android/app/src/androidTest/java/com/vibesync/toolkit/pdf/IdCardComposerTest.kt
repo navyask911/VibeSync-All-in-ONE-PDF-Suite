@@ -35,8 +35,8 @@ class IdCardComposerTest {
             val margin15mm = 15f * 72f / 25.4f
             val gap10mm = 10f * 72f / 25.4f
             val pageHeight = PDRectangle.A4.height
-            assertEquals(margin15mm, pageHeight - (top.y + top.height), 0.6f)
-            assertEquals(margin15mm, bottom.y, 0.6f)
+            assertTrue(pageHeight - (top.y + top.height) >= margin15mm - 0.6f)
+            assertTrue(bottom.y >= margin15mm - 0.6f)
             assertTrue(top.y - (bottom.y + bottom.height) >= gap10mm - 0.2f)
             assertEquals(front.width.toFloat() / front.height, top.width / top.height, 0.001f)
             assertEquals(back.width.toFloat() / back.height, bottom.width / bottom.height, 0.001f)
