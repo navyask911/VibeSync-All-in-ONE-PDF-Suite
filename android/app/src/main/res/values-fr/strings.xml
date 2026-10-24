@@ -227,4 +227,26 @@
     <string name="pdfs_show_less">Afficher moins</string>
     <string name="pdfs_show_section">Afficher les PDF</string>
     <string name="pdfs_hide_section">Masquer la section des PDF</string>
+    <string name="scan_history_title">Historique des scans</string>
+    <string name="scan_history_subtitle">Parcourir, renommer, partager ou supprimer les scans enregistrés</string>
+    <string name="scan_empty_title">Aucun scan pour le moment</string>
+    <string name="scan_empty_body">Vos scans restent sur cet appareil. Lancez un nouveau scan pour créer votre historique.</string>
+    <string name="scan_new">Nouveau scan</string>
+    <string name="scan_page_count">%1$d pages</string>
+    <string name="scan_scanned_at">Numérisé le %1$s</string>
+    <string name="scan_action_menu">Actions du scan</string>
+    <string name="scan_share_images">Partager en images (JPEG)</string>
+    <string name="scan_save_downloads">Enregistrer dans Téléchargements / sur l’appareil</string>
+    <string name="scan_rename">Renommer</string>
+    <string name="scan_delete">Supprimer le scan</string>
+    <string name="scan_delete_title">Supprimer ce scan ?</string>
+    <string name="scan_delete_message">Supprimer %1$s et ses images de page enregistrées ? Cette action est irréversible.</string>
+    <string name="scan_rename_title">Renommer le scan</string>
+    <string name="scan_name_label">Nom du document</string>
+    <string name="scan_rename_success">Scan renommé</string>
+    <string name="scan_delete_success">Scan supprimé</string>
+    <string name="scan_save_success">Scan enregistré à l’emplacement choisi</string>
+    <string name="scan_save_failed">Impossible d’enregistrer le scan à cet emplacement</string>
+    <string name="scan_images_unavailable">Impossible de préparer les images JPEG de ce scan</string>
+    <string name="scan_operation_failed">Impossible de terminer cette action. Réessayez.</string>
 </resources>

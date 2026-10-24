@@ -227,4 +227,26 @@
     <string name="pdfs_show_less">Weniger anzeigen</string>
     <string name="pdfs_show_section">PDFs anzeigen</string>
     <string name="pdfs_hide_section">PDF-Listenbereich ausblenden</string>
+    <string name="scan_history_title">Scanverlauf</string>
+    <string name="scan_history_subtitle">Gespeicherte Scans anzeigen, umbenennen, teilen oder löschen</string>
+    <string name="scan_empty_title">Noch keine Scans</string>
+    <string name="scan_empty_body">Deine Scans bleiben auf diesem Gerät. Starte einen neuen Scan, um den Verlauf aufzubauen.</string>
+    <string name="scan_new">Neuer Scan</string>
+    <string name="scan_page_count">%1$d Seiten</string>
+    <string name="scan_scanned_at">Gescannt am %1$s</string>
+    <string name="scan_action_menu">Scan-Aktionen</string>
+    <string name="scan_share_images">Als Bilder teilen (JPEG)</string>
+    <string name="scan_save_downloads">In Downloads / auf dem Gerät speichern</string>
+    <string name="scan_rename">Umbenennen</string>
+    <string name="scan_delete">Scan löschen</string>
+    <string name="scan_delete_title">Diesen Scan löschen?</string>
+    <string name="scan_delete_message">%1$s und die gespeicherten Seitenbilder löschen? Dies kann nicht rückgängig gemacht werden.</string>
+    <string name="scan_rename_title">Scan umbenennen</string>
+    <string name="scan_name_label">Dokumentname</string>
+    <string name="scan_rename_success">Scan umbenannt</string>
+    <string name="scan_delete_success">Scan gelöscht</string>
+    <string name="scan_save_success">Scan am ausgewählten Ort gespeichert</string>
+    <string name="scan_save_failed">Scan konnte am ausgewählten Ort nicht gespeichert werden</string>
+    <string name="scan_images_unavailable">JPEG-Bilder für diesen Scan konnten nicht erstellt werden</string>
+    <string name="scan_operation_failed">Diese Aktion konnte nicht abgeschlossen werden. Bitte erneut versuchen.</string>
 </resources>
