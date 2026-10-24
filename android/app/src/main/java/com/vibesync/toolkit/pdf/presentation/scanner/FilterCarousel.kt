@@ -2,6 +2,7 @@ package com.vibesync.toolkit.pdf.presentation.scanner
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -95,14 +97,21 @@ fun FilterCarousel(
                             ) {}
                         }
                         if (processingFilter == filterId) {
-                            Surface(
-                                modifier = Modifier.size(64.dp).testTag("filter_carousel_progress_" + filterId.name),
-                                color = MaterialTheme.colorScheme.scrim.copy(alpha = 0.58f)
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .background(MaterialTheme.colorScheme.scrim.copy(alpha = 0.58f))
+                                    .testTag("filter_carousel_progress_" + filterId.name),
+                                contentAlignment = Alignment.Center
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
+                                Box(
+                                    modifier = Modifier.size(28.dp).testTag("filter_carousel_progress_indicator"),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     CircularProgressIndicator(
                                         progress = progress.coerceIn(0f, 1f),
-                                        modifier = Modifier.size(28.dp).testTag("filter_carousel_progress_indicator"),
+                                        modifier = Modifier.fillMaxSize(),
                                         color = MaterialTheme.colorScheme.onPrimary,
                                         trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.25f),
                                         strokeWidth = 3.dp
