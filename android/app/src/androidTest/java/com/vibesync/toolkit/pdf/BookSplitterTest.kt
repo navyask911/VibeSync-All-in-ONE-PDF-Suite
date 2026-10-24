@@ -3,6 +3,9 @@ package com.vibesync.toolkit.pdf
 import android.graphics.Bitmap
 import android.graphics.Color
 import com.vibesync.toolkit.pdf.data.pdf.BookSplitter
+import com.vibesync.toolkit.pdf.data.pdf.filters.FilterEngine
+import com.vibesync.toolkit.pdf.data.pdf.filters.FilterId
+import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -10,7 +13,7 @@ import org.junit.Test
 
 class BookSplitterTest {
     @Test
-    fun detectsCenterGutterSplitsLeftThenRightAndKeepsPortraitAsOnePage() {
+    fun detectsCenterGutterSplitsLeftThenRightAndKeepsPortraitAsOnePage() = runBlocking {
         val spread = Bitmap.createBitmap(400, 200, Bitmap.Config.ARGB_8888)
         spread.eraseColor(Color.rgb(236, 236, 236))
         for (y in 0 until spread.height) {
@@ -32,7 +35,16 @@ class BookSplitterTest {
                 Color.blue(split.pages[0].getPixel(split.pages[0].width / 2, 100)))
             assertTrue(Color.blue(split.pages[1].getPixel(split.pages[1].width / 2, 100)) >
                 Color.red(split.pages[1].getPixel(split.pages[1].width / 2, 100)))
-            split.pages.forEach { it.recycle() }
+
+            // The active B&W filter can process each cropped half independently.
+            val filterEngine = FilterEngine()
+            split.pages.forEach { half ->
+                val pixels = IntArray(half.width * half.height)
+                half.getPixels(pixels, 0, half.width, 0, 0, half.width, half.height)
+                val filtered = filterEngine.apply(FilterId.BW, pixels, half.width, half.height)
+                assertTrue(filtered.all { Color.red(it) == Color.green(it) && Color.green(it) == Color.blue(it) })
+                half.recycle()
+            }
         } finally {
             spread.recycle()
         }
