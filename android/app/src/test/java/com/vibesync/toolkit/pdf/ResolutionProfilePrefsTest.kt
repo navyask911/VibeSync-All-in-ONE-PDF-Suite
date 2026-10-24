@@ -1,6 +1,5 @@
 package com.vibesync.toolkit.pdf
 
-import android.app.Application
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.vibesync.toolkit.pdf.data.pdf.ResolutionProfile
@@ -9,7 +8,6 @@ import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.robolectric.Robolectric
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
@@ -49,7 +47,7 @@ class ResolutionProfilePrefsTest {
                 .edit()
                 .commit()
         )
-        val restartedContext = Robolectric.buildApplication(Application::class.java).create().get()
+        val restartedContext = context.createPackageContext(context.packageName, Context.CONTEXT_INCLUDE_CODE)
         assertEquals(ResolutionProfile.HD_AUTO, ResolutionProfilePrefs(restartedContext).read())
     }
 
