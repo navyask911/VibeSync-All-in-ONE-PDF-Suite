@@ -117,7 +117,7 @@ class DashboardScreenTest {
         composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("pdf_section_close"))
         composeTestRule.onNodeWithTag("pdf_section_close").performClick()
         composeTestRule.onNodeWithTag("pdf_show_section").assertExists()
-        composeTestRule.onNodeWithText("sample_1.pdf").assertDoesNotExist()
+        composeTestRule.onAllNodesWithText("sample_1.pdf").assertCountEquals(0)
         assertEquals(false, context.getSharedPreferences("dashboard_pdf_section_preferences", Context.MODE_PRIVATE).getBoolean("pdf_section_visible", true))
 
         composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("pdf_show_section"))
