@@ -225,7 +225,7 @@ fun BatchScanScreen(
                             prefs.edit().putString(BatchScanViewModel.KEY_FILTER_ID, filterId.name).apply()
                         },
                         label = { Text(stringResource(filterId.labelRes)) },
-                        modifier = Modifier.testTag("batch_filter_\u0024{filterId.name}")
+                        modifier = Modifier.testTag("batch_filter_" + filterId.name)
                     )
                 }
                 if (selectedFilter != null) {
