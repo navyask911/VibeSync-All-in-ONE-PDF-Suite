@@ -307,7 +307,7 @@ fun TranslationScanScreen(
                                 DropdownMenuItem(
                                     text = { Text(stringResource(language.labelRes)) },
                                     onClick = { sourceLanguage = language.code; sourcePicker = false },
-                                    modifier = Modifier.testTag("translation_source_\${language.code}")
+                                    modifier = Modifier.testTag("translation_source_${language.code}")
                                 )
                             }
                         }
@@ -315,16 +315,16 @@ fun TranslationScanScreen(
                 }
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.translation_target_language), style = MaterialTheme.typography.labelLarge)
-                    androidx.compose.material3.Box {
+                    Box {
                         OutlinedButton(onClick = { targetPicker = true }, modifier = Modifier.fillMaxWidth().testTag("translation_target_picker")) {
                             Text(stringResource(supportedLanguages.first { it.code == targetLanguage }.labelRes), maxLines = 1)
                         }
                         DropdownMenu(expanded = targetPicker, onDismissRequest = { targetPicker = false }) {
-                            translationLanguages.forEach { language ->
+                            supportedLanguages.forEach { language ->
                                 DropdownMenuItem(
                                     text = { Text(stringResource(language.labelRes)) },
                                     onClick = { targetLanguage = language.code; targetPicker = false },
-                                    modifier = Modifier.testTag("translation_target_\${language.code}")
+                                    modifier = Modifier.testTag("translation_target_${language.code}")
                                 )
                             }
                         }
