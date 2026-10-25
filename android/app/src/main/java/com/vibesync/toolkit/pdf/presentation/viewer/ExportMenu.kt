@@ -100,7 +100,7 @@ fun ExportMenu(
             }, onError = { showExportError(context, it) })
         }
     }
-    var launchJpg by remember { mutableStateOf<((String) -> Unit)?>(null) }
+    val jpgLaunchRef = remember { arrayOfNulls<(String) -> Unit>(1) }
     val jpgLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/jpeg")) { target ->
         val pageIndex = queuedJpgPages.firstOrNull()
         if (target == null || pageIndex == null) {
@@ -112,7 +112,7 @@ fun ExportMenu(
                     val nextPage = queuedJpgPages.firstOrNull()
                     if (nextPage != null) {
                         val nextName = "${baseName}_page_${nextPage + 1}.jpg"
-                        requestSaf("image/jpeg", nextName) { launchJpg?.invoke(nextName) }
+                        requestSaf("image/jpeg", nextName) { jpgLaunchRef[0]?.invoke(nextName) }
                     } else {
                         Toast.makeText(context, context.getString(R.string.export_saved_jpg), Toast.LENGTH_LONG).show()
                     }
@@ -123,7 +123,7 @@ fun ExportMenu(
             }
         }
     }
-    launchJpg = { name -> jpgLauncher.launch(name) }
+    jpgLaunchRef[0] = { name -> jpgLauncher.launch(name) }
     val zipLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { target ->
         if (target != null) scope.launch {
             running = true
