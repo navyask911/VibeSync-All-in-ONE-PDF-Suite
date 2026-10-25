@@ -125,7 +125,8 @@ private fun BatchPageThumbnail(
         }
     }
     Card(
-        modifier = Modifier.width(112.dp).testTag("batch_page_${page.id}"),
+        // Three Material IconButtons require 144 dp; include 16 dp of horizontal card padding.
+        modifier = Modifier.width(160.dp).testTag("batch_page_${page.id}"),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(8.dp)) {
