@@ -74,6 +74,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.presentation.common.PdfDocumentActionsSheet
+import com.vibesync.toolkit.pdf.presentation.viewer.ExportMenu
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -306,6 +307,11 @@ private fun ScanHistoryCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
+                )
+                ExportMenu(
+                    sourceUri = Uri.fromFile(entry.file),
+                    currentPageIndex = 0,
+                    testTag = "scan_export_menu_${entry.file.name}"
                 )
                 if (firstPageIsLandscape && firstPageImage != null) {
                     TextButton(
