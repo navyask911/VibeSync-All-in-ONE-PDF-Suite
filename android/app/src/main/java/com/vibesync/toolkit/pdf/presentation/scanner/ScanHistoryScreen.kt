@@ -74,6 +74,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.presentation.common.PdfDocumentActionsSheet
+import com.vibesync.toolkit.pdf.presentation.common.launchSystemPdfPrint
 import com.vibesync.toolkit.pdf.presentation.viewer.ExportMenu
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -206,6 +207,13 @@ fun ScanHistoryScreen(
                                         snackbarHostState.showSnackbar(message)
                                     }
                                 }
+                            },
+                            onPrint = { file ->
+                                launchSystemPdfPrint(
+                                    context,
+                                    Uri.fromFile(file),
+                                    context.getString(R.string.print_job_name, file.name)
+                                )
                             }
                         )
                     }
@@ -228,7 +236,8 @@ private fun ScanHistoryCard(
     onNavigateToPdfTool: (String) -> Unit,
     onSplitBook: (Uri) -> Unit,
     onRename: (File, String) -> Unit,
-    onDelete: (File) -> Unit
+    onDelete: (File) -> Unit,
+    onPrint: (File) -> Unit
 ) {
     var showActionsSheet by rememberSaveable(entry.file.absolutePath) { mutableStateOf(false) }
     var showRenameDialog by rememberSaveable(entry.file.absolutePath) { mutableStateOf(false) }
@@ -340,7 +349,8 @@ private fun ScanHistoryCard(
             onCompress = { onNavigateToPdfTool("compress") },
             onWatermark = { onNavigateToPdfTool("watermark") },
             onEncrypt = { onNavigateToPdfTool("encrypt") },
-            onDelete = { showDeleteDialog = true }
+            onDelete = { showDeleteDialog = true },
+            onPrint = { onPrint(entry.file) }
         )
     }
 
