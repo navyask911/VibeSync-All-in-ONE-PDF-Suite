@@ -40,26 +40,31 @@ class PdfPrintDocumentAdapter(
         extras: android.os.Bundle?
     ) {
         try {
-            if (cancellationSignal.isCanceled) {
-                callback.onLayoutCancelled()
-                return
-            }
-            synchronized(lock) {
-                printAttributes = newAttributes
-                ensureRenderer()
-                if (cancellationSignal.isCanceled) {
-                    callback.onLayoutCancelled()
-                    return
-                }
-                val info = PrintDocumentInfo.Builder(normalizePdfName(displayName))
-                    .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
-                    .setPageCount(pageCount)
-                    .build()
-                callback.onLayoutFinished(info, oldAttributes != newAttributes)
-            }
+            val info = prepareLayout(newAttributes, cancellationSignal)
+            callback.onLayoutFinished(info, oldAttributes != newAttributes)
         } catch (error: Exception) {
-            callback.onLayoutFailed(error.localizedMessage ?: "Unable to prepare this PDF for printing.")
+            if (cancellationSignal.isCanceled) callback.onLayoutCancelled()
+            else callback.onLayoutFailed(error.localizedMessage ?: "Unable to prepare this PDF for printing.")
         }
+    }
+
+    /** Performs the layout work separately so the same operation can be verified without SDK-private callbacks. */
+    internal fun prepareLayout(
+        newAttributes: PrintAttributes,
+        cancellationSignal: android.os.CancellationSignal
+    ): PrintDocumentInfo = synchronized(lock) {
+        if (cancellationSignal.isCanceled) {
+            throw java.util.concurrent.CancellationException("Print layout was cancelled.")
+        }
+        printAttributes = newAttributes
+        ensureRenderer()
+        if (cancellationSignal.isCanceled) {
+            throw java.util.concurrent.CancellationException("Print layout was cancelled.")
+        }
+        PrintDocumentInfo.Builder(normalizePdfName(displayName))
+            .setContentType(PrintDocumentInfo.CONTENT_TYPE_DOCUMENT)
+            .setPageCount(pageCount)
+            .build()
     }
 
     override fun onWrite(
@@ -68,6 +73,25 @@ class PdfPrintDocumentAdapter(
         cancellationSignal: android.os.CancellationSignal,
         callback: WriteResultCallback
     ) {
+        try {
+            callback.onWriteFinished(writeDocument(pages, destination, cancellationSignal))
+        } catch (error: Exception) {
+            if (cancellationSignal.isCanceled || error is java.util.concurrent.CancellationException) {
+                callback.onWriteCancelled()
+            } else {
+                callback.onWriteFailed(error.localizedMessage ?: "Unable to print this PDF.")
+            }
+        } finally {
+            runCatching { destination.close() }
+        }
+    }
+
+    /** Rasterizes the selected source pages and writes a PDF to the provided descriptor. */
+    internal fun writeDocument(
+        pages: Array<out PageRange>,
+        destination: android.os.ParcelFileDescriptor,
+        cancellationSignal: android.os.CancellationSignal
+    ): Array<PageRange> {
         val output = android.graphics.pdf.PdfDocument()
         try {
             val sourceRenderer = synchronized(lock) {
@@ -75,24 +99,31 @@ class PdfPrintDocumentAdapter(
                 renderer ?: throw java.io.IOException("The source PDF renderer is unavailable.")
             }
             val attributes = printAttributes
-            val dpi = (attributes?.resolution?.horizontalDpi ?: DEFAULT_DPI).coerceIn(MINIMUM_DPI, MAXIMUM_DPI)
+            val dpi = (attributes?.resolution?.horizontalDpi ?: DEFAULT_DPI)
+                .coerceIn(MINIMUM_DPI, MAXIMUM_DPI)
             val mediaSize = attributes?.mediaSize
-            val outputPageWidthPt = mediaSize?.let { it.widthMils * POINTS_PER_INCH / MILS_PER_INCH } ?: DEFAULT_A4_WIDTH_PT
-            val outputPageHeightPt = mediaSize?.let { it.heightMils * POINTS_PER_INCH / MILS_PER_INCH } ?: DEFAULT_A4_HEIGHT_PT
+            val outputPageWidthPt = mediaSize?.let {
+                it.widthMils * POINTS_PER_INCH / MILS_PER_INCH
+            } ?: DEFAULT_A4_WIDTH_PT
+            val outputPageHeightPt = mediaSize?.let {
+                it.heightMils * POINTS_PER_INCH / MILS_PER_INCH
+            } ?: DEFAULT_A4_HEIGHT_PT
             val allPages = pages.isEmpty() || pages.any { it == PageRange.ALL_PAGES }
 
+            var writtenPages = 0
             for (index in 0 until sourceRenderer.pageCount) {
                 if (!allPages && pages.none { index in it.start..it.end }) continue
                 if (cancellationSignal.isCanceled) {
-                    callback.onWriteCancelled()
-                    return
+                    throw java.util.concurrent.CancellationException("PDF printing was cancelled.")
                 }
                 sourceRenderer.openPage(index).use { sourcePage ->
                     val sourceWidth = sourcePage.width.coerceAtLeast(1)
                     val sourceHeight = sourcePage.height.coerceAtLeast(1)
                     val memoryDpi = memoryBoundDpi(sourceWidth, sourceHeight, dpi)
-                    val bitmapWidth = (sourceWidth.toDouble() * memoryDpi / POINTS_PER_INCH).toInt().coerceAtLeast(1)
-                    val bitmapHeight = (sourceHeight.toDouble() * memoryDpi / POINTS_PER_INCH).toInt().coerceAtLeast(1)
+                    val bitmapWidth = (sourceWidth.toDouble() * memoryDpi / POINTS_PER_INCH)
+                        .toInt().coerceAtLeast(1)
+                    val bitmapHeight = (sourceHeight.toDouble() * memoryDpi / POINTS_PER_INCH)
+                        .toInt().coerceAtLeast(1)
                     val bitmap = android.graphics.Bitmap.createBitmap(
                         bitmapWidth,
                         bitmapHeight,
@@ -108,15 +139,9 @@ class PdfPrintDocumentAdapter(
                         val info = android.graphics.pdf.PdfDocument.PageInfo.Builder(
                             outputPageWidthPt.toInt().coerceAtLeast(1),
                             outputPageHeightPt.toInt().coerceAtLeast(1),
-                            index + 1
+                            writtenPages + 1
                         ).create()
                         val page = output.startPage(info)
-                        val bounds = android.graphics.RectF(
-                            0f,
-                            0f,
-                            outputPageWidthPt,
-                            outputPageHeightPt
-                        )
                         val scale = minOf(
                             outputPageWidthPt / bitmap.width.coerceAtLeast(1),
                             outputPageHeightPt / bitmap.height.coerceAtLeast(1)
@@ -136,6 +161,7 @@ class PdfPrintDocumentAdapter(
                             android.graphics.Paint(android.graphics.Paint.FILTER_BITMAP_FLAG)
                         )
                         output.finishPage(page)
+                        writtenPages++
                     } finally {
                         bitmap.recycle()
                     }
@@ -146,13 +172,9 @@ class PdfPrintDocumentAdapter(
                 stream.flush()
                 destination.fileDescriptor.sync()
             }
-            callback.onWriteFinished(arrayOf(PageRange.ALL_PAGES))
-        } catch (error: Exception) {
-            if (cancellationSignal.isCanceled) callback.onWriteCancelled()
-            else callback.onWriteFailed(error.localizedMessage ?: "Unable to print this PDF.")
+            return if (writtenPages == 0) emptyArray() else arrayOf(PageRange(0, writtenPages - 1))
         } finally {
             output.close()
-            runCatching { destination.close() }
         }
     }
 
