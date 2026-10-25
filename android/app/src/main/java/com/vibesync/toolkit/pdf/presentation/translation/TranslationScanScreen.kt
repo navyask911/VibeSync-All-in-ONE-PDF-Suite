@@ -12,6 +12,7 @@ import android.os.ParcelFileDescriptor
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,6 +34,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -67,11 +69,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import org.apache.pdfbox.pdmodel.PDDocument
-import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException
-import org.apache.pdfbox.rendering.ImageType
-import org.apache.pdfbox.rendering.PDFRenderer
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
+import com.tom_roush.pdfbox.rendering.ImageType
+import com.tom_roush.pdfbox.rendering.PDFRenderer
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -522,7 +525,7 @@ private fun pdfPageBitmap(file: File, index: Int, password: String?): Bitmap {
         if (password.isNullOrBlank()) throw PdfPasswordRequiredException("Enter the PDF password before OCR.", error)
         throw error
     }
-    return document.use { org.apache.pdfbox.rendering.PDFRenderer(it).renderImageWithDPI(index, 180f, ImageType.RGB) }
+    return document.use { com.tom_roush.pdfbox.rendering.PDFRenderer(it).renderImageWithDPI(index, 180f, ImageType.RGB) }
 }
 
 private fun detectSourceLanguage(text: String): String {
