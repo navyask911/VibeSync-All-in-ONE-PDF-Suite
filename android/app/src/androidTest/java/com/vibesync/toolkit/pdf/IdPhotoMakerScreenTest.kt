@@ -9,6 +9,8 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -25,7 +27,9 @@ class IdPhotoMakerScreenTest {
     @Test
     fun dashboardTileNavigatesAndFourPresetsSwitchLockedCropGuide() {
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("tool_id_photo").performScrollTo().performClick()
+        composeRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("tool_id_photo"))
+        composeRule.onNodeWithTag("tool_id_photo").performClick()
+        composeRule.waitForIdle()
         composeRule.onNodeWithText(composeRule.activity.getString(R.string.id_photo_title)).assertIsDisplayed()
 
         val preview = Bitmap.createBitmap(480, 640, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.rgb(180, 120, 80)) }
