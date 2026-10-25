@@ -64,6 +64,7 @@ import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.data.ocr.MlKitOcrEngine
 import com.vibesync.toolkit.pdf.data.ocr.TranslationEngine
 import com.vibesync.toolkit.pdf.data.ocr.TranslationProcessor
+import com.google.mlkit.nl.translate.TranslateLanguage
 import com.vibesync.toolkit.pdf.data.pdf.PdfPasswordRequiredException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -92,7 +93,7 @@ private val translationLanguages = listOf(
     TranslationLanguage("ja", R.string.language_japanese),
     TranslationLanguage("ko", R.string.language_korean),
     TranslationLanguage("ar", R.string.language_arabic),
-    TranslationLanguage("he", R.string.language_hebrew),
+    TranslationLanguage("iw", R.string.language_hebrew),
     TranslationLanguage("hi", R.string.language_hindi),
     TranslationLanguage("bn", R.string.language_bengali),
     TranslationLanguage("ur", R.string.language_urdu),
@@ -127,6 +128,7 @@ fun TranslationScanScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val translator = remember(processor, context) { processor ?: TranslationEngine(context.applicationContext) }
+    val supportedLanguages = remember { translationLanguages.filter { it.code in TranslateLanguage.getAllLanguages() } }
     var originalText by rememberSaveable { mutableStateOf(initialText.orEmpty()) }
     var translatedText by rememberSaveable { mutableStateOf("") }
     var sourceLanguage by rememberSaveable { mutableStateOf("auto") }
@@ -268,7 +270,7 @@ fun TranslationScanScreen(
                                 onClick = { sourceLanguage = "auto"; sourcePicker = false },
                                 modifier = Modifier.testTag("translation_source_auto")
                             )
-                            translationLanguages.forEach { language ->
+                            supportedLanguages.forEach { language ->
                                 DropdownMenuItem(
                                     text = { Text(stringResource(language.labelRes)) },
                                     onClick = { sourceLanguage = language.code; sourcePicker = false },
@@ -282,7 +284,7 @@ fun TranslationScanScreen(
                     Text(stringResource(R.string.translation_target_language), style = MaterialTheme.typography.labelLarge)
                     androidx.compose.material3.Box {
                         OutlinedButton(onClick = { targetPicker = true }, modifier = Modifier.fillMaxWidth().testTag("translation_target_picker")) {
-                            Text(stringResource(translationLanguages.first { it.code == targetLanguage }.labelRes), maxLines = 1)
+                            Text(stringResource(supportedLanguages.first { it.code == targetLanguage }.labelRes), maxLines = 1)
                         }
                         DropdownMenu(expanded = targetPicker, onDismissRequest = { targetPicker = false }) {
                             translationLanguages.forEach { language ->
@@ -313,7 +315,7 @@ fun TranslationScanScreen(
                         Text(stringResource(R.string.translation_original), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Text(originalText, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("translation_original_text"))
                     }
-                    val rtl = targetLanguage == "ar" || targetLanguage == "he" || targetLanguage == "fa" || targetLanguage == "ur"
+                    val rtl = targetLanguage == "ar" || targetLanguage == "iw" || targetLanguage == "fa" || targetLanguage == "ur"
                     CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
                         Column(Modifier.weight(1f).heightIn(min = 120.dp)) {
                             Text(stringResource(R.string.translation_result), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -342,7 +344,7 @@ fun TranslationScanScreen(
     }
 
     if (modelConsentDialog) {
-        val targetName = context.getString(translationLanguages.first { it.code == requestedTarget }.labelRes)
+        val targetName = context.getString(supportedLanguages.first { it.code == requestedTarget }.labelRes)
         AlertDialog(
             onDismissRequest = {
                 modelConsentDialog = false
@@ -546,7 +548,7 @@ private fun pdfPageBitmap(file: File, index: Int, password: String?): Bitmap {
 
 private fun detectSourceLanguage(text: String): String {
     if (text.any { it.code in 0x0600..0x06FF }) return "ar"
-    if (text.any { it.code in 0x0590..0x05FF }) return "he"
+    if (text.any { it.code in 0x0590..0x05FF }) return "iw"
     if (text.any { it.code in 0x0900..0x097F }) return "hi"
     if (text.any { it.code in 0x3040..0x30FF }) return "ja"
     if (text.any { it.code in 0xAC00..0xD7AF }) return "ko"
