@@ -150,6 +150,21 @@ jobs:
           print(f"All-locale resource audit passed: {len(required_profile_keys)} profile keys and {len(required_filter_keys)} filter keys across {len(all_string_files)} strings.xml files.")
           PY
 
+      - name: Verify OCR and print adapters stay on-device
+        run: |
+          forbidden_ocr="$(grep -RniE 'okhttp|retrofit|firebase|google-cloud|cloud-vision|https?://|java\\.net\\.URL|URL\\(' android/app/src/main/java/com/vibesync/toolkit/pdf/data/ocr || true)"
+          if [ -n "$forbidden_ocr" ]; then
+            echo "Forbidden network/cloud integration found in the OCR and translation path:"
+            echo "$forbidden_ocr"
+            exit 1
+          fi
+          non_platform_print_imports="$(grep -RniE '^import ' android/app/src/main/java/com/vibesync/toolkit/pdf/data/print | grep -vE ':import android\\.print\\.' || true)"
+          if [ -n "$non_platform_print_imports" ]; then
+            echo "Print adapter must use only Android platform print imports:"
+            echo "$non_platform_print_imports"
+            exit 1
+          fi
+
       - name: Set up JDK 17
         uses: actions/setup-java@v6
         with:
