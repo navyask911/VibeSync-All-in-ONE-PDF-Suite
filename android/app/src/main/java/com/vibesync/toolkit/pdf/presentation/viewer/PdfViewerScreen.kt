@@ -38,6 +38,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
 import com.vibesync.toolkit.pdf.core.util.BitmapCache
+import com.vibesync.toolkit.pdf.presentation.common.launchSystemPdfPrint
 import com.vibesync.toolkit.pdf.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -174,6 +175,26 @@ fun PdfViewerScreen(
                     }
                     IconButton(onClick = { onNavigateToEditor(documentUri) }) {
                         Icon(Icons.Default.Draw, contentDescription = stringResource(R.string.edit_sign_action), tint = VibeSyncCrimsonPrimary)
+                    }
+                    IconButton(
+                        onClick = {
+                            runCatching {
+                                launchSystemPdfPrint(
+                                    context,
+                                    documentUri,
+                                    context.getString(R.string.print_job_name, uiState.fileName)
+                                )
+                            }.onFailure {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    it.localizedMessage ?: context.getString(R.string.print_failed),
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        },
+                        modifier = Modifier.testTag("viewer_print")
+                    ) {
+                        Icon(Icons.Default.Print, contentDescription = stringResource(R.string.print_action))
                     }
                     ExportMenu(
                         sourceUri = documentUri,
