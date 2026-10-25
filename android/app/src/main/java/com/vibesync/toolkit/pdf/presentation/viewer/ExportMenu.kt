@@ -322,7 +322,7 @@ private fun startTextExport(
                 val pageTotal = withContext(Dispatchers.IO) { pageCountFromFile(source, passwordValue) }
                 onProgress(0, pageTotal)
                 val allText = buildString {
-                    MlKitOcrEngine().use { engine ->
+                    MlKitOcrEngine(context.applicationContext).use { engine ->
                         for (index in 0 until pageTotal) {
                             kotlinx.coroutines.currentCoroutineContext().ensureActive()
                             val bitmap = withContext(Dispatchers.IO) { renderPage(source, index, passwordValue) }
