@@ -4,9 +4,12 @@ import android.content.Context
 import android.net.Uri
 import android.print.PrintAttributes
 import android.print.PrintManager
+import android.print.PrintJob
 import com.vibesync.toolkit.pdf.data.print.PdfPrintDocumentAdapter
 
 /** Opens Android's system print UI with A4, color, 300 DPI and no duplex as the defaults. */
+@Volatile private var activeSystemPrintJob: PrintJob? = null
+
 fun launchSystemPdfPrint(context: Context, sourceUri: Uri, jobName: String) {
     val printManager = context.getSystemService(Context.PRINT_SERVICE) as? PrintManager
         ?: throw IllegalStateException("Android printing is not available on this device.")
@@ -16,5 +19,6 @@ fun launchSystemPdfPrint(context: Context, sourceUri: Uri, jobName: String) {
         .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
         .setDuplexMode(PrintAttributes.DUPLEX_MODE_NONE)
         .build()
-    printManager.print(jobName, PdfPrintDocumentAdapter(context, sourceUri, jobName), attributes)
+    activeSystemPrintJob?.takeIf { it.isQueued || it.isStarted || it.isBlocked }?.cancel()
+    activeSystemPrintJob = printManager.print(jobName, PdfPrintDocumentAdapter(context, sourceUri, jobName), attributes)
 }
