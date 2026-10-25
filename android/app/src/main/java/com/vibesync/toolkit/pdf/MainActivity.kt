@@ -97,6 +97,7 @@ import com.vibesync.toolkit.pdf.presentation.tools.ExtractImagesScreen
 import com.vibesync.toolkit.pdf.presentation.tools.MergeScreen
 import com.vibesync.toolkit.pdf.presentation.tools.PdfQuickActionScreen
 import com.vibesync.toolkit.pdf.presentation.tools.SplitScreen
+import com.vibesync.toolkit.pdf.presentation.translation.TranslationScanScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
 import kotlinx.coroutines.Dispatchers
@@ -513,6 +514,10 @@ class MainActivity : AppCompatActivity() {
 
                         composable("id_photo") {
                             IdPhotoMakerScreen(onNavigateBack = { navController.popBackStack() })
+                        }
+
+                        composable("translation_scan") {
+                            TranslationScanScreen(onNavigateBack = { navController.popBackStack() })
                         }
 
                         // Full-Screen System PDF Viewer
