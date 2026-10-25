@@ -24,6 +24,8 @@ class TranslationScanScreenTest {
     fun languagePickersTranslateAndDisplayRtlArabicResult() {
         val fake = FakeProcessor()
         setTestContent(fake)
+        composeRule.onNodeWithTag("translation_capture").assertIsDisplayed()
+        composeRule.onNodeWithTag("translation_import").assertIsDisplayed()
         composeRule.onNodeWithTag("translation_source_picker").assertIsDisplayed()
         composeRule.onNodeWithTag("translation_target_picker").performClick()
         composeRule.onNodeWithTag("translation_target_ar").performClick()
