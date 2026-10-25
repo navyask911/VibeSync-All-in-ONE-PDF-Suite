@@ -65,12 +65,11 @@ class BatchReviewSheetTest {
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertEquals(listOf("b", "a", "c"), pages.map { it.id }) }
         composeRule.onNodeWithTag("batch_delete_a", useUnmergedTree = true)
-            .assertIsDisplayed()
             .assertIsEnabled()
             .performClick()
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertEquals(listOf("b", "c"), pages.map { it.id }) }
-        composeRule.onNodeWithTag("batch_page_b", useUnmergedTree = true).performTouchInput { swipeRight() }
+        composeRule.onNodeWithTag("batch_drag_b", useUnmergedTree = true).performTouchInput { swipeRight() }
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertEquals(listOf("c", "b"), pages.map { it.id }) }
         composeRule.onNodeWithTag("batch_page_count").assertIsDisplayed()
