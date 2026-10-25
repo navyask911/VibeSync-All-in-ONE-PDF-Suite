@@ -35,7 +35,7 @@ class OcrEngineTest {
             val bitmap = BitmapFactory.decodeFile(fixture.absolutePath)
                 ?: error("PNG fixture could not be decoded")
             try {
-                val result = MlKitOcrEngine().use { it.recognize(bitmap) }
+                val result = MlKitOcrEngine(context.applicationContext).use { it.recognize(bitmap) }
                 val normalized = result.text.lowercase()
                 assertTrue("OCR should recognize Hello; got: ${result.text}", normalized.contains("hello"))
                 assertTrue("OCR should recognize World; got: ${result.text}", normalized.contains("world"))

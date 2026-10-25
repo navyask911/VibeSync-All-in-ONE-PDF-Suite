@@ -69,6 +69,7 @@ fun PdfQuickActionScreen(
     onSuccess: (File) -> Unit
 ) {
     val context = LocalContext.current
+    val formatLocale = context.resources.configuration.locales.get(0)
     val engine = remember { PdfBoxToolkitEngine(context.applicationContext) }
     val compressor = remember { PdfCompressor(context.applicationContext) }
     val scope = rememberCoroutineScope()
@@ -183,9 +184,9 @@ fun PdfQuickActionScreen(
                 }
             } else if (compressionReport != null) {
                 val report = compressionReport!!
-                Text(stringResource(R.string.compression_before_size, formatBytes(report.beforeBytes)), modifier = Modifier.testTag("compression_before_size"))
-                Text(stringResource(R.string.compression_after_size, formatBytes(report.afterBytes)), modifier = Modifier.testTag("compression_after_size"))
-                Text(stringResource(R.string.compression_size_change, String.format(Locale.getDefault(), "%.1f", report.reductionPercent)), modifier = Modifier.testTag("compression_size_change"))
+                Text(stringResource(R.string.compression_before_size, formatBytesForDisplay(report.beforeBytes, formatLocale)), modifier = Modifier.testTag("compression_before_size"))
+                Text(stringResource(R.string.compression_after_size, formatBytesForDisplay(report.afterBytes, formatLocale)), modifier = Modifier.testTag("compression_after_size"))
+                Text(stringResource(R.string.compression_size_change, String.format(formatLocale, "%.1f", report.reductionPercent)), modifier = Modifier.testTag("compression_size_change"))
                 Text(stringResource(R.string.compression_page_count, report.pageCount))
                 Button(onClick = { onSuccess(report.outputFile) }, modifier = Modifier.fillMaxWidth().testTag("compression_use_output")) {
                     Text(stringResource(R.string.compression_use_output))
@@ -257,9 +258,9 @@ fun PdfQuickActionScreen(
     }
 }
 
-private fun formatBytes(bytes: Long): String {
+fun formatBytesForDisplay(bytes: Long, locale: Locale): String {
     if (bytes < 1024L) return "$bytes B"
     val kib = bytes / 1024.0
-    if (kib < 1024.0) return String.format(Locale.getDefault(), "%.1f KB", kib)
-    return String.format(Locale.getDefault(), "%.2f MB", kib / 1024.0)
+    if (kib < 1024.0) return String.format(locale, "%.1f KB", kib)
+    return String.format(locale, "%.2f MB", kib / 1024.0)
 }

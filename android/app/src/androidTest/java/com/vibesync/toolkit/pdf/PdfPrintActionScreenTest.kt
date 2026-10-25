@@ -38,7 +38,7 @@ class PdfPrintActionScreenTest {
         val work = File(context.cacheDir, "print-viewer-ui-" + System.nanoTime()).apply { mkdirs() }
         val source = File(work, "viewer-print.pdf")
         createPdf(source)
-        val monitor = instrumentation.addMonitor("com.android.printspooler", null, false)
+        val monitor = instrumentation.addMonitor("com.android.printspooler.ui.PrintActivity", null, false)
         try {
             setTestContent(source)
             composeRule.onNodeWithTag("viewer_print").performClick()

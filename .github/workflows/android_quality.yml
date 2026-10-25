@@ -262,6 +262,7 @@ jobs:
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 30
+          # Play Services supplies the unbundled ML Kit OCR model; this also supports on-device translation.
           target: google_apis
           arch: x86_64
           profile: pixel_5

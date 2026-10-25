@@ -19,6 +19,7 @@ import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.data.pdf.PdfCompressor
 import com.vibesync.toolkit.pdf.data.pdf.ResolutionProfile
 import com.vibesync.toolkit.pdf.presentation.tools.PdfQuickActionScreen
+import com.vibesync.toolkit.pdf.presentation.tools.formatBytesForDisplay
 import kotlinx.coroutines.runBlocking
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
@@ -35,7 +36,6 @@ import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.Random
-import java.util.Locale
 
 class CompressionToolTest {
     @get:Rule
@@ -139,24 +139,18 @@ class CompressionToolTest {
         }
         composeRule.onNodeWithTag("compression_before_size")
             .assertIsDisplayed()
-            .assertTextContains(formatBytesForTest(input.length()))
+            .assertTextContains(formatBytesForDisplay(input.length(), context.resources.configuration.locales.get(0)))
         composeRule.onNodeWithTag("compression_after_size").assertIsDisplayed()
         composeRule.onNodeWithTag("compression_size_change").assertIsDisplayed()
         composeRule.onNodeWithTag("compression_use_output").performClick()
         composeRule.waitUntil(10_000) { compressedOutput?.isFile == true }
         val output = requireNotNull(compressedOutput)
         composeRule.onNodeWithTag("compression_after_size")
-            .assertTextContains(formatBytesForTest(output.length()))
+            .assertTextContains(formatBytesForDisplay(output.length(), context.resources.configuration.locales.get(0)))
         output.delete()
         work.deleteRecursively()
     }
 
-    private fun formatBytesForTest(bytes: Long): String {
-        if (bytes < 1024L) return "$bytes B"
-        val kib = bytes / 1024.0
-        if (kib < 1024.0) return String.format(Locale.getDefault(), "%.1f KB", kib)
-        return String.format(Locale.getDefault(), "%.2f MB", kib / 1024.0)
-    }
     private fun syntheticPdf(directory: File, protect: Boolean): File {
         val output = File(directory, if (protect) "protected-source.pdf" else "source.pdf")
         val bitmap = Bitmap.createBitmap(900, 1200, Bitmap.Config.ARGB_8888)

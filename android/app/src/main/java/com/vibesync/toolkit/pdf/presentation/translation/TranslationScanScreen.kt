@@ -129,10 +129,20 @@ fun TranslationScanScreen(
     val scope = rememberCoroutineScope()
     val translator = remember(processor, context) { processor ?: TranslationEngine(context.applicationContext) }
     val supportedLanguages = remember { translationLanguages.filter { it.code in TranslateLanguage.getAllLanguages() } }
-    var originalText by rememberSaveable(initialText) { mutableStateOf(initialText.orEmpty()) }
-    var translatedText by rememberSaveable(initialText) { mutableStateOf("") }
-    var sourceLanguage by rememberSaveable(initialText) { mutableStateOf("auto") }
-    var targetLanguage by rememberSaveable(initialText) { mutableStateOf("es") }
+    // A document change must not restore an empty saved state from an older composition.
+    val initialTextStateKey = "${initialText?.length ?: -1}_${initialText?.hashCode() ?: 0}"
+    var originalText by rememberSaveable(initialText, key = "translation_original_$initialTextStateKey") {
+        mutableStateOf(initialText.orEmpty())
+    }
+    var translatedText by rememberSaveable(initialText, key = "translation_result_$initialTextStateKey") {
+        mutableStateOf("")
+    }
+    var sourceLanguage by rememberSaveable(initialText, key = "translation_source_$initialTextStateKey") {
+        mutableStateOf("auto")
+    }
+    var targetLanguage by rememberSaveable(initialText, key = "translation_target_$initialTextStateKey") {
+        mutableStateOf("es")
+    }
     var sourcePicker by remember { mutableStateOf(false) }
     var targetPicker by remember { mutableStateOf(false) }
     var modelConsentDialog by remember { mutableStateOf(false) }
@@ -189,7 +199,7 @@ fun TranslationScanScreen(
                 totalPages = 1
                 status = ""
                 try {
-                    val result = MlKitOcrEngine().use { it.recognize(capturedBitmap) }
+                    val result = MlKitOcrEngine(context.applicationContext).use { it.recognize(capturedBitmap) }
                     originalText = result.text
                     translatedText = ""
                     completedPages = 1
@@ -474,7 +484,7 @@ private suspend fun recognizeUri(
         }
         try {
             onProgress(0, 1)
-            val text = MlKitOcrEngine().use { it.recognize(bitmap).text }
+            val text = MlKitOcrEngine(context.applicationContext).use { it.recognize(bitmap).text }
             onProgress(1, 1)
             return text
         } finally {

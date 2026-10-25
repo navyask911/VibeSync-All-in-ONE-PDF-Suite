@@ -44,7 +44,8 @@ class TranslationRoutingTest {
             composeRule.onAllNodesWithTag("translation_model_decline").fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithTag("translation_model_decline").performClick()
-        composeRule.onNodeWithTag("translation_status").assertTextContains("declined")
+        composeRule.onNodeWithTag("translation_status")
+            .assertTextContains(composeRule.activity.getString(R.string.translation_model_download_declined))
         composeRule.runOnIdle { assertTrue("Decline must abort the translation request", processor.calls.isEmpty()) }
     }
 
