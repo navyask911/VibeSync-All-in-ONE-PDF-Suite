@@ -131,6 +131,7 @@ private fun BatchPageThumbnail(
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(8.dp)) {
             Box(
                 modifier = Modifier.size(88.dp, 112.dp)
+                    .testTag("batch_drag_${page.id}")
                     .pointerInput(page.id, index, pageCount) {
                         var accumulatedDrag = 0f
                         detectDragGestures { change, dragAmount ->
