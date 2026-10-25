@@ -306,6 +306,8 @@ jobs:
 
           started = int(starts[-1])
           finished = int(finishes[-1])
+          if started < 50:
+              sys.exit(f"Step 4 requires at least 50 connected Android tests; only {started} started.")
           report_dir = pathlib.Path("app/build/outputs/androidTest-results/connected/debug")
           report_files = sorted(report_dir.rglob("*.xml")) if report_dir.exists() else []
           if not report_files:
