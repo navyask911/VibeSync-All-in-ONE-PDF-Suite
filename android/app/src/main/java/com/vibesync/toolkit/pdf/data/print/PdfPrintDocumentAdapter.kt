@@ -27,6 +27,8 @@ class PdfPrintDocumentAdapter(
             activeAdapter = this
             cleanup()
             stagedSource = stageSource()
+            // Prepare the page count as soon as source staging succeeds; onLayout reports errors.
+            runCatching { ensureRenderer() }
         }
     }
 
@@ -211,10 +213,12 @@ class PdfPrintDocumentAdapter(
 
     private fun memoryBoundDpi(width: Int, height: Int, requestedDpi: Int): Int {
         val maxPixels = (Runtime.getRuntime().maxMemory().coerceAtLeast(32L * 1024L * 1024L) / 4L / 4L)
-            .coerceAtLeast(1L)
-        val nativePixels = width.toLong() * height.toLong()
-        if (nativePixels <= maxPixels) return requestedDpi
-        val scale = kotlin.math.sqrt(maxPixels.toDouble() / nativePixels.toDouble())
+            .coerceAtLeast(1L).toDouble()
+        val scaleAtRequestedDpi = requestedDpi.toDouble() / POINTS_PER_INCH
+        val requestedPixels = width.toDouble() * scaleAtRequestedDpi *
+            height.toDouble() * scaleAtRequestedDpi
+        if (requestedPixels <= maxPixels) return requestedDpi
+        val scale = kotlin.math.sqrt(maxPixels / requestedPixels)
         return (requestedDpi * scale).toInt().coerceIn(MINIMUM_DPI, requestedDpi)
     }
 
