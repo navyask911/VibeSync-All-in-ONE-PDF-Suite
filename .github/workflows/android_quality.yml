@@ -208,7 +208,7 @@ jobs:
             echo "$forbidden_ocr"
             exit 1
           fi
-          non_platform_print_imports="$(grep -RniE '^import ' android/app/src/main/java/com/vibesync/toolkit/pdf/data/print | grep -vE ':import android\.print\.' || true)"
+          non_platform_print_imports="$(grep -RniE '^import ' android/app/src/main/java/com/vibesync/toolkit/pdf/data/print | grep -vE 'import android\\.print\\.' || true)"
           if [ -n "$non_platform_print_imports" ]; then
             echo "Print adapter must use only Android platform print imports:"
             echo "$non_platform_print_imports"
