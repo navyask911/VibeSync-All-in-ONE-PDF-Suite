@@ -13,9 +13,9 @@ import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.presentation.viewer.ExportMenu
 import com.vibesync.toolkit.pdf.presentation.viewer.buildJpgPagesZip
-import org.apache.pdfbox.pdmodel.PDDocument
-import org.apache.pdfbox.pdmodel.PDPage
-import org.apache.pdfbox.pdmodel.common.PDRectangle
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.pdmodel.PDPage
+import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
