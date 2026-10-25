@@ -110,13 +110,10 @@ private val translationLanguages = listOf(
     TranslationLanguage("mr", R.string.language_marathi),
     TranslationLanguage("gu", R.string.language_gujarati),
     TranslationLanguage("kn", R.string.language_kannada),
-    TranslationLanguage("ml", R.string.language_malayalam),
-    TranslationLanguage("ne", R.string.language_nepali),
-    TranslationLanguage("si", R.string.language_sinhala),
     TranslationLanguage("ro", R.string.language_romanian),
     TranslationLanguage("uk", R.string.language_ukrainian),
     TranslationLanguage("sw", R.string.language_swahili),
-    TranslationLanguage("fil", R.string.language_filipino)
+    TranslationLanguage("tl", R.string.language_filipino)
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
