@@ -66,8 +66,7 @@ fun PdfQuickActionScreen(
     mode: String,
     initialUri: Uri,
     onNavigateBack: () -> Unit,
-    onSuccess: (File) -> Unit,
-    onCompressionReport: (CompressionReport, Locale) -> Unit = { _, _ -> }
+    onSuccess: (File) -> Unit
 ) {
     val context = LocalContext.current
     val formatLocale = context.resources.configuration.locales.get(0)
@@ -117,7 +116,6 @@ fun PdfQuickActionScreen(
             result.fold(
                 onSuccess = { report ->
                     compressionReport = report
-                    onCompressionReport(report, formatLocale)
                     password = ""
                     pendingPasswordRetry = false
                 },

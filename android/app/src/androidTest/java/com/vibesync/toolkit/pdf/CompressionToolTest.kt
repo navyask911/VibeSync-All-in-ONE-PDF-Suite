@@ -3,17 +3,17 @@ package com.vibesync.toolkit.pdf
 import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.test.core.app.ApplicationProvider
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
-import com.vibesync.toolkit.pdf.data.pdf.CompressionReport
 import com.vibesync.toolkit.pdf.data.pdf.PdfCompressor
 import com.vibesync.toolkit.pdf.data.pdf.ResolutionProfile
 import com.vibesync.toolkit.pdf.presentation.tools.PdfQuickActionScreen
@@ -124,59 +124,41 @@ class CompressionToolTest {
         val work = File(context.cacheDir, "compression-ui-" + System.nanoTime()).apply { mkdirs() }
         val input = syntheticPdf(work, protect = false)
         var compressedOutput: File? = null
-        val observedReport = AtomicReference<CompressionReport?>()
-        val observedFormatLocale = AtomicReference<Locale?>()
+        val displayLocale = AtomicReference<Locale?>()
         composeRule.setContent {
+            val uiContext = LocalContext.current
+            SideEffect { displayLocale.set(uiContext.resources.configuration.locales.get(0)) }
             VibeSyncPdfTheme {
                 PdfQuickActionScreen(
                     mode = "compress",
                     initialUri = Uri.fromFile(input),
                     onNavigateBack = {},
-                    onSuccess = { compressedOutput = it },
-                    onCompressionReport = { report, locale ->
-                        observedReport.set(report)
-                        observedFormatLocale.set(locale)
-                    }
+                    onSuccess = { compressedOutput = it }
                 )
             }
         }
         composeRule.onNodeWithTag("compression_run").performClick()
         composeRule.waitUntil(180_000) {
-            observedReport.get() != null &&
-                composeRule.onAllNodesWithTag("compression_before_size").fetchSemanticsNodes().isNotEmpty() &&
+            composeRule.onAllNodesWithTag("compression_before_size").fetchSemanticsNodes().isNotEmpty() &&
                 composeRule.onAllNodesWithTag("compression_after_size").fetchSemanticsNodes().isNotEmpty()
         }
-
-        // Expected values must use the exact bytes and locale supplied to the UI formatter.
-        // input.length() is logged separately because compression stages the source into a cache file.
-        val report = requireNotNull(observedReport.get()) { "Compression report was not observed by the test." }
-        val uiFormatLocale = requireNotNull(observedFormatLocale.get()) { "UI formatter locale was not observed." }
-        val inputBytes = input.length()
-        val expectedBefore = formatBytesForDisplay(report.beforeBytes, uiFormatLocale)
-        val expectedAfter = formatBytesForDisplay(report.afterBytes, uiFormatLocale)
-        val beforeNode = composeRule.onNodeWithTag("compression_before_size")
-        val afterNode = composeRule.onNodeWithTag("compression_after_size")
-        val actualBeforeText = runCatching {
-            beforeNode.fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)
-                ?.joinToString(separator = "") { it.text }
-        }.getOrNull() ?: "<no text semantics>"
-        val actualAfterText = runCatching {
-            afterNode.fetchSemanticsNode().config.getOrNull(SemanticsProperties.Text)
-                ?.joinToString(separator = "") { it.text }
-        }.getOrNull() ?: "<no text semantics>"
-        println(
-            "Compression size diagnostic: inputBytes=$inputBytes; uiBeforeBytes=${report.beforeBytes}; " +
-                "uiAfterBytes=${report.afterBytes}; locale=$uiFormatLocale; expectedBefore=$expectedBefore; " +
-                "actualBeforeText=$actualBeforeText; expectedAfter=$expectedAfter; actualAfterText=$actualAfterText"
-        )
-
-        beforeNode.assertIsDisplayed().assertTextContains(expectedBefore, substring = true)
-        afterNode.assertIsDisplayed().assertTextContains(expectedAfter, substring = true)
+        val uiFormatLocale = requireNotNull(displayLocale.get()) { "Compose UI locale was not captured." }
+        // PdfCompressor stages this file by copying its bytes exactly; therefore input.length()
+        // is the beforeBytes value displayed by the compression report.
+        val expectedBefore = formatBytesForDisplay(input.length(), uiFormatLocale)
+        composeRule.onNodeWithTag("compression_before_size")
+            .assertIsDisplayed()
+            .assertTextContains(expectedBefore)
+        composeRule.onNodeWithTag("compression_after_size").assertIsDisplayed()
         composeRule.onNodeWithTag("compression_size_change").assertIsDisplayed()
         composeRule.onNodeWithTag("compression_use_output").performClick()
         composeRule.waitUntil(10_000) { compressedOutput?.isFile == true }
         val output = requireNotNull(compressedOutput)
-        afterNode.assertTextContains(expectedAfter, substring = true)
+        val expectedAfter = formatBytesForDisplay(output.length(), uiFormatLocale)
+        composeRule.onNodeWithTag("compression_after_size")
+            .assertTextContains(expectedAfter)
+        output.delete()
+        work.deleteRecursively()
         output.delete()
         work.deleteRecursively()
     }
