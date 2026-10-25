@@ -177,7 +177,7 @@ fun PdfQuickActionScreen(
                     style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.testTag("compression_progress_count")
                 )
-                OutlinedButton(onClick = { activeJob?.cancel() }, modifier = Modifier.fillMaxWidth().testTag("compression_cancel")) {
+                OutlinedButton(onClick = { activeJob?.cancel(); activeJob = null; processing = false }, modifier = Modifier.fillMaxWidth().testTag("compression_cancel")) {
                     Text(stringResource(R.string.cancel))
                 }
             } else if (compressionReport != null) {
