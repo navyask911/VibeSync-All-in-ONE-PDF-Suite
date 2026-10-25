@@ -50,8 +50,6 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
-import com.tom_roush.pdfbox.rendering.ImageType
-import com.tom_roush.pdfbox.rendering.PDFRenderer
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -481,36 +479,58 @@ private fun pageCountFromFile(file: File, password: String?): Int {
 }
 
 private fun renderPage(file: File, pageIndex: Int, password: String?): Bitmap {
-    if (password.isNullOrBlank()) {
+    var decryptedFile: File? = null
+    val renderFile = if (password.isNullOrBlank()) {
+        file
+    } else {
+        val decrypted = File.createTempFile("export_decrypted_", ".pdf", file.parentFile)
         try {
-            val descriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
-            PdfRenderer(descriptor).use { renderer ->
-                require(pageIndex in 0 until renderer.pageCount) { "The requested PDF page does not exist." }
-                renderer.openPage(pageIndex).use { page ->
-                    val scale = minOf(2.0, 2400.0 / page.width.coerceAtLeast(1), 3200.0 / page.height.coerceAtLeast(1))
-                    val bitmap = Bitmap.createBitmap(
-                        (page.width * scale).toInt().coerceAtLeast(1),
-                        (page.height * scale).toInt().coerceAtLeast(1),
-                        Bitmap.Config.ARGB_8888
-                    )
-                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                    return bitmap
-                }
+            PDDocument.load(file, password).use { document ->
+                document.setAllSecurityToBeRemoved(true)
+                document.save(decrypted)
             }
+            decryptedFile = decrypted
+            decrypted
         } catch (error: Exception) {
-            val probe = try { PDDocument.load(file) } catch (protected: InvalidPasswordException) {
-                throw ExportPasswordRequiredException("Enter the PDF password to export this document.", protected)
-            }
-            probe.close()
+            decrypted.delete()
+            throw error
         }
     }
-    val document = try {
-        if (password.isNullOrBlank()) PDDocument.load(file) else PDDocument.load(file, password)
-    } catch (error: InvalidPasswordException) {
-        if (password.isNullOrBlank()) throw ExportPasswordRequiredException("Enter the PDF password to export this document.", error)
+    try {
+        val descriptor = ParcelFileDescriptor.open(renderFile, ParcelFileDescriptor.MODE_READ_ONLY)
+        PdfRenderer(descriptor).use { renderer ->
+            require(pageIndex in 0 until renderer.pageCount) { "The requested PDF page does not exist." }
+            renderer.openPage(pageIndex).use { page ->
+                val scale = minOf(2.5, 2400.0 / page.width.coerceAtLeast(1), 3200.0 / page.height.coerceAtLeast(1))
+                val bitmap = Bitmap.createBitmap(
+                    (page.width * scale).toInt().coerceAtLeast(1),
+                    (page.height * scale).toInt().coerceAtLeast(1),
+                    Bitmap.Config.ARGB_8888
+                )
+                try {
+                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
+                    return bitmap
+                } catch (error: Exception) {
+                    bitmap.recycle()
+                    throw error
+                }
+            }
+        }
+    } catch (error: Exception) {
+        if (password.isNullOrBlank()) {
+            try {
+                PDDocument.load(file).use { /* confirms whether PDFBox requires a password */ }
+            } catch (protected: InvalidPasswordException) {
+                throw ExportPasswordRequiredException(
+                    "Enter the PDF password to export this document.",
+                    protected
+                )
+            }
+        }
         throw error
+    } finally {
+        decryptedFile?.delete()
     }
-    return document.use { PDFRenderer(it).renderImageWithDPI(pageIndex, 180f, ImageType.RGB) }
 }
 
 private class ExportPasswordRequiredException(message: String, cause: Throwable) : IOException(message, cause)
