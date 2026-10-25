@@ -9,6 +9,7 @@ import android.view.ViewGroup
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.performScrollToNode
@@ -59,13 +60,17 @@ class BatchReviewSheetTest {
         }
         composeRule.onNodeWithTag("batch_page_count").assertIsDisplayed()
         composeRule.onNodeWithTag("batch_compile").assertIsEnabled()
-        composeRule.onNodeWithTag("batch_move_right_a", useUnmergedTree = true)
+        composeRule.onNodeWithTag("batch_move_right_a")
+            .assertIsDisplayed()
             .assertIsEnabled()
+            .assertHasClickAction()
             .performClick()
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertEquals(listOf("b", "a", "c"), pages.map { it.id }) }
-        composeRule.onNodeWithTag("batch_delete_a", useUnmergedTree = true)
+        composeRule.onNodeWithTag("batch_delete_a")
+            .assertIsDisplayed()
             .assertIsEnabled()
+            .assertHasClickAction()
             .performClick()
         composeRule.waitForIdle()
         composeRule.runOnIdle { assertEquals(listOf("b", "c"), pages.map { it.id }) }
