@@ -126,6 +126,10 @@ fun ExportMenu(
     launchJpg = { name -> jpgLauncher.launch(name) }
     val zipLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { target ->
         if (target != null) scope.launch {
+            running = true
+            progress = 0f
+            completedPages = 0
+            totalPages = 0
             runExport(context, {
                 exportAllPagesZip(context, sourceUri, target) { complete, total ->
                     completedPages = complete
@@ -133,8 +137,12 @@ fun ExportMenu(
                     progress = if (total > 0) complete.toFloat() / total else 0f
                 }
             }, onDone = {
+                running = false
                 Toast.makeText(context, context.getString(R.string.export_saved_zip), Toast.LENGTH_LONG).show()
-            }, onError = { showExportError(context, it) })
+            }, onError = {
+                running = false
+                showExportError(context, it)
+            })
         }
     }
     val txtLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { target ->
@@ -234,7 +242,7 @@ fun ExportMenu(
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.testTag("export_progress_count")
             )
-            TextButton(onClick = { activeJob?.cancel() }, modifier = Modifier.testTag("export_cancel")) {
+            TextButton(onClick = { activeJob?.cancel(); activeJob = null; running = false }, modifier = Modifier.testTag("export_cancel")) {
                 Text(stringResource(R.string.cancel))
             }
         }
