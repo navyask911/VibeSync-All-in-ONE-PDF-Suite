@@ -35,6 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -80,13 +81,16 @@ fun BatchReviewSheet(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             pages.forEachIndexed { index, page ->
-                BatchPageThumbnail(
-                    page = page,
-                    index = index,
-                    onDelete = { onDeletePage(page.id) },
-                    onMove = onMovePage,
-                    pageCount = pages.size
-                )
+                // Keep each thumbnail's composition attached to the page while its index changes.
+                key(page.id) {
+                    BatchPageThumbnail(
+                        page = page,
+                        index = index,
+                        onDelete = { onDeletePage(page.id) },
+                        onMove = onMovePage,
+                        pageCount = pages.size
+                    )
+                }
             }
         }
         Spacer(Modifier.height(14.dp))
