@@ -23,9 +23,8 @@ import com.vibesync.toolkit.pdf.data.print.PdfPrintDocumentAdapter
 import com.vibesync.toolkit.pdf.presentation.common.launchSystemPdfPrint
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
-import io.mockk.match
-import io.mockk.mockk
-import io.mockk.verify
+import io.mockk.*
+import kotlin.requireNotNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -83,8 +82,11 @@ class PdfPrintActionScreenTest {
             assertEquals("Viewer print must dispatch exactly once.", 1, dispatchCount.get())
             assertTrue("Print job name must be populated.", dispatchedJobName.get().orEmpty().isNotBlank())
             assertEquals(PrintAttributes.MediaSize.ISO_A4, attributes.mediaSize)
-            assertEquals(300, attributes.resolution.horizontalDpi)
-            assertEquals(300, attributes.resolution.verticalDpi)
+            val resolution = requireNotNull(attributes.resolution) {
+                "Print resolution must be non-null for A4/300DPI test"
+            }
+            assertEquals(300, resolution.horizontalDpi)
+            assertEquals(300, resolution.verticalDpi)
             assertEquals(PrintAttributes.COLOR_MODE_COLOR, attributes.colorMode)
             assertEquals(PrintAttributes.DUPLEX_MODE_NONE, attributes.duplexMode)
 
