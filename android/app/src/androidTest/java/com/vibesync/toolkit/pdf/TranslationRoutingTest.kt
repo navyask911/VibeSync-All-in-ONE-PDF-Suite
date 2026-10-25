@@ -7,6 +7,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.data.ocr.TranslationProcessor
@@ -39,7 +40,10 @@ class TranslationRoutingTest {
         val processor = FakeTranslationProcessor(ready = false)
         setTestContent(processor)
         composeRule.onNodeWithTag("translation_run").performClick()
-        composeRule.onNodeWithTag("translation_model_download_decline").performClick()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag("translation_model_decline").fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("translation_model_decline").performClick()
         composeRule.onNodeWithTag("translation_status").assertTextContains("declined")
         composeRule.runOnIdle { assertTrue("Decline must abort the translation request", processor.calls.isEmpty()) }
     }

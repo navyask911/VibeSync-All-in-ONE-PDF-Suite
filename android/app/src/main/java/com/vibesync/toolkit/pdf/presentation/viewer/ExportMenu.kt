@@ -47,6 +47,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
@@ -124,24 +125,27 @@ fun ExportMenu(
     }
     jpgLaunchRef[0] = { name -> jpgLauncher.launch(name) }
     val zipLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { target ->
-        if (target != null) scope.launch {
-            running = true
-            progress = 0f
-            completedPages = 0
-            totalPages = 0
-            runExport(context, {
-                exportAllPagesZip(context, sourceUri, target) { complete, total ->
-                    completedPages = complete
-                    totalPages = total
-                    progress = if (total > 0) complete.toFloat() / total else 0f
+        if (target != null) {
+            activeJob = scope.launch {
+                running = true
+                progress = 0f
+                completedPages = 0
+                totalPages = 0
+                try {
+                    runExport(context, {
+                        exportAllPagesZip(context, sourceUri, target) { complete, total ->
+                            completedPages = complete
+                            totalPages = total
+                            progress = if (total > 0) complete.toFloat() / total else 0f
+                        }
+                    }, onDone = {
+                        Toast.makeText(context, context.getString(R.string.export_saved_zip), Toast.LENGTH_LONG).show()
+                    }, onError = { showExportError(context, it) })
+                } finally {
+                    running = false
+                    activeJob = null
                 }
-            }, onDone = {
-                running = false
-                Toast.makeText(context, context.getString(R.string.export_saved_zip), Toast.LENGTH_LONG).show()
-            }, onError = {
-                running = false
-                showExportError(context, it)
-            })
+            }
         }
     }
     val txtLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { target ->
@@ -398,7 +402,7 @@ private fun exportPageJpg(context: Context, sourceUri: Uri, targetUri: Uri, page
     }
 }
 
-private fun exportAllPagesZip(
+private suspend fun exportAllPagesZip(
     context: Context,
     sourceUri: Uri,
     targetUri: Uri,
@@ -416,17 +420,19 @@ private fun exportAllPagesZip(
 }
 
 /** Builds the ZIP before SAF persistence so its entry list and JPEG bytes can be verified. */
-internal fun buildJpgPagesZip(
+internal suspend fun buildJpgPagesZip(
     context: Context,
     sourceUri: Uri,
     targetFile: File,
     onProgress: (Int, Int) -> Unit = { _, _ -> }
 ) {
+    val exportCoroutineContext = currentCoroutineContext()
     val source = stagePdf(context, sourceUri)
     try {
         val count = pageCountFromFile(source, null)
         ZipOutputStream(FileOutputStream(targetFile)).use { zip ->
             for (index in 0 until count) {
+                exportCoroutineContext.ensureActive()
                 val bitmap = renderPage(source, index, null)
                 try {
                     zip.putNextEntry(ZipEntry(String.format(Locale.ROOT, "page_%03d.jpg", index + 1)))

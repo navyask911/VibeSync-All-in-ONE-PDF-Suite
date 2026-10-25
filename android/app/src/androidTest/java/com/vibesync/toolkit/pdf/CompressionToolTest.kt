@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertTextContains
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -34,6 +35,7 @@ import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.Random
+import java.util.Locale
 
 class CompressionToolTest {
     @get:Rule
@@ -53,9 +55,19 @@ class CompressionToolTest {
                 outputs += output
                 compressor.compress(Uri.fromFile(input), output, profile, maxMemoryBytes = 512L * 1024L * 1024L).getOrThrow()
             }
+            val expectedRotations = PDDocument.load(input).use { source ->
+                (0 until source.numberOfPages).map { index -> source.getPage(index).rotation }
+            }
             ResolutionProfile.values().forEach { profile ->
                 assertEquals("Page count must remain five for $profile", 5, reports.getValue(profile).pageCount)
-                PDDocument.load(reports.getValue(profile).outputFile).use { assertEquals(5, it.numberOfPages) }
+                PDDocument.load(reports.getValue(profile).outputFile).use { outputDocument ->
+                    assertEquals(5, outputDocument.numberOfPages)
+                    assertEquals(
+                        "Page rotations and order must be preserved for $profile",
+                        expectedRotations,
+                        (0 until outputDocument.numberOfPages).map { index -> outputDocument.getPage(index).rotation }
+                    )
+                }
             }
             assertTrue(
                 "SMALLEST output must be smaller than STANDARD",
@@ -111,12 +123,13 @@ class CompressionToolTest {
         PDFBoxResourceLoader.init(context)
         val work = File(context.cacheDir, "compression-ui-" + System.nanoTime()).apply { mkdirs() }
         val input = syntheticPdf(work, protect = false)
+        var compressedOutput: File? = null
         setTestContent {
             PdfQuickActionScreen(
                 mode = "compress",
                 initialUri = Uri.fromFile(input),
                 onNavigateBack = {},
-                onSuccess = {}
+                onSuccess = { compressedOutput = it }
             )
         }
         composeRule.onNodeWithTag("compression_run").performClick()
@@ -124,12 +137,26 @@ class CompressionToolTest {
             composeRule.onAllNodesWithTag("compression_before_size").fetchSemanticsNodes().isNotEmpty() &&
                 composeRule.onAllNodesWithTag("compression_after_size").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithTag("compression_before_size").assertIsDisplayed()
+        composeRule.onNodeWithTag("compression_before_size")
+            .assertIsDisplayed()
+            .assertTextContains(formatBytesForTest(input.length()))
         composeRule.onNodeWithTag("compression_after_size").assertIsDisplayed()
         composeRule.onNodeWithTag("compression_size_change").assertIsDisplayed()
+        composeRule.onNodeWithTag("compression_use_output").performClick()
+        composeRule.waitUntil(10_000) { compressedOutput?.isFile == true }
+        val output = requireNotNull(compressedOutput)
+        composeRule.onNodeWithTag("compression_after_size")
+            .assertTextContains(formatBytesForTest(output.length()))
+        output.delete()
         work.deleteRecursively()
     }
 
+    private fun formatBytesForTest(bytes: Long): String {
+        if (bytes < 1024L) return "$bytes B"
+        val kib = bytes / 1024.0
+        if (kib < 1024.0) return String.format(Locale.getDefault(), "%.1f KB", kib)
+        return String.format(Locale.getDefault(), "%.2f MB", kib / 1024.0)
+    }
     private fun syntheticPdf(directory: File, protect: Boolean): File {
         val output = File(directory, if (protect) "protected-source.pdf" else "source.pdf")
         val bitmap = Bitmap.createBitmap(900, 1200, Bitmap.Config.ARGB_8888)
@@ -152,6 +179,7 @@ class CompressionToolTest {
         PDDocument().use { document ->
             repeat(5) {
                 val page = PDPage(PDRectangle.A4)
+                page.rotation = if (it == 0) 90 else 0
                 document.addPage(page)
                 val image = PDImageXObject.createFromByteArray(document, jpegStream.toByteArray(), "fixture")
                 PDPageContentStream(document, page).use { it.drawImage(image, 0f, 0f, PDRectangle.A4.width, PDRectangle.A4.height) }

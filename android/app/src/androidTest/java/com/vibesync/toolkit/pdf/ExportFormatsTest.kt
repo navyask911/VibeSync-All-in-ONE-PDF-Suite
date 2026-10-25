@@ -20,6 +20,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.zip.ZipFile
@@ -73,7 +74,7 @@ class ExportFormatsTest {
     }
 
     @Test
-    fun multipagePdfCreatesZipWithOneValidJpegEntryPerPage() {
+    fun multipagePdfCreatesZipWithOneValidJpegEntryPerPage() = runBlocking {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         PDFBoxResourceLoader.init(context)
         val work = File(context.cacheDir, "export-zip-" + System.nanoTime()).apply { mkdirs() }

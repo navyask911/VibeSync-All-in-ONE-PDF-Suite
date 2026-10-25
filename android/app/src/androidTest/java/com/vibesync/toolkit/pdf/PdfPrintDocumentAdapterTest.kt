@@ -10,6 +10,7 @@ import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
+import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
 import com.vibesync.toolkit.pdf.data.print.PdfPrintDocumentAdapter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -52,6 +53,18 @@ class PdfPrintDocumentAdapterTest {
             )
             assertEquals(listOf(PageRange(0, 2)), written.toList())
             assertTrue("Printed PDF should be non-empty.", output.isFile && output.length() > 0L)
+            val embeddedImageSizes = PDDocument.load(output).use { printed ->
+                val resources = printed.getPage(0).resources
+                resources.xObjectNames.mapNotNull { name ->
+                    resources.getXObject(name) as? PDImageXObject
+                }.map { it.width to it.height }
+            }
+            assertTrue(
+                "300 DPI A4 should embed a full-resolution page image; got $embeddedImageSizes",
+                embeddedImageSizes.any { (width, height) ->
+                    (width >= 2_000 && height >= 3_000) || (height >= 2_000 && width >= 3_000)
+                }
+            )
             ParcelFileDescriptor.open(output, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
                 android.graphics.pdf.PdfRenderer(pfd).use { renderer ->
                     assertEquals(3, renderer.pageCount)

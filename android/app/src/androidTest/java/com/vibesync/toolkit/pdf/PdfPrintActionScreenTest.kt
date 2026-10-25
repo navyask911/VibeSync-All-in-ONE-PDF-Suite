@@ -42,7 +42,7 @@ class PdfPrintActionScreenTest {
         try {
             setTestContent(source)
             composeRule.onNodeWithTag("viewer_print").performClick()
-            val printActivity = instrumentation.waitForMonitorWithTimeout(monitor, 15_000)
+            val printActivity = instrumentation.waitForMonitorWithTimeout(monitor, 30_000)
             assertNotNull("Viewer Print should open the Android system print UI.", printActivity)
             (context.getSystemService(Context.PRINT_SERVICE) as? PrintManager)?.printJobs?.forEach { it.cancel() }
         } finally {

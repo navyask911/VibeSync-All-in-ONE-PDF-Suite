@@ -129,10 +129,10 @@ fun TranslationScanScreen(
     val scope = rememberCoroutineScope()
     val translator = remember(processor, context) { processor ?: TranslationEngine(context.applicationContext) }
     val supportedLanguages = remember { translationLanguages.filter { it.code in TranslateLanguage.getAllLanguages() } }
-    var originalText by rememberSaveable { mutableStateOf(initialText.orEmpty()) }
-    var translatedText by rememberSaveable { mutableStateOf("") }
-    var sourceLanguage by rememberSaveable { mutableStateOf("auto") }
-    var targetLanguage by rememberSaveable { mutableStateOf("es") }
+    var originalText by rememberSaveable(initialText) { mutableStateOf(initialText.orEmpty()) }
+    var translatedText by rememberSaveable(initialText) { mutableStateOf("") }
+    var sourceLanguage by rememberSaveable(initialText) { mutableStateOf("auto") }
+    var targetLanguage by rememberSaveable(initialText) { mutableStateOf("es") }
     var sourcePicker by remember { mutableStateOf(false) }
     var targetPicker by remember { mutableStateOf(false) }
     var modelConsentDialog by remember { mutableStateOf(false) }
