@@ -496,7 +496,7 @@ private suspend fun recognizeUri(
     try {
         val count = withContext(Dispatchers.IO) { pdfPageCount(source, password) }
         val builder = StringBuilder()
-        MlKitOcrEngine(context.applicationContext).use { engine ->
+        MlKitOcrEngine(context).use { engine ->
             for (index in 0 until count) {
                 kotlinx.coroutines.currentCoroutineContext().ensureActive()
                 val bitmap = withContext(Dispatchers.IO) { pdfPageBitmap(source, index, password) }
