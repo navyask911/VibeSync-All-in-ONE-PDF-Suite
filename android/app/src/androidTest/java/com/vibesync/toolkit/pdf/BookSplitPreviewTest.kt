@@ -7,6 +7,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -27,7 +29,9 @@ class BookSplitPreviewTest {
     @Test
     fun dashboardBookSplitTileOpensToolAndDividerCanBeDraggedBeforeCommit() {
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("tool_book_split").performScrollTo().performClick()
+        composeRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("tool_book_split"))
+        composeRule.onNodeWithTag("tool_book_split").performClick()
+        composeRule.waitForIdle()
         composeRule.onNodeWithText(composeRule.activity.getString(R.string.book_split_title)).assertIsDisplayed()
 
         val source = Bitmap.createBitmap(400, 200, Bitmap.Config.ARGB_8888).apply { eraseColor(android.graphics.Color.LTGRAY) }
