@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Tune
@@ -62,7 +63,8 @@ fun PdfDocumentActionsSheet(
     onWatermark: () -> Unit,
     onEncrypt: () -> Unit,
     onDelete: () -> Unit,
-    onSaveToDownloads: (() -> Unit)? = null
+    onSaveToDownloads: (() -> Unit)? = null,
+    onPrint: (() -> Unit)? = null
 ) {
     val actions = listOf(
         PdfDocumentActionItem(stringResource(R.string.action_open_view_pdf), "open", Icons.Default.PictureAsPdf, onClick = onOpen),
@@ -72,6 +74,8 @@ fun PdfDocumentActionsSheet(
         PdfDocumentActionItem(stringResource(R.string.action_share_jpg_images), "share_images", Icons.Default.Image, onClick = onShareImages)
     ) + (onSaveToDownloads?.let {
         listOf(PdfDocumentActionItem(stringResource(R.string.scan_save_downloads), "save_downloads", Icons.Default.PictureAsPdf, onClick = it))
+    } ?: emptyList()) + (onPrint?.let {
+        listOf(PdfDocumentActionItem(stringResource(R.string.print_action), "print", Icons.Default.Print, onClick = it))
     } ?: emptyList()) + listOf(
         PdfDocumentActionItem(stringResource(R.string.tool_split_document), "split", Icons.Default.CallSplit, onClick = onSplit),
         PdfDocumentActionItem(stringResource(R.string.action_compress_pdf), "compress", Icons.Default.Tune, onClick = onCompress),
