@@ -397,24 +397,40 @@ private fun exportAllPagesZip(
     targetUri: Uri,
     onProgress: (Int, Int) -> Unit
 ) {
+    val stagedZip = File.createTempFile("export_pages_", ".zip", context.cacheDir)
+    try {
+        buildJpgPagesZip(context, sourceUri, stagedZip, onProgress)
+        context.contentResolver.openOutputStream(targetUri, "wt")?.use { target ->
+            stagedZip.inputStream().use { source -> source.copyTo(target) }
+        } ?: throw IOException("The selected destination could not be opened.")
+    } finally {
+        stagedZip.delete()
+    }
+}
+
+/** Builds the ZIP before SAF persistence so its entry list and JPEG bytes can be verified. */
+internal fun buildJpgPagesZip(
+    context: Context,
+    sourceUri: Uri,
+    targetFile: File,
+    onProgress: (Int, Int) -> Unit = { _, _ -> }
+) {
     val source = stagePdf(context, sourceUri)
     try {
         val count = pageCountFromFile(source, null)
-        context.contentResolver.openOutputStream(targetUri, "wt")?.use { raw ->
-            ZipOutputStream(raw).use { zip ->
-                for (index in 0 until count) {
-                    val bitmap = renderPage(source, index, null)
-                    try {
-                        zip.putNextEntry(ZipEntry(String.format(Locale.ROOT, "page_%03d.jpg", index + 1)))
-                        if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 92, zip)) throw IOException("Could not encode a page as JPG.")
-                        zip.closeEntry()
-                    } finally {
-                        bitmap.recycle()
-                    }
-                    onProgress(index + 1, count)
+        ZipOutputStream(FileOutputStream(targetFile)).use { zip ->
+            for (index in 0 until count) {
+                val bitmap = renderPage(source, index, null)
+                try {
+                    zip.putNextEntry(ZipEntry(String.format(Locale.ROOT, "page_%03d.jpg", index + 1)))
+                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 92, zip)) throw IOException("Could not encode a page as JPG.")
+                    zip.closeEntry()
+                } finally {
+                    bitmap.recycle()
                 }
+                onProgress(index + 1, count)
             }
-        } ?: throw IOException("The selected destination could not be opened.")
+        }
     } finally {
         source.delete()
     }
