@@ -49,7 +49,26 @@ class IdCardComposerTest {
                         try {
                             page.render(rendered, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                             assertTrue(rendered.width > 0 && rendered.height > 0)
-                            assertTrue(Color.alpha(rendered.getPixel(rendered.width / 2, rendered.height / 2)) > 0)
+                            // Sample inside each placed image, not the intentional blank gap
+                            // between front/back (which can be transparent in PdfRenderer).
+                            val frontX = ((top.x + top.width / 2f) / PDRectangle.A4.width * rendered.width)
+                                .toInt().coerceIn(0, rendered.width - 1)
+                            val frontY = ((PDRectangle.A4.height - (top.y + top.height / 2f)) /
+                                PDRectangle.A4.height * rendered.height).toInt().coerceIn(0, rendered.height - 1)
+                            val backX = ((bottom.x + bottom.width / 2f) / PDRectangle.A4.width * rendered.width)
+                                .toInt().coerceIn(0, rendered.width - 1)
+                            val backY = ((PDRectangle.A4.height - (bottom.y + bottom.height / 2f)) /
+                                PDRectangle.A4.height * rendered.height).toInt().coerceIn(0, rendered.height - 1)
+                            val frontPixel = rendered.getPixel(frontX, frontY)
+                            val backPixel = rendered.getPixel(backX, backY)
+                            assertTrue(
+                                "Front placement did not render the red source image: " + Integer.toHexString(frontPixel),
+                                Color.red(frontPixel) > Color.blue(frontPixel) + 80
+                            )
+                            assertTrue(
+                                "Back placement did not render the blue source image: " + Integer.toHexString(backPixel),
+                                Color.blue(backPixel) > Color.red(backPixel) + 80
+                            )
                         } finally {
                             rendered.recycle()
                         }
