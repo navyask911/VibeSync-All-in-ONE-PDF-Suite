@@ -46,11 +46,12 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
-import org.apache.pdfbox.pdmodel.PDDocument
-import org.apache.pdfbox.pdmodel.encryption.InvalidPasswordException
-import org.apache.pdfbox.rendering.ImageType
-import org.apache.pdfbox.rendering.PDFRenderer
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
+import com.tom_roush.pdfbox.rendering.ImageType
+import com.tom_roush.pdfbox.rendering.PDFRenderer
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
