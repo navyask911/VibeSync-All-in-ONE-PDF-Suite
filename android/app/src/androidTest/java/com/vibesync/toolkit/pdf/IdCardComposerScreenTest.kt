@@ -10,6 +10,8 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -26,7 +28,9 @@ class IdCardComposerScreenTest {
     @Test
     fun dashboardTileNavigatesAndSaveRequiresBothFrontAndBack() {
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("tool_id_card").performScrollTo().performClick()
+        composeRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("tool_id_card"))
+        composeRule.onNodeWithTag("tool_id_card").performClick()
+        composeRule.waitForIdle()
         composeRule.onNodeWithText(composeRule.activity.getString(R.string.id_card_title)).assertIsDisplayed()
 
         val front = Bitmap.createBitmap(120, 72, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.RED) }
