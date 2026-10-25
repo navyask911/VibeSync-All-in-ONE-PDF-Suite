@@ -125,7 +125,7 @@ private fun BatchPageThumbnail(
         }
     }
     Card(
-        modifier = Modifier.width(112.dp).testTag("batch_page_${index}"),
+        modifier = Modifier.width(112.dp).testTag("batch_page_${page.id}"),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(8.dp)) {
@@ -157,13 +157,13 @@ private fun BatchPageThumbnail(
             }
             Text(stringResource(R.string.batch_page_number, index + 1), style = MaterialTheme.typography.labelMedium)
             Row {
-                IconButton(onClick = { onMove(index, (index - 1).coerceAtLeast(0)) }, enabled = index > 0, modifier = Modifier.testTag("batch_move_left_${index}")) {
+                IconButton(onClick = { onMove(index, (index - 1).coerceAtLeast(0)) }, enabled = index > 0, modifier = Modifier.testTag("batch_move_left_${page.id}")) {
                     Icon(Icons.Default.KeyboardArrowLeft, contentDescription = stringResource(R.string.batch_move_left))
                 }
-                IconButton(onClick = { onMove(index, (index + 1).coerceAtMost(pageCount - 1)) }, enabled = index < pageCount - 1, modifier = Modifier.testTag("batch_move_right_${index}")) {
+                IconButton(onClick = { onMove(index, (index + 1).coerceAtMost(pageCount - 1)) }, enabled = index < pageCount - 1, modifier = Modifier.testTag("batch_move_right_${page.id}")) {
                     Icon(Icons.Default.KeyboardArrowRight, contentDescription = stringResource(R.string.batch_move_right))
                 }
-                IconButton(onClick = onDelete, modifier = Modifier.testTag("batch_delete_${index}")) {
+                IconButton(onClick = onDelete, modifier = Modifier.testTag("batch_delete_${page.id}")) {
                     Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.batch_delete_page))
                 }
             }
