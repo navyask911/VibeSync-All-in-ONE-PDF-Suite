@@ -12,6 +12,7 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.presentation.viewer.ExportMenu
+import com.vibesync.toolkit.pdf.presentation.viewer.buildJpgPagesZip
 import org.apache.pdfbox.pdmodel.PDDocument
 import org.apache.pdfbox.pdmodel.PDPage
 import org.apache.pdfbox.pdmodel.common.PDRectangle
@@ -21,6 +22,7 @@ import org.junit.Rule
 import org.junit.Test
 import java.io.File
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.zip.ZipFile
 
 class ExportFormatsTest {
     @get:Rule
@@ -65,6 +67,37 @@ class ExportFormatsTest {
             select("export_txt")
             assertEquals("text/plain", calls.last().first)
             assertTrue(calls.last().second.endsWith(".txt"))
+        } finally {
+            work.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun multipagePdfCreatesZipWithOneValidJpegEntryPerPage() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        PDFBoxResourceLoader.init(context)
+        val work = File(context.cacheDir, "export-zip-" + System.nanoTime()).apply { mkdirs() }
+        val source = File(work, "pages.pdf")
+        val zipFile = File(work, "pages.zip")
+        createPdf(source, 3)
+        try {
+            val progress = mutableListOf<Pair<Int, Int>>()
+            buildJpgPagesZip(context, Uri.fromFile(source), zipFile) { completed, total ->
+                progress += completed to total
+            }
+            assertTrue(zipFile.isFile && zipFile.length() > 0L)
+            ZipFile(zipFile).use { zip ->
+                val entries = zip.entries().asSequence().toList()
+                assertEquals(listOf("page_001.jpg", "page_002.jpg", "page_003.jpg"), entries.map { it.name })
+                entries.forEach { entry ->
+                    assertTrue("JPEG entry must not be empty", entry.size > 0L)
+                    zip.getInputStream(entry).use { input ->
+                        assertEquals(0xFF, input.read())
+                        assertEquals(0xD8, input.read())
+                    }
+                }
+            }
+            assertEquals(listOf(1 to 3, 2 to 3, 3 to 3), progress)
         } finally {
             work.deleteRecursively()
         }
