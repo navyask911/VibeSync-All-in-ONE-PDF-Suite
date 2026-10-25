@@ -59,6 +59,7 @@ fun PdfViewerScreen(
     onSaveScanToDownloads: () -> Unit = {},
     onDeleteScan: () -> Unit = {}
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
