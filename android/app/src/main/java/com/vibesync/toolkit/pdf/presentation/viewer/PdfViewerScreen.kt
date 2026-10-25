@@ -175,6 +175,11 @@ fun PdfViewerScreen(
                     IconButton(onClick = { onNavigateToEditor(documentUri) }) {
                         Icon(Icons.Default.Draw, contentDescription = stringResource(R.string.edit_sign_action), tint = VibeSyncCrimsonPrimary)
                     }
+                    ExportMenu(
+                        sourceUri = documentUri,
+                        currentPageIndex = uiState.currentPageIndex,
+                        testTag = "viewer_export_menu"
+                    )
                     if (isManagedScan) {
                         Box {
                             IconButton(onClick = { scanMenuExpanded = true }) {
