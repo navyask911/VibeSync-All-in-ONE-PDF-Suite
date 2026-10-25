@@ -1,22 +1,20 @@
 package com.vibesync.toolkit.pdf
 
 import android.net.Uri
-import android.os.Bundle
 import android.os.CancellationSignal
 import android.os.ParcelFileDescriptor
 import android.print.PageRange
 import android.print.PrintAttributes
 import androidx.test.platform.app.InstrumentationRegistry
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
-import com.vibesync.toolkit.pdf.data.print.PdfPrintDocumentAdapter
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
+import com.vibesync.toolkit.pdf.data.print.PdfPrintDocumentAdapter
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
-import java.util.concurrent.atomic.AtomicReference
 
 class PdfPrintDocumentAdapterTest {
     @Test
@@ -34,62 +32,37 @@ class PdfPrintDocumentAdapterTest {
             .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
             .setDuplexMode(PrintAttributes.DUPLEX_MODE_NONE)
             .build()
-        val layout = AtomicReference<android.print.PrintDocumentInfo?>()
-        val layoutFailure = AtomicReference<String?>()
         try {
             adapter.onStart()
-            adapter.onLayout(
-                null,
-                attributes,
-                CancellationSignal(),
-                object : android.print.PrintDocumentAdapter.LayoutResultCallback() {
-                    override fun onLayoutFinished(info: android.print.PrintDocumentInfo, changed: Boolean) {
-                        layout.set(info)
-                    }
-                    override fun onLayoutFailed(error: CharSequence?) {
-                        layoutFailure.set(error?.toString() ?: "layout failed")
-                    }
-                    override fun onLayoutCancelled() {
-                        layoutFailure.set("layout cancelled")
-                    }
-                },
-                Bundle()
-            )
-            assertEquals(null, layoutFailure.get())
-            assertEquals(3, layout.get()?.pageCount)
+            val info = adapter.prepareLayout(attributes, CancellationSignal())
+            assertEquals(3, info.pageCount)
             assertEquals(300, attributes.resolution?.horizontalDpi)
             assertEquals(PrintAttributes.MediaSize.ISO_A4, attributes.mediaSize)
 
-            val writeFailure = AtomicReference<String?>()
-            var writeFinished = false
-            adapter.onWrite(
-                arrayOf(PageRange.ALL_PAGES),
-                ParcelFileDescriptor.open(output, ParcelFileDescriptor.MODE_CREATE or ParcelFileDescriptor.MODE_READ_WRITE or ParcelFileDescriptor.MODE_TRUNCATE),
-                CancellationSignal(),
-                object : android.print.PrintDocumentAdapter.WriteResultCallback() {
-                    override fun onWriteFinished(pages: Array<out PageRange>) {
-                        writeFinished = true
-                    }
-                    override fun onWriteFailed(error: CharSequence?) {
-                        writeFailure.set(error?.toString() ?: "write failed")
-                    }
-                    override fun onWriteCancelled() {
-                        writeFailure.set("write cancelled")
-                    }
-                }
+            val descriptor = ParcelFileDescriptor.open(
+                output,
+                ParcelFileDescriptor.MODE_CREATE or
+                    ParcelFileDescriptor.MODE_READ_WRITE or
+                    ParcelFileDescriptor.MODE_TRUNCATE
             )
-            assertEquals(null, writeFailure.get())
-            assertTrue("Print adapter should finish writing the requested pages.", writeFinished)
+            val written = adapter.writeDocument(
+                arrayOf(PageRange.ALL_PAGES),
+                descriptor,
+                CancellationSignal()
+            )
+            assertEquals(listOf(PageRange(0, 2)), written.toList())
             assertTrue("Printed PDF should be non-empty.", output.isFile && output.length() > 0L)
-            android.graphics.pdf.PdfRenderer(
-                ParcelFileDescriptor.open(output, ParcelFileDescriptor.MODE_READ_ONLY)
-            ).use { renderer ->
-                assertEquals(3, renderer.pageCount)
-                renderer.openPage(0).use { page ->
-                    assertTrue("A4 portrait page should have expected rendered dimensions", page.width >= 500 && page.height >= 700)
+            ParcelFileDescriptor.open(output, ParcelFileDescriptor.MODE_READ_ONLY).use { pfd ->
+                android.graphics.pdf.PdfRenderer(pfd).use { renderer ->
+                    assertEquals(3, renderer.pageCount)
+                    renderer.openPage(0).use { page ->
+                        assertTrue(
+                            "A4 portrait page should have expected rendered dimensions",
+                            page.width >= 500 && page.height >= 700
+                        )
+                    }
                 }
             }
-            adapter.onFinish()
         } finally {
             adapter.onFinish()
             work.deleteRecursively()
