@@ -8,15 +8,18 @@ import android.os.ParcelFileDescriptor
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.ActivityResultLauncher
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -62,7 +65,8 @@ fun ExportMenu(
     currentPageIndex: Int = 0,
     modifier: Modifier = Modifier,
     testTag: String = "export_menu",
-    onExportSelected: (mimeType: String, displayName: String) -> Unit = { _, _ -> }
+    onExportSelected: (mimeType: String, displayName: String) -> Unit = { _, _ -> },
+    onSafLaunch: ((mimeType: String, displayName: String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -75,13 +79,18 @@ fun ExportMenu(
     var passwordDialog by remember { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
     var pendingTextTarget by remember { mutableStateOf<Uri?>(null) }
-    var queuedJpgPageIndex by remember { mutableIntStateOf(0) }
+    var queuedJpgPages by remember { mutableStateOf<List<Int>>(emptyList()) }
 
     val baseName = remember(sourceUri) {
         runCatching { UriUtils.getFileName(context, sourceUri) }
             .getOrDefault(sourceUri.lastPathSegment ?: "document.pdf")
             .substringBeforeLast('.')
             .ifBlank { "document" }
+    }
+
+    fun requestSaf(mimeType: String, displayName: String, launch: () -> Unit) {
+        onExportSelected(mimeType, displayName)
+        if (onSafLaunch != null) onSafLaunch(mimeType, displayName) else launch()
     }
 
     val pdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { target ->
@@ -91,13 +100,26 @@ fun ExportMenu(
             }, onError = { showExportError(context, it) })
         }
     }
-    val jpgLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/jpeg")) { target ->
-        if (target != null) {
-            val pageIndex = queuedJpgPageIndex
+    lateinit var jpgLauncher: ActivityResultLauncher<String>
+    jpgLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("image/jpeg")) { target ->
+        val pageIndex = queuedJpgPages.firstOrNull()
+        if (target == null || pageIndex == null) {
+            queuedJpgPages = emptyList()
+        } else {
             scope.launch {
                 runExport(context, { exportPageJpg(context, sourceUri, target, pageIndex, null) }, onDone = {
-                    Toast.makeText(context, context.getString(R.string.export_saved_jpg), Toast.LENGTH_LONG).show()
-                }, onError = { showExportError(context, it) })
+                    queuedJpgPages = queuedJpgPages.drop(1)
+                    val nextPage = queuedJpgPages.firstOrNull()
+                    if (nextPage != null) {
+                        val nextName = "${baseName}_page_${nextPage + 1}.jpg"
+                        requestSaf("image/jpeg", nextName) { jpgLauncher.launch(nextName) }
+                    } else {
+                        Toast.makeText(context, context.getString(R.string.export_saved_jpg), Toast.LENGTH_LONG).show()
+                    }
+                }, onError = {
+                    queuedJpgPages = emptyList()
+                    showExportError(context, it)
+                })
             }
         }
     }
@@ -141,10 +163,9 @@ fun ExportMenu(
     }
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        androidx.compose.material3.Box {
-            Button(onClick = { expanded = true }, enabled = !running, modifier = Modifier.testTag(testTag)) {
-                androidx.compose.material3.Icon(Icons.Default.FileDownload, contentDescription = null)
-                Text(stringResource(R.string.export_menu_title), modifier = Modifier.padding(start = 6.dp))
+        Box {
+            IconButton(onClick = { expanded = true }, enabled = !running, modifier = Modifier.testTag(testTag)) {
+                Icon(Icons.Default.FileDownload, contentDescription = stringResource(R.string.export_menu_title))
             }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                 DropdownMenuItem(
@@ -153,8 +174,7 @@ fun ExportMenu(
                     onClick = {
                         expanded = false
                         val name = "$baseName.pdf"
-                        onExportSelected("application/pdf", name)
-                        pdfLauncher.launch(name)
+                        requestSaf("application/pdf", name) { pdfLauncher.launch(name) }
                     }
                 )
                 DropdownMenuItem(
@@ -162,10 +182,10 @@ fun ExportMenu(
                     modifier = Modifier.testTag("export_jpg_current"),
                     onClick = {
                         expanded = false
-                        queuedJpgPageIndex = currentPageIndex.coerceAtLeast(0)
-                        val name = "\${baseName}_page_\${queuedJpgPageIndex + 1}.jpg"
-                        onExportSelected("image/jpeg", name)
-                        jpgLauncher.launch(name)
+                        val page = currentPageIndex.coerceAtLeast(0)
+                        queuedJpgPages = listOf(page)
+                        val name = "${baseName}_page_${page + 1}.jpg"
+                        requestSaf("image/jpeg", name) { jpgLauncher.launch(name) }
                     }
                 )
                 DropdownMenuItem(
@@ -176,11 +196,10 @@ fun ExportMenu(
                         scope.launch {
                             try {
                                 val count = withContext(Dispatchers.IO) { pageCount(context, sourceUri, null) }
-                                // SAF creates one user-named JPG per action; the user can choose any page by revisiting the page.
-                                queuedJpgPageIndex = (0 until count).firstOrNull() ?: 0
-                                val name = "\${baseName}_page_\${queuedJpgPageIndex + 1}.jpg"
-                                onExportSelected("image/jpeg", name)
-                                jpgLauncher.launch(name)
+                                queuedJpgPages = (0 until count).toList()
+                                val firstPage = queuedJpgPages.firstOrNull() ?: return@launch
+                                val name = "${baseName}_page_${firstPage + 1}.jpg"
+                                requestSaf("image/jpeg", name) { jpgLauncher.launch(name) }
                             } catch (error: Throwable) {
                                 showExportError(context, error)
                             }
@@ -192,9 +211,8 @@ fun ExportMenu(
                     modifier = Modifier.testTag("export_jpg_zip"),
                     onClick = {
                         expanded = false
-                        val name = "\${baseName}_pages.zip"
-                        onExportSelected("application/zip", name)
-                        zipLauncher.launch(name)
+                        val name = "${baseName}_pages.zip"
+                        requestSaf("application/zip", name) { zipLauncher.launch(name) }
                     }
                 )
                 DropdownMenuItem(
@@ -203,8 +221,7 @@ fun ExportMenu(
                     onClick = {
                         expanded = false
                         val name = "$baseName.txt"
-                        onExportSelected("text/plain", name)
-                        txtLauncher.launch(name)
+                        requestSaf("text/plain", name) { txtLauncher.launch(name) }
                     }
                 )
             }
