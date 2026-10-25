@@ -180,6 +180,32 @@ fun TranslationScanScreen(
         }
     }
 
+    val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { capturedBitmap ->
+        if (capturedBitmap != null) {
+            activeJob = scope.launch {
+                processing = true
+                progress = 0f
+                completedPages = 0
+                totalPages = 1
+                status = ""
+                try {
+                    val result = MlKitOcrEngine().use { it.recognize(capturedBitmap) }
+                    originalText = result.text
+                    translatedText = ""
+                    completedPages = 1
+                    progress = 1f
+                    status = context.getString(R.string.translation_ocr_complete)
+                } catch (error: Throwable) {
+                    if (error is CancellationException) throw error
+                    status = error.localizedMessage ?: context.getString(R.string.translation_failed)
+                } finally {
+                    capturedBitmap.recycle()
+                    processing = false
+                }
+            }
+        }
+    }
+
     val txtLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         if (uri != null) scope.launch {
             runCatching {
@@ -241,11 +267,18 @@ fun TranslationScanScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(stringResource(R.string.translation_scan_description), style = MaterialTheme.typography.bodyMedium)
-            Button(
-                onClick = { importLauncher.launch(arrayOf("application/pdf", "image/*")) },
-                enabled = !processing,
-                modifier = Modifier.fillMaxWidth().testTag("translation_import")
-            ) { Text(stringResource(R.string.translation_import)) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                Button(
+                    onClick = { cameraLauncher.launch(null) },
+                    enabled = !processing,
+                    modifier = Modifier.weight(1f).testTag("translation_capture")
+                ) { Text(stringResource(R.string.scan_new)) }
+                Button(
+                    onClick = { importLauncher.launch(arrayOf("application/pdf", "image/*")) },
+                    enabled = !processing,
+                    modifier = Modifier.weight(1f).testTag("translation_import")
+                ) { Text(stringResource(R.string.translation_import)) }
+            }
             if (processing) {
                 androidx.compose.material3.LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().testTag("translation_progress"))
                 if (totalPages > 0) Text(stringResource(R.string.export_progress_pages, completedPages, totalPages))
@@ -256,11 +289,11 @@ fun TranslationScanScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.translation_source_language), style = MaterialTheme.typography.labelLarge)
-                    androidx.compose.material3.Box {
+                    Box {
                         OutlinedButton(onClick = { sourcePicker = true }, modifier = Modifier.fillMaxWidth().testTag("translation_source_picker")) {
                             Text(
                                 if (sourceLanguage == "auto") stringResource(R.string.translation_language_auto)
-                                else stringResource(translationLanguages.first { it.code == sourceLanguage }.labelRes),
+                                else stringResource(supportedLanguages.first { it.code == sourceLanguage }.labelRes),
                                 maxLines = 1
                             )
                         }
