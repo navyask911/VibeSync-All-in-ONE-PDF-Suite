@@ -4,72 +4,121 @@ import android.app.Application
 import android.content.Context
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
+import android.os.Bundle
+import android.os.CancellationSignal
 import android.os.ParcelFileDescriptor
-import android.print.PrintManager
-import android.view.View
-import android.view.ViewGroup
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.ComposeView
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import android.print.PageRange
+import android.print.PrintAttributes
+import android.print.PrintDocumentAdapter
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
-import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.core.app.ApplicationProvider
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
-import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
-import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
-import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
-import org.junit.Assert.assertNotNull
+import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
+import com.vibesync.toolkit.pdf.data.print.PdfPrintDocumentAdapter
+import com.vibesync.toolkit.pdf.presentation.common.launchSystemPdfPrint
+import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
+import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
+import io.mockk.match
+import io.mockk.mockk
+import io.mockk.verify
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 class PdfPrintActionScreenTest {
     @get:Rule
-    val composeRule = createAndroidComposeRule<MainActivity>()
+    val composeRule = createComposeRule()
 
     @Test
-    fun printActionFromViewerOpensSystemPrintActivity() {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val context = instrumentation.targetContext
+    fun printActionDispatchesA4Color300DpiAndAdapterLifecycleCompletes() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val application = ApplicationProvider.getApplicationContext<Application>()
         PDFBoxResourceLoader.init(context)
         val work = File(context.cacheDir, "print-viewer-ui-" + System.nanoTime()).apply { mkdirs() }
         val source = File(work, "viewer-print.pdf")
         createPdf(source)
-        val monitor = instrumentation.addMonitor("com.android.printspooler.ui.PrintActivity", null, false)
-        try {
-            setTestContent(source)
-            composeRule.onNodeWithTag("viewer_print").performClick()
-            val printActivity = instrumentation.waitForMonitorWithTimeout(monitor, 30_000)
-            assertNotNull("Viewer Print should open the Android system print UI.", printActivity)
-            (context.getSystemService(Context.PRINT_SERVICE) as? PrintManager)?.printJobs?.forEach { it.cancel() }
-        } finally {
-            instrumentation.removeMonitor(monitor)
-            work.deleteRecursively()
-        }
-    }
 
-    private fun setTestContent(source: File) {
-        val application = InstrumentationRegistry.getInstrumentation().targetContext.applicationContext as Application
-        val viewModel = PdfViewerViewModel(application)
-        composeRule.activity.runOnUiThread {
-            val composeView = findComposeView(composeRule.activity.window.decorView)
-                ?: error("MainActivity ComposeView was not found")
-            composeView.setContent {
+        val dispatchCount = AtomicInteger(0)
+        val dispatchedJobName = AtomicReference<String?>()
+        val dispatchedAdapter = AtomicReference<PdfPrintDocumentAdapter?>()
+        val dispatchedAttributes = AtomicReference<PrintAttributes?>()
+        try {
+            composeRule.setContent {
                 VibeSyncPdfTheme {
                     PdfViewerScreen(
                         documentUri = Uri.fromFile(source),
-                        viewModel = viewModel,
+                        viewModel = PdfViewerViewModel(application),
                         onNavigateBack = {},
                         onNavigateToEditor = {},
-                        onShareDocument = {}
+                        onShareDocument = {},
+                        onLaunchPrint = { printContext, uri, jobName ->
+                            launchSystemPdfPrint(printContext, uri, jobName) { submittedName, adapter, attributes ->
+                                dispatchCount.incrementAndGet()
+                                dispatchedJobName.set(submittedName)
+                                dispatchedAdapter.set(adapter as? PdfPrintDocumentAdapter)
+                                dispatchedAttributes.set(attributes)
+                                null
+                            }
+                        }
                     )
                 }
             }
+
+            composeRule.onNodeWithTag("viewer_print").performClick()
+            composeRule.waitUntil(15_000) {
+                dispatchedAdapter.get() != null && dispatchedAttributes.get() != null && !dispatchedJobName.get().isNullOrBlank()
+            }
+
+            val attributes = requireNotNull(dispatchedAttributes.get())
+            val adapter = requireNotNull(dispatchedAdapter.get())
+            assertEquals("Viewer print must dispatch exactly once.", 1, dispatchCount.get())
+            assertTrue("Print job name must be populated.", dispatchedJobName.get().orEmpty().isNotBlank())
+            assertEquals(PrintAttributes.MediaSize.ISO_A4, attributes.mediaSize)
+            assertEquals(300, attributes.resolution.horizontalDpi)
+            assertEquals(300, attributes.resolution.verticalDpi)
+            assertEquals(PrintAttributes.COLOR_MODE_COLOR, attributes.colorMode)
+            assertEquals(PrintAttributes.DUPLEX_MODE_NONE, attributes.duplexMode)
+
+            val layoutCallback = mockk<PrintDocumentAdapter.LayoutResultCallback>(relaxed = true)
+            adapter.onStart()
+            adapter.onLayout(null, attributes, CancellationSignal(), layoutCallback, Bundle())
+            verify(exactly = 1) {
+                layoutCallback.onLayoutFinished(match { it.pageCount == 1 }, true)
+            }
+
+            val output = File(work, "printed-output.pdf")
+            val destination = ParcelFileDescriptor.open(
+                output,
+                ParcelFileDescriptor.MODE_CREATE or
+                    ParcelFileDescriptor.MODE_TRUNCATE or
+                    ParcelFileDescriptor.MODE_READ_WRITE
+            )
+            val writeCallback = mockk<PrintDocumentAdapter.WriteResultCallback>(relaxed = true)
+            adapter.onWrite(arrayOf(PageRange.ALL_PAGES), destination, CancellationSignal(), writeCallback)
+            verify(exactly = 1) {
+                writeCallback.onWriteFinished(match { ranges ->
+                    ranges.size == 1 && ranges[0].start == 0 && ranges[0].end == 0
+                })
+            }
+            assertTrue("The adapter should write a non-empty printable PDF.", output.isFile && output.length() > 0L)
+            ParcelFileDescriptor.open(output, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+                PdfRenderer(descriptor).use { renderer ->
+                    assertEquals(1, renderer.pageCount)
+                }
+            }
+        } finally {
+            dispatchedAdapter.get()?.onFinish()
+            work.deleteRecursively()
         }
-        composeRule.waitForIdle()
     }
 
     private fun createPdf(file: File) {
@@ -77,13 +126,5 @@ class PdfPrintActionScreenTest {
             document.addPage(PDPage(PDRectangle.A4))
             document.save(file)
         }
-    }
-
-    private fun findComposeView(view: View): ComposeView? {
-        if (view is ComposeView) return view
-        if (view is ViewGroup) {
-            for (index in 0 until view.childCount) findComposeView(view.getChildAt(index))?.let { return it }
-        }
-        return null
     }
 }

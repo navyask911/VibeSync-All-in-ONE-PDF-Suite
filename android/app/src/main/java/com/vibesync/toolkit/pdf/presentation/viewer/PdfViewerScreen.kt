@@ -1,5 +1,6 @@
 package com.vibesync.toolkit.pdf.presentation.viewer
 
+import android.content.Context
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -57,7 +58,10 @@ fun PdfViewerScreen(
     onShareScanPdf: () -> Unit = {},
     onShareScanImages: () -> Unit = {},
     onSaveScanToDownloads: () -> Unit = {},
-    onDeleteScan: () -> Unit = {}
+    onDeleteScan: () -> Unit = {},
+    onLaunchPrint: (Context, Uri, String) -> Unit = { printContext, uri, jobName ->
+        launchSystemPdfPrint(printContext, uri, jobName)
+    }
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
@@ -180,7 +184,7 @@ fun PdfViewerScreen(
                     IconButton(
                         onClick = {
                             runCatching {
-                                launchSystemPdfPrint(
+                                onLaunchPrint(
                                     context,
                                     documentUri,
                                     context.getString(R.string.print_job_name, uiState.fileName)

@@ -1,19 +1,17 @@
 package com.vibesync.toolkit.pdf
 
-import android.app.Application
+import android.content.Context
 import android.graphics.Bitmap
 import android.net.Uri
-import android.view.View
-import android.view.ViewGroup
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertTextContains
-import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
-import androidx.test.platform.app.InstrumentationRegistry
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.platform.LocalContext
+import androidx.test.core.app.ApplicationProvider
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.data.pdf.PdfCompressor
@@ -36,14 +34,16 @@ import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.util.Random
+import java.util.Locale
+import java.util.concurrent.atomic.AtomicReference
 
 class CompressionToolTest {
     @get:Rule
-    val composeRule = createAndroidComposeRule<MainActivity>()
+    val composeRule = createComposeRule()
 
     @Test
     fun syntheticFivePagePdfRoundTripsAllProfilesAndPreservesPageCount() = runBlocking {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val context = ApplicationProvider.getApplicationContext<Context>()
         PDFBoxResourceLoader.init(context)
         val work = File(context.cacheDir, "compression-profiles-" + System.nanoTime()).apply { mkdirs() }
         val input = syntheticPdf(work, protect = false)
@@ -95,7 +95,7 @@ class CompressionToolTest {
 
     @Test
     fun passwordProtectedPdfRequiresPasswordAndCanBeCompressedWithIt() = runBlocking {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val context = ApplicationProvider.getApplicationContext<Context>()
         PDFBoxResourceLoader.init(context)
         val work = File(context.cacheDir, "compression-password-" + System.nanoTime()).apply { mkdirs() }
         val source = syntheticPdf(work, protect = true)
@@ -119,34 +119,40 @@ class CompressionToolTest {
 
     @Test
     fun compressionUiShowsAccurateBeforeAndAfterSizes() {
-        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val context = ApplicationProvider.getApplicationContext<Context>()
         PDFBoxResourceLoader.init(context)
         val work = File(context.cacheDir, "compression-ui-" + System.nanoTime()).apply { mkdirs() }
         val input = syntheticPdf(work, protect = false)
         var compressedOutput: File? = null
-        setTestContent {
-            PdfQuickActionScreen(
-                mode = "compress",
-                initialUri = Uri.fromFile(input),
-                onNavigateBack = {},
-                onSuccess = { compressedOutput = it }
-            )
+        val displayLocale = AtomicReference<Locale?>()
+        composeRule.setContent {
+            val uiContext = LocalContext.current
+            SideEffect { displayLocale.set(uiContext.resources.configuration.locales.get(0)) }
+            VibeSyncPdfTheme {
+                PdfQuickActionScreen(
+                    mode = "compress",
+                    initialUri = Uri.fromFile(input),
+                    onNavigateBack = {},
+                    onSuccess = { compressedOutput = it }
+                )
+            }
         }
         composeRule.onNodeWithTag("compression_run").performClick()
         composeRule.waitUntil(180_000) {
             composeRule.onAllNodesWithTag("compression_before_size").fetchSemanticsNodes().isNotEmpty() &&
                 composeRule.onAllNodesWithTag("compression_after_size").fetchSemanticsNodes().isNotEmpty()
         }
+        val uiFormatLocale = requireNotNull(displayLocale.get()) { "Compose UI locale was not captured." }
         composeRule.onNodeWithTag("compression_before_size")
             .assertIsDisplayed()
-            .assertTextContains(formatBytesForDisplay(input.length(), context.resources.configuration.locales.get(0)))
+            .assertTextContains(formatBytesForDisplay(input.length(), uiFormatLocale))
         composeRule.onNodeWithTag("compression_after_size").assertIsDisplayed()
         composeRule.onNodeWithTag("compression_size_change").assertIsDisplayed()
         composeRule.onNodeWithTag("compression_use_output").performClick()
         composeRule.waitUntil(10_000) { compressedOutput?.isFile == true }
         val output = requireNotNull(compressedOutput)
         composeRule.onNodeWithTag("compression_after_size")
-            .assertTextContains(formatBytesForDisplay(output.length(), context.resources.configuration.locales.get(0)))
+            .assertTextContains(formatBytesForDisplay(output.length(), uiFormatLocale))
         output.delete()
         work.deleteRecursively()
     }
@@ -186,23 +192,6 @@ class CompressionToolTest {
             document.save(output)
         }
         return output
-    }
-
-    private fun setTestContent(content: @Composable () -> Unit) {
-        composeRule.activity.runOnUiThread {
-            val composeView = findComposeView(composeRule.activity.window.decorView)
-                ?: error("MainActivity ComposeView was not found")
-            composeView.setContent { VibeSyncPdfTheme { content() } }
-        }
-        composeRule.waitForIdle()
-    }
-
-    private fun findComposeView(view: View): ComposeView? {
-        if (view is ComposeView) return view
-        if (view is ViewGroup) {
-            for (index in 0 until view.childCount) findComposeView(view.getChildAt(index))?.let { return it }
-        }
-        return null
     }
 
     companion object {
