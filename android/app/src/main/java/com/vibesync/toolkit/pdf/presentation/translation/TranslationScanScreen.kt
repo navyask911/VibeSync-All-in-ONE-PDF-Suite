@@ -246,7 +246,7 @@ fun TranslationScanScreen(
             if (processing) {
                 androidx.compose.material3.LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().testTag("translation_progress"))
                 if (totalPages > 0) Text(stringResource(R.string.export_progress_pages, completedPages, totalPages))
-                OutlinedButton(onClick = { activeJob?.cancel() }, modifier = Modifier.fillMaxWidth().testTag("translation_cancel")) {
+                OutlinedButton(onClick = { activeJob?.cancel(); activeJob = null; processing = false }, modifier = Modifier.fillMaxWidth().testTag("translation_cancel")) {
                     Text(stringResource(R.string.cancel))
                 }
             }
