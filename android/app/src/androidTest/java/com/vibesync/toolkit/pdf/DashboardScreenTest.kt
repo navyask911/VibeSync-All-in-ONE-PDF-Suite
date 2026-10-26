@@ -15,6 +15,8 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.printToLog
 import androidx.compose.ui.test.hasText
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
@@ -219,6 +221,8 @@ class DashboardScreenTest {
 
         composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasText(choosePdfFolderLabel))
         composeTestRule.onNodeWithText(choosePdfFolderLabel).performClick()
+        composeTestRule.onRoot(useUnmergedTree = true).printToLog("FOLDER_PICKER_TREE_DUMP")
+        composeTestRule.onAllNodesWithText(folderPickerTitle).printToLog("FOLDER_PICKER_MATCHES")
         composeTestRule.onNodeWithText(folderPickerTitle).assertIsDisplayed()
         composeTestRule.onNodeWithText(folderPickerMessage).assertIsDisplayed()
         composeTestRule.onNodeWithText(selectFilesManuallyLabel).assertIsDisplayed()
