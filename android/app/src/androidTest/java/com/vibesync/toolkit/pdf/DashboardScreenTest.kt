@@ -195,6 +195,10 @@ class DashboardScreenTest {
     @Test
     fun pdfDiscoveryExplainsThatOnlyTheSelectedFolderIsIndexed() {
         val context = ApplicationProvider.getApplicationContext<Context>()
+        val choosePdfFolderLabel = context.getString(R.string.choose_pdf_folder)
+        val folderPickerTitle = context.getString(R.string.pdf_folder_picker_title)
+        val folderPickerMessage = context.getString(R.string.pdf_folder_picker_message)
+        val selectFilesManuallyLabel = context.getString(R.string.select_files_manually)
         context.getSharedPreferences("document_picker_preferences", Context.MODE_PRIVATE)
             .edit().clear().commit()
         val viewModel = DashboardViewModel(
@@ -213,13 +217,11 @@ class DashboardScreenTest {
             }
         }
 
-        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasText("Choose PDF folder"))
-        composeTestRule.onNodeWithText("Choose PDF folder").performClick()
-        composeTestRule.onNodeWithText("Choose a folder for PDF discovery").assertIsDisplayed()
-        composeTestRule.onNodeWithText(
-            "VibeSync no longer scans your whole device. Choose a folder to list PDFs in that folder and its subfolders. Only the selected location is indexed."
-        ).assertIsDisplayed()
-        composeTestRule.onNodeWithText("Select files manually (SAF)").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasText(choosePdfFolderLabel))
+        composeTestRule.onNodeWithText(choosePdfFolderLabel).performClick()
+        composeTestRule.onNodeWithText(folderPickerTitle).assertIsDisplayed()
+        composeTestRule.onNodeWithText(folderPickerMessage).assertIsDisplayed()
+        composeTestRule.onNodeWithText(selectFilesManuallyLabel).assertIsDisplayed()
     }
 
     @Test
