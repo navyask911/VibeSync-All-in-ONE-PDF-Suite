@@ -137,7 +137,6 @@ class DashboardScreenTest {
                     onNavigateToEditor = {},
                     onNavigateToTool = { routes.add(it) },
                     onLaunchScanner = { scannerLaunched = true },
-                    onRequestStoragePermission = {}
                 )
             }
         }

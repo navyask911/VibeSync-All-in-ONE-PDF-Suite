@@ -207,7 +207,7 @@ jobs:
 
       - name: Verify PDF discovery uses SAF only
         run: |
-          forbidden_manifest="$(grep -nE 'android.permission\\.(MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|READ_MEDIA_IMAGES|READ_MEDIA_VIDEO|READ_MEDIA_VISUAL_USER_SELECTED)' android/app/src/main/AndroidManifest.xml || true)"
+          forbidden_manifest="$(grep -nE 'android[.]permission[.](MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|READ_MEDIA_IMAGES|READ_MEDIA_VIDEO|READ_MEDIA_VISUAL_USER_SELECTED)' android/app/src/main/AndroidManifest.xml || true)"
           if [ -n "$forbidden_manifest" ]; then
             echo "Broad storage/media permissions are forbidden; PDF and image input must use SAF/system pickers:"
             echo "$forbidden_manifest"
