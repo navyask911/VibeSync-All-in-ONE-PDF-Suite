@@ -2,8 +2,11 @@ package com.vibesync.toolkit.pdf
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNode
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
@@ -15,8 +18,6 @@ import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onRoot
-import androidx.compose.ui.test.printToLog
 import androidx.compose.ui.test.hasText
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
@@ -221,11 +222,11 @@ class DashboardScreenTest {
 
         composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasText(choosePdfFolderLabel))
         composeTestRule.onNodeWithText(choosePdfFolderLabel).performClick()
-        composeTestRule.onRoot(useUnmergedTree = true).printToLog("FOLDER_PICKER_TREE_DUMP")
-        composeTestRule.onAllNodesWithText(folderPickerTitle).printToLog("FOLDER_PICKER_MATCHES")
-        composeTestRule.onNodeWithText(folderPickerTitle).assertIsDisplayed()
-        composeTestRule.onNodeWithText(folderPickerMessage).assertIsDisplayed()
-        composeTestRule.onNodeWithText(selectFilesManuallyLabel).assertIsDisplayed()
+        // Scope assertions to the dialog window, not the underlying dashboard semantics.
+        composeTestRule.onNode(isDialog()).assertExists()
+        composeTestRule.onNode(hasText(folderPickerTitle) and hasAnyAncestor(isDialog())).assertIsDisplayed()
+        composeTestRule.onNode(hasText(folderPickerMessage) and hasAnyAncestor(isDialog())).assertIsDisplayed()
+        composeTestRule.onNode(hasText(selectFilesManuallyLabel) and hasAnyAncestor(isDialog())).assertIsDisplayed()
     }
 
     @Test
