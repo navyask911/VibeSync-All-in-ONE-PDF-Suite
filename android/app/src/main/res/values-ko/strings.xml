@@ -389,4 +389,9 @@
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
     <string name="translation_translate_action">Translate</string>
+    <!-- SAF-only PDF discovery scope. -->
+    <string name="pdf_folder_picker_title">PDF 검색 폴더 선택</string>
+    <string name="pdf_folder_picker_message">VibeSync는 더 이상 기기 전체를 검색하지 않습니다. 폴더와 하위 폴더의 PDF를 표시할 폴더를 선택하세요. 선택한 위치만 색인화됩니다.</string>
+    <string name="pdf_folder_picker_hint">여기에 PDF를 표시할 폴더를 선택하세요. VibeSync는 기기의 나머지 영역을 검색하지 않습니다.</string>
+
 </resources>

@@ -8,7 +8,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.DocumentMetadata
-import com.vibesync.toolkit.pdf.data.pdf.DevicePdfScanner
 import com.vibesync.toolkit.pdf.data.pdf.SafPdfFolderScanner
 import com.vibesync.toolkit.pdf.data.pdf.DiscoveredPdf
 import kotlinx.coroutines.CancellationException
@@ -24,8 +23,7 @@ data class DashboardUiState(
     val recentDocuments: List<DocumentMetadata> = emptyList(),
     val discoveredPdfs: List<DiscoveredPdf> = emptyList(),
     val isScanning: Boolean = false,
-    val showPermissionRationale: Boolean = false,
-    val hasStoragePermission: Boolean = false,
+    val showFolderPickerRationale: Boolean = false,
     val isProcessing: Boolean = false,
     val message: String? = null,
     val isFolderScanResult: Boolean = false
@@ -33,77 +31,42 @@ data class DashboardUiState(
 
 class DashboardViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val scanner = DevicePdfScanner(application)
     private val folderScanner = SafPdfFolderScanner(application)
     private var scanJob: Job? = null
     private val _uiState = MutableStateFlow(DashboardUiState())
     val uiState: StateFlow<DashboardUiState> = _uiState.asStateFlow()
 
     init {
-        checkPermissionAndScan()
+        refreshCurrentSource()
         loadRecentDocuments()
     }
 
-    fun checkPermissionAndScan() {
-        val hasPermission = scanner.hasStoragePermission()
-        _uiState.value = _uiState.value.copy(hasStoragePermission = hasPermission)
-        if (_uiState.value.isFolderScanResult) {
-            refreshCurrentSource()
-        } else if (hasPermission) {
-            refreshDevicePdfs()
-        }
+    fun triggerFolderSelection() {
+        _uiState.value = _uiState.value.copy(showFolderPickerRationale = true)
     }
 
-    fun triggerScanRequest() {
-        if (scanner.hasStoragePermission()) {
-            refreshDevicePdfs()
-        } else {
-            _uiState.value = _uiState.value.copy(showPermissionRationale = true)
-        }
+    fun dismissFolderSelectionRationale() {
+        _uiState.value = _uiState.value.copy(showFolderPickerRationale = false)
     }
 
-    fun dismissPermissionRationale() {
-        _uiState.value = _uiState.value.copy(showPermissionRationale = false)
-    }
-
-    /** Re-scans whichever source is currently displayed without changing its scope. */
+    /** Re-scans only the folder explicitly selected by the user through SAF. */
     fun refreshCurrentSource() {
-        if (!_uiState.value.isFolderScanResult) {
-            refreshDevicePdfs()
-            return
-        }
-
         val savedTreeUri = getApplication<Application>()
             .getSharedPreferences(PREFERENCES_NAME, android.content.Context.MODE_PRIVATE)
             .getString(KEY_SELECTED_PDF_TREE_URI, null)
 
         if (savedTreeUri.isNullOrBlank()) {
-            refreshDevicePdfs()
-        } else {
-            scanSelectedFolder(Uri.parse(savedTreeUri))
+            scanJob?.cancel()
+            _uiState.value = _uiState.value.copy(
+                discoveredPdfs = emptyList(),
+                isScanning = false,
+                isFolderScanResult = false,
+                message = null
+            )
+            return
         }
-    }
 
-    fun refreshDevicePdfs() {
-        scanJob?.cancel()
-        scanJob = viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isScanning = true, isFolderScanResult = false)
-            try {
-                val pdfs = scanner.scanDevicePdfs()
-                _uiState.value = _uiState.value.copy(
-                    discoveredPdfs = normalizeDiscoveredPdfs(pdfs),
-                    isScanning = false,
-                    isFolderScanResult = false
-                )
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isScanning = false,
-                    message = getApplication<Application>().getString(com.vibesync.toolkit.pdf.R.string.folder_scan_failed)
-                )
-            }
-        }
+        scanSelectedFolder(Uri.parse(savedTreeUri))
     }
 
     /**

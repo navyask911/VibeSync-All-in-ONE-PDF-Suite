@@ -139,4 +139,9 @@
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
     <string name="translation_translate_action">Translate</string>
+    <!-- SAF-only PDF discovery scope. -->
+    <string name="pdf_folder_picker_title">เลือกโฟลเดอร์เพื่อค้นหา PDF</string>
+    <string name="pdf_folder_picker_message">VibeSync จะไม่สแกนทั้งอุปกรณ์อีกต่อไป เลือกโฟลเดอร์เพื่อแสดง PDF ในโฟลเดอร์และโฟลเดอร์ย่อย ระบบจะจัดทำดัชนีเฉพาะตำแหน่งที่คุณเลือก</string>
+    <string name="pdf_folder_picker_hint">เลือกโฟลเดอร์เพื่อแสดง PDF ที่นี่ VibeSync จะไม่สแกนส่วนอื่นของอุปกรณ์</string>
+
 </resources>

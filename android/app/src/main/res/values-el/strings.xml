@@ -139,4 +139,9 @@
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
     <string name="translation_translate_action">Translate</string>
+    <!-- SAF-only PDF discovery scope. -->
+    <string name="pdf_folder_picker_title">Επιλέξτε φάκελο για αναζήτηση PDF</string>
+    <string name="pdf_folder_picker_message">Το VibeSync δεν σαρώνει πλέον ολόκληρη τη συσκευή. Επιλέξτε φάκελο για να εμφανίζονται τα PDF αυτού του φακέλου και των υποφακέλων του. Ευρετηριάζεται μόνο η επιλεγμένη τοποθεσία.</string>
+    <string name="pdf_folder_picker_hint">Επιλέξτε φάκελο για να εμφανίζονται εδώ PDF. Το VibeSync δεν σαρώνει την υπόλοιπη συσκευή.</string>
+
 </resources>

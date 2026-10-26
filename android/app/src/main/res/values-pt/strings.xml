@@ -389,4 +389,9 @@
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
     <string name="translation_translate_action">Translate</string>
+    <!-- SAF-only PDF discovery scope. -->
+    <string name="pdf_folder_picker_title">Escolha uma pasta para procurar PDFs</string>
+    <string name="pdf_folder_picker_message">O VibeSync já não analisa todo o dispositivo. Escolha uma pasta para mostrar os PDFs dessa pasta e das respetivas subpastas. Apenas a localização selecionada é indexada.</string>
+    <string name="pdf_folder_picker_hint">Escolha uma pasta para ver PDFs aqui. O VibeSync não analisa o resto do dispositivo.</string>
+
 </resources>

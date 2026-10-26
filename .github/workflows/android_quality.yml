@@ -170,7 +170,12 @@ jobs:
               "translation_target_language",
               "translation_translate_action",
           ]
-          required_scan_keys = required_profile_keys + required_filter_keys + required_step4_keys
+          required_d2_keys = [
+              "pdf_folder_picker_title",
+              "pdf_folder_picker_message",
+              "pdf_folder_picker_hint",
+          ]
+          required_scan_keys = required_profile_keys + required_filter_keys + required_step4_keys + required_d2_keys
           all_string_files = sorted(root.glob("values*/strings.xml"))
           if root / "values/strings.xml" not in all_string_files:
               sys.exit("Base strings.xml was not found by the all-locale audit.")
@@ -190,15 +195,30 @@ jobs:
                   items[name] = "".join(node.itertext())
               for name in required_scan_keys:
                   if name not in items:
-                      sys.exit(f"{locale}: missing required profile string: {name}")
+                      sys.exit(f"{locale}: missing required scan string: {name}")
                   if name not in base_items:
                       sys.exit(f"default: required profile string missing: {name}")
                   source_args = sorted(re.findall(r"%(?:[0-9]+\$)?[a-zA-Z]", base_items[name]))
                   target_args = sorted(re.findall(r"%(?:[0-9]+\$)?[a-zA-Z]", items[name]))
                   if source_args != target_args:
                       sys.exit(f"{locale}: placeholders differ for {name}: {source_args} != {target_args}")
-          print(f"All-locale resource audit passed: {len(required_profile_keys)} profile keys and {len(required_filter_keys)} filter keys across {len(all_string_files)} strings.xml files.")
+          print(f"All-locale resource audit passed: {len(required_profile_keys)} profile keys, {len(required_filter_keys)} filter keys, and {len(required_d2_keys)} SAF-only discovery keys across {len(all_string_files)} strings.xml files.")
           PY
+
+      - name: Verify PDF discovery uses SAF only
+        run: |
+          forbidden_manifest="$(grep -nE 'android.permission\\.(MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|READ_MEDIA_IMAGES|READ_MEDIA_VIDEO|READ_MEDIA_VISUAL_USER_SELECTED)' android/app/src/main/AndroidManifest.xml || true)"
+          if [ -n "$forbidden_manifest" ]; then
+            echo "Broad storage/media permissions are forbidden; PDF and image input must use SAF/system pickers:"
+            echo "$forbidden_manifest"
+            exit 1
+          fi
+          forbidden_code="$(git grep -nE 'DevicePdfScanner|isExternalStorageManager|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION|ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION' -- android/app/src/main/java android/app/src/main/AndroidManifest.xml || true)"
+          if [ -n "$forbidden_code" ]; then
+            echo "Legacy device-wide storage discovery or settings flow remains in source:"
+            echo "$forbidden_code"
+            exit 1
+          fi
 
       - name: Verify OCR and print adapters stay on-device
         run: |

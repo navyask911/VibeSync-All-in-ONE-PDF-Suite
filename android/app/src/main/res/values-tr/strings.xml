@@ -389,4 +389,9 @@
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
     <string name="translation_translate_action">Translate</string>
+    <!-- SAF-only PDF discovery scope. -->
+    <string name="pdf_folder_picker_title">PDF aramak için bir klasör seçin</string>
+    <string name="pdf_folder_picker_message">VibeSync artık cihazınızın tamamını taramaz. Klasördeki ve alt klasörlerindeki PDF dosyalarını listelemek için bir klasör seçin. Yalnızca seçilen konum dizine eklenir.</string>
+    <string name="pdf_folder_picker_hint">PDF dosyalarını burada görmek için bir klasör seçin. VibeSync cihazın geri kalanını taramaz.</string>
+
 </resources>

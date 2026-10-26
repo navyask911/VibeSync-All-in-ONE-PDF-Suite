@@ -389,4 +389,9 @@
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
     <string name="translation_translate_action">Translate</string>
+    <!-- SAF-only PDF discovery scope. -->
+    <string name="pdf_folder_picker_title">Scegli una cartella per cercare PDF</string>
+    <string name="pdf_folder_picker_message">VibeSync non esegue più la scansione dell’intero dispositivo. Scegli una cartella per mostrare i PDF al suo interno e nelle sottocartelle. Viene indicizzata solo la posizione selezionata.</string>
+    <string name="pdf_folder_picker_hint">Scegli una cartella per visualizzare qui i PDF. VibeSync non esegue la scansione del resto del dispositivo.</string>
+
 </resources>

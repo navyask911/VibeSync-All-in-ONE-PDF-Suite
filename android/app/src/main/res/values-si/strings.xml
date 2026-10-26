@@ -139,4 +139,9 @@
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
     <string name="translation_translate_action">Translate</string>
+    <!-- SAF-only PDF discovery scope. -->
+    <string name="pdf_folder_picker_title">PDF සෙවීමට ෆෝල්ඩරයක් තෝරන්න</string>
+    <string name="pdf_folder_picker_message">VibeSync තවදුරටත් මුළු උපාංගයම ස්කෑන් නොකරයි. එම ෆෝල්ඩරයේ සහ එහි උපෆෝල්ඩරවල PDF පෙන්වීමට ෆෝල්ඩරයක් තෝරන්න. තෝරාගත් ස්ථානය පමණක් දර්ශකගත වේ.</string>
+    <string name="pdf_folder_picker_hint">මෙහි PDF පෙන්වීමට ෆෝල්ඩරයක් තෝරන්න. VibeSync උපාංගයේ ඉතිරි කොටස ස්කෑන් නොකරයි.</string>
+
 </resources>

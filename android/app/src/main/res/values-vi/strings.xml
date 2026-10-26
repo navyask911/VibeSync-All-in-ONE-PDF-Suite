@@ -139,4 +139,9 @@
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
     <string name="translation_translate_action">Translate</string>
+    <!-- SAF-only PDF discovery scope. -->
+    <string name="pdf_folder_picker_title">Chọn thư mục để tìm PDF</string>
+    <string name="pdf_folder_picker_message">VibeSync không còn quét toàn bộ thiết bị. Hãy chọn thư mục để hiển thị PDF trong thư mục đó và các thư mục con. Chỉ vị trí đã chọn được lập chỉ mục.</string>
+    <string name="pdf_folder_picker_hint">Chọn thư mục để xem PDF tại đây. VibeSync không quét phần còn lại của thiết bị.</string>
+
 </resources>

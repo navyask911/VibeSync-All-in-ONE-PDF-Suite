@@ -139,4 +139,9 @@
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
     <string name="translation_translate_action">Translate</string>
+    <!-- SAF-only PDF discovery scope. -->
+    <string name="pdf_folder_picker_title">PDF ਲੱਭਣ ਲਈ ਫੋਲਡਰ ਚੁਣੋ</string>
+    <string name="pdf_folder_picker_message">VibeSync ਹੁਣ ਤੁਹਾਡੀ ਪੂਰੀ ਡਿਵਾਈਸ ਨੂੰ ਸਕੈਨ ਨਹੀਂ ਕਰਦਾ। ਉਸ ਫੋਲਡਰ ਅਤੇ ਇਸਦੇ ਸਬਫੋਲਡਰਾਂ ਦੀਆਂ PDF ਦਿਖਾਉਣ ਲਈ ਫੋਲਡਰ ਚੁਣੋ। ਸਿਰਫ਼ ਚੁਣੀ ਥਾਂ ਨੂੰ ਸੂਚੀਬੱਧ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।</string>
+    <string name="pdf_folder_picker_hint">ਇੱਥੇ PDF ਵੇਖਣ ਲਈ ਫੋਲਡਰ ਚੁਣੋ। VibeSync ਡਿਵਾਈਸ ਦੇ ਬਾਕੀ ਹਿੱਸੇ ਨੂੰ ਸਕੈਨ ਨਹੀਂ ਕਰਦਾ।</string>
+
 </resources>

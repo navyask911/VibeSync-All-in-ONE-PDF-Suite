@@ -389,4 +389,9 @@
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
     <string name="translation_translate_action">Translate</string>
+    <!-- SAF-only PDF discovery scope. -->
+    <string name="pdf_folder_picker_title">اختر مجلدًا للبحث عن ملفات PDF</string>
+    <string name="pdf_folder_picker_message">لم يعد VibeSync يفحص الجهاز بالكامل. اختر مجلدًا لعرض ملفات PDF فيه وفي مجلداته الفرعية. تتم فهرسة الموقع المحدد فقط.</string>
+    <string name="pdf_folder_picker_hint">اختر مجلدًا لعرض ملفات PDF هنا. لا يفحص VibeSync بقية الجهاز.</string>
+
 </resources>

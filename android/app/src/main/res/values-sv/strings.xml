@@ -139,4 +139,9 @@
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
     <string name="translation_translate_action">Translate</string>
+    <!-- SAF-only PDF discovery scope. -->
+    <string name="pdf_folder_picker_title">Välj en mapp för att söka efter PDF-filer</string>
+    <string name="pdf_folder_picker_message">VibeSync söker inte längre igenom hela enheten. Välj en mapp för att visa PDF-filer i mappen och dess undermappar. Endast den valda platsen indexeras.</string>
+    <string name="pdf_folder_picker_hint">Välj en mapp för att visa PDF-filer här. VibeSync söker inte igenom resten av enheten.</string>
+
 </resources>

@@ -139,4 +139,9 @@
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
     <string name="translation_translate_action">Translate</string>
+    <!-- SAF-only PDF discovery scope. -->
+    <string name="pdf_folder_picker_title">選擇用於尋找 PDF 的資料夾</string>
+    <string name="pdf_folder_picker_message">VibeSync 不再掃描整個裝置。選擇資料夾即可顯示該資料夾及其子資料夾中的 PDF。系統只會為所選位置建立索引。</string>
+    <string name="pdf_folder_picker_hint">選擇資料夾以在此顯示 PDF。VibeSync 不會掃描裝置的其他位置。</string>
+
 </resources>

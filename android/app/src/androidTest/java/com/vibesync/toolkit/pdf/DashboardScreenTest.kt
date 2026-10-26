@@ -194,6 +194,36 @@ class DashboardScreenTest {
     }
 
     @Test
+    fun pdfDiscoveryExplainsThatOnlyTheSelectedFolderIsIndexed() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.getSharedPreferences("document_picker_preferences", Context.MODE_PRIVATE)
+            .edit().clear().commit()
+        val viewModel = DashboardViewModel(
+            ApplicationProvider.getApplicationContext<android.app.Application>()
+        )
+
+        composeTestRule.setContent {
+            VibeSyncPdfTheme {
+                DashboardScreen(
+                    viewModel = viewModel,
+                    onNavigateToViewer = {},
+                    onNavigateToEditor = {},
+                    onNavigateToTool = {},
+                    onLaunchScanner = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasText("Choose PDF folder"))
+        composeTestRule.onNodeWithText("Choose PDF folder").performClick()
+        composeTestRule.onNodeWithText("Choose a folder for PDF discovery").assertIsDisplayed()
+        composeTestRule.onNodeWithText(
+            "VibeSync no longer scans your whole device. Choose a folder to list PDFs in that folder and its subfolders. Only the selected location is indexed."
+        ).assertIsDisplayed()
+        composeTestRule.onNodeWithText("Select files manually (SAF)").assertIsDisplayed()
+    }
+
+    @Test
     fun pdfListShowsTenByDefaultAndSupportsExpandCollapseAndPersistentHide() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         context.getSharedPreferences("dashboard_pdf_section_preferences", Context.MODE_PRIVATE)

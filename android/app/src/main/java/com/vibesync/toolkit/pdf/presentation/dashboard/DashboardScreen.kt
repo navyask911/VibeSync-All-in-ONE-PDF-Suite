@@ -67,7 +67,6 @@ fun DashboardScreen(
     onNavigateToEditor: (Uri) -> Unit,
     onNavigateToTool: (String) -> Unit,
     onLaunchScanner: () -> Unit,
-    onRequestStoragePermission: () -> Unit = {},
     onSelectLanguage: (String) -> Unit = {},
     onSharePdfDocument: (Uri) -> Unit = {},
     onShareJpgImages: (Uri) -> Unit = {},
@@ -228,8 +227,8 @@ fun DashboardScreen(
                         IconButton(onClick = { launchPickerSafely { folderPickerLauncher.launch(null) } }, modifier = Modifier.testTag("dashboard_action_folder")) {
                             Icon(Icons.Default.FolderOpen, contentDescription = stringResource(R.string.choose_pdf_folder), tint = VibeSyncCrimsonPrimary)
                         }
-                        IconButton(onClick = { viewModel.triggerScanRequest() }, modifier = Modifier.testTag("dashboard_action_refresh")) {
-                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.scan_device_pdfs), tint = VibeSyncCrimsonPrimary)
+                        IconButton(onClick = { viewModel.refreshCurrentSource() }, modifier = Modifier.testTag("dashboard_action_refresh")) {
+                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.rescan), tint = VibeSyncCrimsonPrimary)
                         }
                         IconButton(onClick = { launchPickerSafely { viewerPickerLauncher.launch(arrayOf("application/pdf")) } }, modifier = Modifier.testTag("dashboard_action_import")) {
                             Icon(Icons.Default.FileOpen, contentDescription = stringResource(R.string.open_document), tint = VibeSyncCrimsonPrimary)
@@ -427,7 +426,7 @@ fun DashboardScreen(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(
-                                stringResource(if (uiState.isFolderScanResult) R.string.pdfs_in_selected_folder else R.string.pdf_recent_heading),
+                                stringResource(if (uiState.isFolderScanResult) R.string.pdfs_in_selected_folder else R.string.pdf_folder_picker_title),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold
@@ -469,11 +468,11 @@ fun DashboardScreen(
                             Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(Icons.Default.FindInPage, contentDescription = null, tint = VibeSyncCrimsonPrimary, modifier = Modifier.size(36.dp))
                                 Spacer(Modifier.height(8.dp))
-                                Text(stringResource(R.string.automatic_pdf_discovery), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text(stringResource(R.string.scan_storage_invitation), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(stringResource(R.string.pdf_folder_picker_title), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text(stringResource(R.string.pdf_folder_picker_hint), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.height(12.dp))
-                                Button(onClick = { viewModel.triggerScanRequest() }, colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)) {
-                                    Text(stringResource(R.string.scan_device_storage))
+                                Button(onClick = { viewModel.triggerFolderSelection() }, colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)) {
+                                    Text(stringResource(R.string.choose_pdf_folder))
                                 }
                             }
                         }
@@ -741,9 +740,9 @@ fun DashboardScreen(
     }
 
     // Transparent Permission Request Explanatory Rationale Dialog
-    if (uiState.showPermissionRationale) {
+    if (uiState.showFolderPickerRationale) {
         AlertDialog(
-            onDismissRequest = { viewModel.dismissPermissionRationale() },
+            onDismissRequest = { viewModel.dismissFolderSelectionRationale() },
             icon = {
                 Icon(
                     imageVector = Icons.Default.FolderSpecial,
@@ -753,12 +752,12 @@ fun DashboardScreen(
                 )
             },
             title = {
-                Text(stringResource(R.string.allow_device_pdf_access), fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.pdf_folder_picker_title), fontWeight = FontWeight.Bold)
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        stringResource(R.string.device_access_rationale),
+                        stringResource(R.string.pdf_folder_picker_message),
                         fontSize = 13.sp,
                         lineHeight = 18.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -775,18 +774,18 @@ fun DashboardScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.dismissPermissionRationale()
-                        onRequestStoragePermission()
+                        viewModel.dismissFolderSelectionRationale()
+                        launchPickerSafely { folderPickerLauncher.launch(null) }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
                 ) {
-                    Text(stringResource(R.string.grant_access))
+                    Text(stringResource(R.string.choose_pdf_folder))
                 }
             },
             dismissButton = {
                 OutlinedButton(
                     onClick = {
-                        viewModel.dismissPermissionRationale()
+                        viewModel.dismissFolderSelectionRationale()
                         launchPickerSafely { viewerPickerLauncher.launch(arrayOf("application/pdf")) }
                     }
                 ) {

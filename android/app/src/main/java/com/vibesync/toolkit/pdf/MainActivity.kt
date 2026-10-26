@@ -1,6 +1,5 @@
 package com.vibesync.toolkit.pdf
 
-import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -14,7 +13,6 @@ import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.graphics.Bitmap
 import android.graphics.Matrix
@@ -52,7 +50,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -168,15 +165,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var saveScanLauncher: ActivityResultLauncher<String>
     private var pendingScanExportFile: File? = null
 
-    // Permission launcher for Android 14+ photo and media access
-    private val permissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val granted = permissions.entries.all { it.value }
-        if (!granted) {
-            Toast.makeText(this, getString(R.string.storage_permissions_denied), Toast.LENGTH_SHORT).show()
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -421,9 +409,6 @@ class MainActivity : AppCompatActivity() {
                                     scannerManager.startScan(scannerLauncher) { error ->
                                         Toast.makeText(this@MainActivity, getString(R.string.error_scanner, error.message ?: ""), Toast.LENGTH_SHORT).show()
                                     }
-                                },
-                                onRequestStoragePermission = {
-                                    requestStoragePermissionFlow()
                                 },
                                 onSelectLanguage = { languageTag ->
                                     val locales = if (languageTag.isBlank()) {
@@ -1218,22 +1203,6 @@ class MainActivity : AppCompatActivity() {
         return incomingUri
     }
 
-    private fun checkAndRequestPermissions() {
-        // This legacy path is reached only on Android 10 and earlier, where the
-        // device-wide PDF discovery feature still uses READ_EXTERNAL_STORAGE.
-        // Image selection must use the system Photo Picker and never requests
-        // broad photo/video library access.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return
-
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            permissionLauncher.launch(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE))
-        }
-    }
-
     override fun onStart() {
         super.onStart()
         registerConnectivityCallback()
@@ -1248,7 +1217,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         reviewEligibilityTracker.recordSessionIfDue()
         reviewEligibilityRevision += 1
-        dashboardViewModel.checkPermissionAndScan()
+        dashboardViewModel.refreshCurrentSource()
         refreshInternetStatus()
         maybeCheckForUpdate()
     }
@@ -1501,22 +1470,6 @@ class MainActivity : AppCompatActivity() {
         } catch (error: Exception) {
             Log.w(TAG, "Google Play in-app review is unavailable.", error)
             reviewFlowLaunching = false
-        }
-    }
-
-    private fun requestStoragePermissionFlow() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            try {
-                val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                    data = Uri.parse("package:$packageName")
-                }
-                startActivity(intent)
-            } catch (e: Exception) {
-                val intent = Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                startActivity(intent)
-            }
-        } else {
-            checkAndRequestPermissions()
         }
     }
 

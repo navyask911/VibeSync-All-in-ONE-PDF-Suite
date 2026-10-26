@@ -389,4 +389,9 @@
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
     <string name="translation_translate_action">Translate</string>
+    <!-- SAF-only PDF discovery scope. -->
+    <string name="pdf_folder_picker_title">Pilih folder untuk mencari PDF</string>
+    <string name="pdf_folder_picker_message">VibeSync tidak lagi memindai seluruh perangkat. Pilih folder untuk menampilkan PDF di folder tersebut dan subfoldernya. Hanya lokasi yang dipilih yang diindeks.</string>
+    <string name="pdf_folder_picker_hint">Pilih folder untuk menampilkan PDF di sini. VibeSync tidak memindai bagian lain perangkat Anda.</string>
+
 </resources>

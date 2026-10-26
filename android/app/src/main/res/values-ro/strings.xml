@@ -139,4 +139,9 @@
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
     <string name="translation_translate_action">Translate</string>
+    <!-- SAF-only PDF discovery scope. -->
+    <string name="pdf_folder_picker_title">Alegeți un folder pentru căutarea PDF-urilor</string>
+    <string name="pdf_folder_picker_message">VibeSync nu mai scanează întregul dispozitiv. Alegeți un folder pentru a afișa PDF-urile din acesta și din subfolderele sale. Doar locația selectată este indexată.</string>
+    <string name="pdf_folder_picker_hint">Alegeți un folder pentru a vedea PDF-uri aici. VibeSync nu scanează restul dispozitivului.</string>
+
 </resources>

@@ -139,4 +139,9 @@
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
     <string name="translation_translate_action">Translate</string>
+    <!-- SAF-only PDF discovery scope. -->
+    <string name="pdf_folder_picker_title">پوشه‌ای برای یافتن PDF انتخاب کنید</string>
+    <string name="pdf_folder_picker_message">VibeSync دیگر کل دستگاه را اسکن نمی‌کند. پوشه‌ای انتخاب کنید تا فایل‌های PDF آن و زیرپوشه‌هایش نمایش داده شوند. فقط مکان انتخاب‌شده نمایه‌سازی می‌شود.</string>
+    <string name="pdf_folder_picker_hint">برای نمایش PDFها در اینجا پوشه‌ای انتخاب کنید. VibeSync بقیه دستگاه را اسکن نمی‌کند.</string>
+
 </resources>

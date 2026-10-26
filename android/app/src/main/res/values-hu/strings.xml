@@ -139,4 +139,9 @@
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
     <string name="translation_translate_action">Translate</string>
+    <!-- SAF-only PDF discovery scope. -->
+    <string name="pdf_folder_picker_title">Mappa kiválasztása PDF-kereséshez</string>
+    <string name="pdf_folder_picker_message">A VibeSync már nem vizsgálja át az egész eszközt. Válasszon egy mappát, hogy az abban és almappáiban található PDF-ek megjelenjenek. Csak a kiválasztott hely kerül indexelésre.</string>
+    <string name="pdf_folder_picker_hint">Válasszon mappát a PDF-ek megjelenítéséhez. A VibeSync nem vizsgálja át az eszköz többi részét.</string>
+
 </resources>

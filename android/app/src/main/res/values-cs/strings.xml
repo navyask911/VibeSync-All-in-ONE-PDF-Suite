@@ -139,4 +139,9 @@
     <string name="translation_source_language">Source language</string>
     <string name="translation_target_language">Target language</string>
     <string name="translation_translate_action">Translate</string>
+    <!-- SAF-only PDF discovery scope. -->
+    <string name="pdf_folder_picker_title">Vyberte složku pro hledání PDF</string>
+    <string name="pdf_folder_picker_message">VibeSync už neprohledává celé zařízení. Vyberte složku a zobrazte PDF v ní a jejích podsložkách. Indexuje se pouze vybrané umístění.</string>
+    <string name="pdf_folder_picker_hint">Chcete-li zde zobrazit PDF, vyberte složku. VibeSync neprohledává zbytek zařízení.</string>
+
 </resources>
