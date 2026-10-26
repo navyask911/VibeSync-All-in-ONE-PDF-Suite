@@ -3,6 +3,8 @@ package com.vibesync.toolkit.pdf.presentation.scanner
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
@@ -59,6 +61,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+
+@Composable
+internal fun rememberBookSplitPhotoPickerLauncher(
+    onImagePicked: (Uri?) -> Unit
+): ActivityResultLauncher<PickVisualMediaRequest> =
+    rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri -> onImagePicked(uri) }
 
 @Composable
 fun BookSplitPreview(
@@ -118,7 +128,7 @@ fun BookSplitEntryScreen(
     onNavigateBack: () -> Unit,
     onChooseImage: (Uri) -> Unit
 ) {
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val launcher = rememberBookSplitPhotoPickerLauncher { uri ->
         uri?.let(onChooseImage)
     }
     Scaffold(topBar = {
@@ -134,7 +144,7 @@ fun BookSplitEntryScreen(
         Column(Modifier.padding(padding).padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Icon(Icons.Default.Book, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
             Text(stringResource(R.string.book_split_choose_description))
-            Button(onClick = { launcher.launch("image/*") }, modifier = Modifier.fillMaxWidth().testTag("book_split_choose_image")) {
+            Button(onClick = { launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, modifier = Modifier.fillMaxWidth().testTag("book_split_choose_image")) {
                 Text(stringResource(R.string.book_split_choose_image))
             }
         }

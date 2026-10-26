@@ -388,7 +388,12 @@ fun DashboardScreen(
                                     Icon(tool.icon, contentDescription = null, tint = tool.color, modifier = Modifier.size(24.dp))
                                 }
                                 Spacer(modifier = Modifier.height(10.dp))
-                                Text(tool.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                Text(
+                                    tool.title,
+                                    modifier = if (tool.route == "convert") Modifier.testTag("dashboard_photo_picker_import_entry") else Modifier,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp
+                                )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     tool.subtitle,
