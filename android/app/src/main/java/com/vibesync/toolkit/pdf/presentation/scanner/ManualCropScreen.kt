@@ -8,7 +8,7 @@ import android.graphics.RectF
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -158,7 +159,7 @@ fun ManualCropScreen(
                                 val scale = min(size.width.toFloat() / bitmap.width, size.height.toFloat() / bitmap.height)
                                 return Triple(scale, (size.width - bitmap.width * scale) / 2f, (size.height - bitmap.height * scale) / 2f)
                             }
-                            androidx.compose.foundation.gestures.detectDragGestures(
+                            detectDragGestures(
                                 onDragStart = { start ->
                                     val (scale, left, top) = scaleAndOffset()
                                     selectedHandle = corners.indices.minByOrNull { index ->
@@ -173,7 +174,7 @@ fun ManualCropScreen(
                                         sqrt(dx * dx + dy * dy) <= 48f
                                     } ?: -1
                                 },
-                                onDrag = { change, dragAmount ->
+                                onDrag = { change: PointerInputChange, dragAmount: Offset ->
                                     if (selectedHandle >= 0) {
                                         change.consume()
                                         val (scale, _, _) = scaleAndOffset()
