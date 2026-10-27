@@ -173,7 +173,10 @@ fun DashboardScreen(
             ToolItem(context.getString(R.string.tool_book_split), context.getString(R.string.tool_book_split_subtitle), Icons.Default.MenuBook, "book_split", VibeSyncRubyAccent),
             ToolItem(context.getString(R.string.tool_id_card), context.getString(R.string.tool_id_card_subtitle), Icons.Default.Badge, "id_card", Color(0xFFC62828)),
             ToolItem(context.getString(R.string.tool_id_photo), context.getString(R.string.tool_id_photo_subtitle), Icons.Default.Portrait, "id_photo", Color(0xFF8E0000)),
-            ToolItem(context.getString(R.string.tool_translation_scan), context.getString(R.string.tool_translation_scan_subtitle), Icons.Default.Translate, "translation_scan", VibeSyncRubyAccent)
+            ToolItem(context.getString(R.string.tool_translation_scan), context.getString(R.string.tool_translation_scan_subtitle), Icons.Default.Translate, "translation_scan", VibeSyncRubyAccent),
+            ToolItem(context.getString(R.string.manual_crop_title), context.getString(R.string.manual_crop_subtitle), Icons.Default.Crop, "manual_crop", VibeSyncCrimsonPrimary),
+            ToolItem(context.getString(R.string.signature_manager_title), context.getString(R.string.signature_manager_subtitle), Icons.Default.Draw, "signature_manager", VibeSyncRubyAccent),
+            ToolItem(context.getString(R.string.vault_title), context.getString(R.string.vault_subtitle), Icons.Default.Lock, "vault", Color(0xFF5F0000))
         )
     }
 

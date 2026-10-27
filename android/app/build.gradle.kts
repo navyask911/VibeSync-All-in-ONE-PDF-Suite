@@ -145,6 +145,7 @@ dependencies {
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0-beta1")
     implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("com.google.mlkit:translate:17.0.3")
+    implementation("androidx.biometric:biometric:1.1.0")
 
     // Google Mobile Ads (AdMob)
     implementation("com.google.android.gms:play-services-ads:23.3.0")

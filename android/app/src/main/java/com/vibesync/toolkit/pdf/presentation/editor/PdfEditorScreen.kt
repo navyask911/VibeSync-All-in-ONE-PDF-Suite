@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncRubyDeep
@@ -53,6 +54,7 @@ fun PdfEditorScreen(
     val uiState by viewModel.uiState.collectAsState()
 
     var showSignatureDialog by remember { mutableStateOf(false) }
+    var showSignatureManagerDialog by remember { mutableStateOf(false) }
     var showTextInputDialog by remember { mutableStateOf(false) }
     var pendingTapOffset by remember { mutableStateOf(Offset.Zero) }
     var textInputState by remember { mutableStateOf("") }
@@ -86,6 +88,9 @@ fun PdfEditorScreen(
                     }
                     IconButton(onClick = { viewModel.redo() }, enabled = uiState.canRedo) {
                         Icon(Icons.Default.Redo, contentDescription = stringResource(R.string.editor_redo))
+                    }
+                    IconButton(onClick = { showSignatureManagerDialog = true }, modifier = Modifier.testTag("editor_saved_signatures")) {
+                        Icon(Icons.Default.Draw, contentDescription = stringResource(R.string.signature_manager_title))
                     }
                     Button(
                         onClick = {
@@ -287,6 +292,24 @@ fun PdfEditorScreen(
                 viewModel.addSignature(bitmap, x = 120f, y = 300f)
             }
         )
+    }
+
+    if (showSignatureManagerDialog) {
+        Dialog(onDismissRequest = { showSignatureManagerDialog = false }) {
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface,
+                modifier = Modifier.fillMaxWidth().heightIn(max = 680.dp)
+            ) {
+                SignatureManagerScreen(
+                    onNavigateBack = { showSignatureManagerDialog = false },
+                    onSelectSignature = { bitmap, x, y, width, height, rotation ->
+                        viewModel.addSignature(bitmap, x, y, width, height, rotation, saveToVault = false)
+                        showSignatureManagerDialog = false
+                    }
+                )
+            }
+        }
     }
 
     // Text Input Modal Dialog

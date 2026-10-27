@@ -26,6 +26,7 @@ import android.widget.LinearLayout
 import android.widget.Toast
 import java.io.File
 import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.activity.compose.setContent
 import androidx.compose.ui.platform.ComposeView
@@ -45,6 +46,8 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -76,6 +79,11 @@ import com.vibesync.toolkit.pdf.presentation.dashboard.DashboardScreen
 import com.vibesync.toolkit.pdf.presentation.dashboard.DashboardViewModel
 import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
 import com.vibesync.toolkit.pdf.presentation.editor.PdfEditorScreen
+import com.vibesync.toolkit.pdf.presentation.editor.SignatureManagerScreen
+import com.vibesync.toolkit.pdf.presentation.scanner.ManualCropScreen
+import com.vibesync.toolkit.pdf.presentation.vault.VaultGate
+import com.vibesync.toolkit.pdf.presentation.vault.VaultScreen
+import com.vibesync.toolkit.pdf.data.vault.VaultStorage
 import com.vibesync.toolkit.pdf.presentation.monetization.AdMobManager
 import com.vibesync.toolkit.pdf.presentation.scanner.DocumentScannerManager
 import com.vibesync.toolkit.pdf.presentation.scanner.BatchScanViewModel
@@ -507,6 +515,84 @@ class MainActivity : AppCompatActivity() {
 
                         composable("translation_scan") {
                             TranslationScanScreen(onNavigateBack = { navController.popBackStack() })
+                        }
+
+                        composable("manual_crop") {
+                            val cropScope = rememberCoroutineScope()
+                            ManualCropScreen(
+                                onNavigateBack = {
+                                    if (!navController.popBackStack("scan_history", false)) {
+                                        navController.navigate("scan_history") {
+                                            popUpTo("dashboard") { inclusive = false }
+                                            launchSingleTop = true
+                                        }
+                                    }
+                                },
+                                onCommit = { croppedBitmap ->
+                                    cropScope.launch {
+                                        try {
+                                            val saved = withContext(Dispatchers.IO) {
+                                                val scansDirectory = File(filesDir, "scans")
+                                                if (!scansDirectory.exists() && !scansDirectory.mkdirs()) {
+                                                    throw java.io.IOException("Unable to create cropped image storage.")
+                                                }
+                                                val temporaryPng = File.createTempFile("manual_crop_", ".png", cacheDir)
+                                                try {
+                                                    temporaryPng.outputStream().use { stream ->
+                                                        if (!croppedBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)) {
+                                                            throw java.io.IOException("Unable to encode the cropped image.")
+                                                        }
+                                                    }
+                                                    val output = File(scansDirectory, "Manual_Crop_${System.currentTimeMillis()}.pdf")
+                                                    PdfBoxToolkitEngine(applicationContext)
+                                                        .convertImagesToPdf(listOf(Uri.fromFile(temporaryPng)), output)
+                                                        .getOrThrow()
+                                                    output
+                                                } finally {
+                                                    temporaryPng.delete()
+                                                }
+                                            }
+                                            scannerHistoryViewModel.refresh()
+                                            Toast.makeText(this@MainActivity, getString(R.string.manual_crop_saved, saved.name), Toast.LENGTH_LONG).show()
+                                        } catch (error: Exception) {
+                                            Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.manual_crop_error), Toast.LENGTH_LONG).show()
+                                        } finally {
+                                            if (!croppedBitmap.isRecycled) croppedBitmap.recycle()
+                                            navController.popBackStack()
+                                        }
+                                    }
+                                }
+                            )
+                        }
+
+                        composable("signature_manager") {
+                            SignatureManagerScreen(
+                                onNavigateBack = { navController.popBackStack() },
+                                onSelectSignature = { bitmap, _, _, _, _, _ ->
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        getString(R.string.signature_manager_open_editor_hint),
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                    if (!bitmap.isRecycled) bitmap.recycle()
+                                }
+                            )
+                        }
+
+                        composable("vault") {
+                            val vaultStorage = remember { VaultStorage(applicationContext) }
+                            VaultScreen(
+                                storage = vaultStorage,
+                                onNavigateBack = { navController.popBackStack() },
+                                onAuthenticate = { result ->
+                                    val host = this@MainActivity as? FragmentActivity
+                                    if (host == null) {
+                                        result(false)
+                                    } else {
+                                        VaultGate().authenticate(host, result)
+                                    }
+                                }
+                            )
                         }
 
                         // Full-Screen System PDF Viewer

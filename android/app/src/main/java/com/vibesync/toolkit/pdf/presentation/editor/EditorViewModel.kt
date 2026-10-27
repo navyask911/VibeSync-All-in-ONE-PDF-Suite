@@ -2,6 +2,7 @@ package com.vibesync.toolkit.pdf.presentation.editor
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.util.Log
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.UUID
 
 data class EditorUiState(
     val currentPageIndex: Int = 0,
@@ -49,6 +51,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private val rendererEngine = PdfRendererEngine(application)
     private val toolkitEngine = PdfBoxToolkitEngine(application)
     private val securityVault by lazy { SecurityVault(getApplication<Application>()) }
+    private val temporarySignatureBitmaps = mutableSetOf<Bitmap>()
 
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
@@ -177,23 +180,71 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         persistCurrentPageAnnotations()
     }
 
-    fun addSignature(bitmap: Bitmap, x: Float, y: Float) {
-        // Automatically save to Encrypted Vault
-        securityVault.saveDefaultSignature(bitmap)
+    fun addSignature(
+        bitmap: Bitmap,
+        x: Float,
+        y: Float,
+        width: Float = 160f,
+        height: Float = 80f,
+        rotationDegrees: Float = 0f,
+        saveToVault: Boolean = true
+    ) {
+        // Keep captured signatures discoverable by their stable encrypted identifiers.
+        if (saveToVault) {
+            securityVault.saveDefaultSignature(bitmap)
+            securityVault.saveSignature(
+                "signature_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(8)}",
+                bitmap
+            )
+        }
+        val normalizedRotation = ((rotationDegrees % 360f) + 360f) % 360f
+        val placedBitmap = if (normalizedRotation == 0f) {
+            bitmap
+        } else {
+            Bitmap.createBitmap(
+                bitmap, 0, 0, bitmap.width, bitmap.height,
+                Matrix().apply { postRotate(normalizedRotation) }, true
+            ).also { if (!bitmap.isRecycled) bitmap.recycle() }
+        }
+        temporarySignatureBitmaps.add(placedBitmap)
 
         undoStack.add(currentPageAnnotations())
         redoStack.clear()
-
         val sig = SignatureAnnotation(
             x = x,
             y = y,
-            width = 160f,
-            height = 80f,
-            bitmap = bitmap
+            width = width.coerceAtLeast(1f),
+            height = height.coerceAtLeast(1f),
+            bitmap = placedBitmap
         )
         val updated = _uiState.value.currentSignatures + sig
-        _uiState.value = _uiState.value.copy(currentSignatures = updated)
+        _uiState.value = _uiState.value.copy(
+            currentSignatures = updated,
+            canUndo = undoStack.isNotEmpty(),
+            canRedo = redoStack.isNotEmpty()
+        )
         persistCurrentPageAnnotations()
+    }
+
+    fun listSavedSignatures(): List<SecurityVault.SavedSignature> = securityVault.listSignatures()
+
+    fun renameSavedSignature(oldId: String, newId: String): Boolean =
+        securityVault.renameSignature(oldId, newId)
+
+    fun deleteSavedSignature(id: String): Boolean = securityVault.deleteSignature(id)
+
+    /** Releases decoded/placed signature bitmaps once PDF flattening has finished. */
+    fun releaseSignatureBitmapsAfterFlatten() {
+        temporarySignatureBitmaps.forEach { bitmap ->
+            if (!bitmap.isRecycled) bitmap.recycle()
+        }
+        temporarySignatureBitmaps.clear()
+        pageAnnotationsMap.keys.toList().forEach { pageIndex ->
+            pageAnnotationsMap[pageIndex]?.let { annotations ->
+                pageAnnotationsMap[pageIndex] = annotations.copy(signatures = emptyList())
+            }
+        }
+        _uiState.value = _uiState.value.copy(currentSignatures = emptyList())
     }
 
     fun undo() {
@@ -288,6 +339,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
             result.fold(
                 onSuccess = { file ->
+                    releaseSignatureBitmapsAfterFlatten()
                     _uiState.value = _uiState.value.copy(isSaving = false, exportSuccessFile = file)
                     onComplete(file)
                 },
