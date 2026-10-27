@@ -40,6 +40,7 @@ import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncRubyDeep
 import com.vibesync.toolkit.pdf.presentation.monetization.BannerAd
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.presentation.common.PdfDocumentActionsSheet
+import com.vibesync.toolkit.pdf.presentation.common.PdfWatermarkOptions
 import kotlinx.coroutines.launch
 
 private const val VIBESYNC_PUBLIC_INFO_URL = "https://github.com/navyask911/VibeSync-All-in-ONE-PDF-Suite-Read-Me"
@@ -73,7 +74,8 @@ fun DashboardScreen(
     onShareJpgImages: (Uri) -> Unit = {},
     onRenameDocument: (Uri, String) -> Unit = { _, _ -> },
     onDeleteDocument: (Uri) -> Unit = {},
-    onNavigateToPdfTool: (String, Uri) -> Unit = { route, _ -> onNavigateToTool(route) }
+    onNavigateToPdfTool: (String, Uri) -> Unit = { route, _ -> onNavigateToTool(route) },
+    onApplyWatermark: (Uri, PdfWatermarkOptions) -> Unit = { uri, _ -> onNavigateToPdfTool("watermark", uri) }
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
@@ -595,7 +597,7 @@ fun DashboardScreen(
                 onShareImages = { onShareJpgImages(target.uri) },
                 onSplit = { onNavigateToPdfTool("split", target.uri) },
                 onCompress = { onNavigateToPdfTool("compress", target.uri) },
-                onWatermark = { onNavigateToPdfTool("watermark", target.uri) },
+                onWatermark = { options -> onApplyWatermark(target.uri, options) },
                 onEncrypt = { onNavigateToPdfTool("encrypt", target.uri) },
                 onDelete = { showDeleteDocumentDialog = true }
             )

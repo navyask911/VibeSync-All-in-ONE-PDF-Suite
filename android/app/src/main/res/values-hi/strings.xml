@@ -253,4 +253,10 @@
     <string name="document_rename_success">दस्तावेज़ का नाम बदल दिया गया।</string>
     <string name="document_delete_success">दस्तावेज़ हटा दिया गया।</string>
     <string name="document_action_failed">दस्तावेज़ कार्रवाई पूरी नहीं हो सकी। फिर कोशिश करें।</string>
+
+    <!-- PDF watermark controls -->
+    <string name="watermark_text_label">वॉटरमार्क टेक्स्ट</string>
+    <string name="watermark_opacity_label">अपारदर्शिता</string>
+    <string name="watermark_angle_label">कोण</string>
+    <string name="watermark_apply_action">वॉटरमार्क लागू करें</string>
 </resources>

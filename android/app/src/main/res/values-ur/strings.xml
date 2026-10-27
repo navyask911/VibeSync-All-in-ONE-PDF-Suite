@@ -253,4 +253,10 @@
     <string name="document_rename_success">دستاویز کا نام تبدیل ہوگیا۔</string>
     <string name="document_delete_success">دستاویز حذف ہوگئی۔</string>
     <string name="document_action_failed">دستاویز کا عمل مکمل نہیں ہوسکا۔ دوبارہ کوشش کریں۔</string>
+
+    <!-- PDF watermark controls -->
+    <string name="watermark_text_label">واٹرمارک کا متن</string>
+    <string name="watermark_opacity_label">دھندلاپن</string>
+    <string name="watermark_angle_label">زاویہ</string>
+    <string name="watermark_apply_action">واٹرمارک لگائیں</string>
 </resources>

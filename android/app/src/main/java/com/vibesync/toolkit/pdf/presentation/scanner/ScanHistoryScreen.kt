@@ -73,6 +73,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.presentation.common.PdfDocumentActionsSheet
+import com.vibesync.toolkit.pdf.presentation.common.PdfWatermarkOptions
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -91,7 +92,8 @@ fun ScanHistoryScreen(
     onShareImages: (File) -> Unit,
     onSaveToDownloads: (File) -> Unit,
     onNavigateToEditor: (Uri) -> Unit = {},
-    onNavigateToPdfTool: (String, Uri) -> Unit = { _, _ -> }
+    onNavigateToPdfTool: (String, Uri) -> Unit = { _, _ -> },
+    onApplyWatermark: (Uri, PdfWatermarkOptions) -> Unit = { uri, _ -> onNavigateToPdfTool("watermark", uri) }
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsState()
@@ -181,6 +183,7 @@ fun ScanHistoryScreen(
                             onSaveToDownloads = { onSaveToDownloads(scan.file) },
                             onEdit = { onNavigateToEditor(Uri.fromFile(scan.file)) },
                             onNavigateToPdfTool = { route -> onNavigateToPdfTool(route, Uri.fromFile(scan.file)) },
+                            onApplyWatermark = { options -> onApplyWatermark(Uri.fromFile(scan.file), options) },
                             onRename = { file, name ->
                                 viewModel.renameScan(file, name) { result ->
                                     scope.launch {
@@ -222,6 +225,7 @@ private fun ScanHistoryCard(
     onSaveToDownloads: () -> Unit,
     onEdit: () -> Unit,
     onNavigateToPdfTool: (String) -> Unit,
+    onApplyWatermark: (PdfWatermarkOptions) -> Unit,
     onRename: (File, String) -> Unit,
     onDelete: (File) -> Unit
 ) {
@@ -314,7 +318,7 @@ private fun ScanHistoryCard(
             onSaveToDownloads = onSaveToDownloads,
             onSplit = { onNavigateToPdfTool("split") },
             onCompress = { onNavigateToPdfTool("compress") },
-            onWatermark = { onNavigateToPdfTool("watermark") },
+            onWatermark = onApplyWatermark,
             onEncrypt = { onNavigateToPdfTool("encrypt") },
             onDelete = { showDeleteDialog = true }
         )

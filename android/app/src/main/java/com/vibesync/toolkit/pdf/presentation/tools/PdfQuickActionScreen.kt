@@ -48,7 +48,10 @@ fun PdfQuickActionScreen(
     mode: String,
     initialUri: Uri,
     onNavigateBack: () -> Unit,
-    onSuccess: (File) -> Unit
+    onSuccess: (File) -> Unit,
+    watermarkText: String = "",
+    watermarkOpacity: Float = 150f / 255f,
+    watermarkAngleDegrees: Float = 0f
 ) {
     val context = LocalContext.current
     val engine = remember { PdfBoxToolkitEngine(context.applicationContext) }
@@ -99,7 +102,13 @@ fun PdfQuickActionScreen(
                             UriUtils.createExportCacheFile(context, if (isWatermark) "watermarked_pdf" else "compressed_pdf")
                         }
                         val result = if (isWatermark) {
-                            engine.watermarkPdf(initialUri, context.getString(R.string.pdf_watermark_text), output)
+                            engine.watermarkPdf(
+                                sourceUri = initialUri,
+                                watermarkText = watermarkText.ifBlank { context.getString(R.string.pdf_watermark_text) },
+                                outputFile = output,
+                                opacity = watermarkOpacity,
+                                angleDegrees = watermarkAngleDegrees
+                            )
                         } else {
                             engine.compressPdf(initialUri, output)
                         }

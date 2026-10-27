@@ -253,4 +253,10 @@
     <string name="document_rename_success">Belge yeniden adlandırıldı.</string>
     <string name="document_delete_success">Belge silindi.</string>
     <string name="document_action_failed">Belge işlemi tamamlanamadı. Tekrar deneyin.</string>
+
+    <!-- PDF watermark controls -->
+    <string name="watermark_text_label">Filigran metni</string>
+    <string name="watermark_opacity_label">Opaklık</string>
+    <string name="watermark_angle_label">Açı</string>
+    <string name="watermark_apply_action">Filigranı uygula</string>
 </resources>

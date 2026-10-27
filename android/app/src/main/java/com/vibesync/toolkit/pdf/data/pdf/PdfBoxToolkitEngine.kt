@@ -43,6 +43,7 @@ import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import kotlin.math.ceil
+import kotlin.math.roundToInt
 import java.security.Security
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 
@@ -425,14 +426,22 @@ class PdfBoxToolkitEngine(private val context: Context) {
     suspend fun watermarkPdf(
         sourceUri: Uri,
         watermarkText: String,
-        outputFile: File
+        outputFile: File,
+        opacity: Float = 150f / 255f,
+        angleDegrees: Float = 0f
     ): Result<File> = withContext(Dispatchers.IO) {
         var sourceFileToDelete: File? = null
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "watermark_src_")
             sourceFileToDelete = sourceFile
             PDDocument.load(sourceFile).use { document ->
-                applyVibeSyncWatermark(document, watermarkText)
+                applyVibeSyncWatermark(
+                    document = document,
+                    watermarkText = watermarkText,
+                    opacity = opacity,
+                    angleDegrees = angleDegrees,
+                    centerOnPage = true
+                )
                 document.save(outputFile)
             }
             Result.success(outputFile)
@@ -687,7 +696,10 @@ class PdfBoxToolkitEngine(private val context: Context) {
 
     private fun applyVibeSyncWatermark(
         document: PDDocument,
-        watermarkText: String = context.getString(R.string.pdf_watermark_text)
+        watermarkText: String = context.getString(R.string.pdf_watermark_text),
+        opacity: Float = 150f / 255f,
+        angleDegrees: Float = 0f,
+        centerOnPage: Boolean = false
     ) {
         val documentInfo = document.documentInformation
         if (documentInfo.getCustomMetadataValue(WATERMARK_METADATA_KEY) == WATERMARK_METADATA_VALUE) {
@@ -696,9 +708,9 @@ class PdfBoxToolkitEngine(private val context: Context) {
         if (watermarkText.isBlank()) return
 
         // Built-in Type1 fonts cannot encode Arabic, CJK, and many Indic glyphs. Shape the
-        // localized footer with Android text layout and embed a transparent image in the PDF.
+        // localized watermark with Android text layout and embed it as a transparent image.
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(150, 142, 0, 0)
+            color = Color.argb((opacity.coerceIn(0f, 1f) * 255f).roundToInt(), 142, 0, 0)
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
             textSize = 28f
         }
@@ -724,25 +736,48 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 restore()
             }
 
-            val watermarkImage = LosslessFactory.createFromImage(document, bitmap)
-            for (page in document.pages) {
-                val mediaBox = page.mediaBox
-                val maxWidthPt = mediaBox.width * 0.85f
-                val aspectRatio = bitmap.width.toFloat() / bitmap.height.toFloat().coerceAtLeast(1f)
-                val targetHeightPt = minOf(10f, maxWidthPt / aspectRatio)
-                val targetWidthPt = targetHeightPt * aspectRatio
-                val x = mediaBox.lowerLeftX + (mediaBox.width - targetWidthPt) / 2f
-                val y = mediaBox.lowerLeftY + 6f
-
-                PDPageContentStream(
-                    document,
-                    page,
-                    PDPageContentStream.AppendMode.APPEND,
-                    true,
+            val normalizedAngle = angleDegrees.coerceIn(-180f, 180f)
+            val watermarkBitmap = if (normalizedAngle == 0f) {
+                bitmap
+            } else {
+                Bitmap.createBitmap(
+                    bitmap,
+                    0,
+                    0,
+                    bitmap.width,
+                    bitmap.height,
+                    android.graphics.Matrix().apply { postRotate(normalizedAngle) },
                     true
-                ).use { stream ->
-                    stream.drawImage(watermarkImage, x, y, targetWidthPt, targetHeightPt)
+                )
+            }
+            try {
+                val watermarkImage = LosslessFactory.createFromImage(document, watermarkBitmap)
+                for (page in document.pages) {
+                    val mediaBox = page.mediaBox
+                    val maxWidthPt = mediaBox.width * 0.85f
+                    val aspectRatio = watermarkBitmap.width.toFloat() / watermarkBitmap.height.toFloat().coerceAtLeast(1f)
+                    val maxHeightPt = if (centerOnPage) mediaBox.height * 0.12f else 10f
+                    val targetHeightPt = minOf(maxHeightPt, maxWidthPt / aspectRatio)
+                    val targetWidthPt = targetHeightPt * aspectRatio
+                    val x = mediaBox.lowerLeftX + (mediaBox.width - targetWidthPt) / 2f
+                    val y = if (centerOnPage) {
+                        mediaBox.lowerLeftY + (mediaBox.height - targetHeightPt) / 2f
+                    } else {
+                        mediaBox.lowerLeftY + 6f
+                    }
+
+                    PDPageContentStream(
+                        document,
+                        page,
+                        PDPageContentStream.AppendMode.APPEND,
+                        true,
+                        true
+                    ).use { stream ->
+                        stream.drawImage(watermarkImage, x, y, targetWidthPt, targetHeightPt)
+                    }
                 }
+            } finally {
+                if (watermarkBitmap !== bitmap && !watermarkBitmap.isRecycled) watermarkBitmap.recycle()
             }
         } finally {
             if (!bitmap.isRecycled) bitmap.recycle()

@@ -253,4 +253,10 @@
     <string name="document_rename_success">Documento rinominato.</string>
     <string name="document_delete_success">Documento eliminato.</string>
     <string name="document_action_failed">Impossibile completare l’azione. Riprova.</string>
+
+    <!-- PDF watermark controls -->
+    <string name="watermark_text_label">Testo filigrana</string>
+    <string name="watermark_opacity_label">Opacità</string>
+    <string name="watermark_angle_label">Angolo</string>
+    <string name="watermark_apply_action">Applica filigrana</string>
 </resources>

@@ -253,4 +253,10 @@
     <string name="document_rename_success">Documento renomeado.</string>
     <string name="document_delete_success">Documento excluído.</string>
     <string name="document_action_failed">Não foi possível concluir esta ação. Tente novamente.</string>
+
+    <!-- PDF watermark controls -->
+    <string name="watermark_text_label">Texto da marca d'água</string>
+    <string name="watermark_opacity_label">Opacidade</string>
+    <string name="watermark_angle_label">Ângulo</string>
+    <string name="watermark_apply_action">Aplicar marca d'água</string>
 </resources>
