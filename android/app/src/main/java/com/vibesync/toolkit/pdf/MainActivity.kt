@@ -423,6 +423,7 @@ class MainActivity : AppCompatActivity() {
                                 onRenameDocument = { uri, name -> renamePdfDocument(uri, name) },
                                 onDeleteDocument = { uri -> deletePdfDocument(uri) },
                                 onNavigateToPdfTool = { route, uri ->
+                                    if (route == "watermark") getSharedPreferences("pdf_watermark_options", MODE_PRIVATE).edit().putBoolean("watermark_custom_enabled", true).apply()
                                     navController.navigate("$route/${encodeUriRoute(uri)}")
                                 }
                             )
@@ -449,7 +450,10 @@ class MainActivity : AppCompatActivity() {
                                 onShareImages = { file -> shareScanImages(file) },
                                 onSaveToDownloads = { file -> saveScanToDownloads(file) },
                                 onNavigateToEditor = { uri -> navController.navigate("editor/${encodeUriRoute(uri)}") },
-                                onNavigateToPdfTool = { route, uri -> navController.navigate("$route/${encodeUriRoute(uri)}") },
+                                onNavigateToPdfTool = { route, uri ->
+                                    if (route == "watermark") getSharedPreferences("pdf_watermark_options", MODE_PRIVATE).edit().putBoolean("watermark_custom_enabled", true).apply()
+                                    navController.navigate("$route/${encodeUriRoute(uri)}")
+                                },
                                 onSplitBook = { imageUri -> navController.navigate("book_split/${encodeUriRoute(imageUri)}") }
                             )
                         }

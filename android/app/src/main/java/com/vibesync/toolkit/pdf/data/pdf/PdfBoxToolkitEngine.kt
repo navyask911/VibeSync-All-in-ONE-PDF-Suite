@@ -540,14 +540,118 @@ class PdfBoxToolkitEngine(private val context: Context) {
     suspend fun watermarkPdf(
         sourceUri: Uri,
         watermarkText: String,
-        outputFile: File
+        outputFile: File,
+        opacity: Float = 150f / 255f,
+        angleDegrees: Float = 0f
     ): Result<File> = withContext(Dispatchers.IO) {
         var sourceFileToDelete: File? = null
+        val watermarkPreferences = context.getSharedPreferences("pdf_watermark_options", Context.MODE_PRIVATE)
+        val useCustomOptions = watermarkPreferences.getBoolean("watermark_custom_enabled", false)
+        val effectiveText = if (useCustomOptions) {
+            watermarkPreferences.getString("watermark_text", watermarkText)?.takeIf { it.isNotBlank() } ?: watermarkText
+        } else {
+            watermarkText
+        }
+        val effectiveOpacity = (if (useCustomOptions) {
+            watermarkPreferences.getFloat("watermark_opacity", opacity)
+        } else {
+            opacity
+        }).coerceIn(0f, 1f)
+        val effectiveAngle = (if (useCustomOptions) {
+            watermarkPreferences.getFloat("watermark_angle", angleDegrees)
+        } else {
+            angleDegrees
+        }).coerceIn(0f, 90f)
+        if (useCustomOptions) {
+            watermarkPreferences.edit().putBoolean("watermark_custom_enabled", false).apply()
+        }
+
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "watermark_src_")
             sourceFileToDelete = sourceFile
             PDDocument.load(sourceFile).use { document ->
-                applyVibeSyncWatermark(document, watermarkText)
+                val documentInfo = document.documentInformation
+                if (
+                    documentInfo.getCustomMetadataValue(WATERMARK_METADATA_KEY) != WATERMARK_METADATA_VALUE &&
+                    effectiveText.isNotBlank()
+                ) {
+                    // Android text layout shapes scripts that PDFBox's built-in fonts cannot encode.
+                    val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = Color.rgb(142, 0, 0)
+                        typeface = Typeface.create("sans-serif", Typeface.BOLD)
+                        textSize = 28f
+                    }
+                    val measuredTextWidth = ceil(paint.measureText(effectiveText)).toInt().coerceAtLeast(1)
+                    val bitmap = Bitmap.createBitmap(
+                        measuredTextWidth + 16,
+                        (ceil(paint.fontMetrics.descent - paint.fontMetrics.ascent).toInt() + 8).coerceAtLeast(1),
+                        Bitmap.Config.ARGB_8888
+                    )
+                    try {
+                        val textLayout = StaticLayout.Builder
+                            .obtain(effectiveText, 0, effectiveText.length, paint, measuredTextWidth)
+                            .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                            .setTextDirection(TextDirectionHeuristics.FIRSTSTRONG_LTR)
+                            .setIncludePad(true)
+                            .setMaxLines(1)
+                            .build()
+                        Canvas(bitmap).apply {
+                            save()
+                            translate(8f, ((bitmap.height - textLayout.height) / 2f).coerceAtLeast(0f))
+                            textLayout.draw(this)
+                            restore()
+                        }
+
+                        val watermarkBitmap = if (effectiveAngle == 0f) {
+                            bitmap
+                        } else {
+                            Bitmap.createBitmap(
+                                bitmap,
+                                0,
+                                0,
+                                bitmap.width,
+                                bitmap.height,
+                                android.graphics.Matrix().apply { postRotate(effectiveAngle) },
+                                true
+                            )
+                        }
+                        try {
+                            val watermarkImage = LosslessFactory.createFromImage(document, watermarkBitmap)
+                            for (page in document.pages) {
+                                val mediaBox = page.mediaBox
+                                val maxWidthPt = mediaBox.width * 0.85f
+                                val maxHeightPt = mediaBox.height * 0.72f
+                                val scale = minOf(
+                                    maxWidthPt / watermarkBitmap.width.toFloat().coerceAtLeast(1f),
+                                    maxHeightPt / watermarkBitmap.height.toFloat().coerceAtLeast(1f)
+                                )
+                                val targetWidthPt = watermarkBitmap.width * scale
+                                val targetHeightPt = watermarkBitmap.height * scale
+                                val x = mediaBox.lowerLeftX + (mediaBox.width - targetWidthPt) / 2f
+                                val y = mediaBox.lowerLeftY + (mediaBox.height - targetHeightPt) / 2f
+                                val graphicsState = PDExtendedGraphicsState().apply {
+                                    nonStrokingAlphaConstant = effectiveOpacity
+                                    strokingAlphaConstant = effectiveOpacity
+                                }
+                                PDPageContentStream(
+                                    document,
+                                    page,
+                                    PDPageContentStream.AppendMode.APPEND,
+                                    true,
+                                    true
+                                ).use { stream ->
+                                    stream.setGraphicsStateParameters(graphicsState)
+                                    stream.drawImage(watermarkImage, x, y, targetWidthPt, targetHeightPt)
+                                }
+                            }
+                        } finally {
+                            if (watermarkBitmap !== bitmap && !watermarkBitmap.isRecycled) watermarkBitmap.recycle()
+                        }
+                    } finally {
+                        if (!bitmap.isRecycled) bitmap.recycle()
+                    }
+                    documentInfo.setCustomMetadataValue(WATERMARK_METADATA_KEY, WATERMARK_METADATA_VALUE)
+                }
                 document.save(outputFile)
             }
             Result.success(outputFile)
@@ -562,6 +666,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
             sourceFileToDelete?.delete()
         }
     }
+
     /**
      * Flattens and bakes real-time vector annotations, highlighters, text boxes,
      * and digital signatures onto the original PDF stream mapped precisely at 72 DPI.
