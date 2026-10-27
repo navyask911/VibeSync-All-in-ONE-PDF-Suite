@@ -84,13 +84,11 @@ fun SignatureManagerScreen(
         signatures.addAll(vault.listSignatures())
         if (selectedId != null && signatures.none { it.id == selectedId }) {
             selectedId = null
-            previewBitmap?.let { if (!it.isRecycled) it.recycle() }
             previewBitmap = null
         }
     }
 
     fun selectSignature(id: String) {
-        previewBitmap?.let { if (!it.isRecycled) it.recycle() }
         selectedId = id
         previewBitmap = vault.getSignature(id)
         offsetX = 24f
@@ -104,8 +102,9 @@ fun SignatureManagerScreen(
         onDispose { }
     }
     DisposableEffect(previewBitmap) {
+        val bitmapToDispose = previewBitmap
         onDispose {
-            previewBitmap?.let { if (!it.isRecycled) it.recycle() }
+            bitmapToDispose?.let { if (!it.isRecycled) it.recycle() }
         }
     }
 
@@ -149,13 +148,14 @@ fun SignatureManagerScreen(
                 }
             }
             val preview = previewBitmap
-            if (preview != null && !preview.isRecycled) {
+            val previewImageBitmap = remember(preview) { preview?.asImageBitmap() }
+            if (preview != null && previewImageBitmap != null && !preview.isRecycled) {
                 Text(stringResource(R.string.signature_manager_drag_hint), style = MaterialTheme.typography.bodySmall)
                 Box(
                     modifier = Modifier.fillMaxWidth().height(180.dp).background(MaterialTheme.colorScheme.surfaceVariant).testTag("signature_placement_canvas")
                 ) {
                     Image(
-                        bitmap = preview.asImageBitmap(),
+                        bitmap = previewImageBitmap,
                         contentDescription = stringResource(R.string.signature_manager_select),
                         modifier = Modifier
                             .offset(x = offsetX.dp, y = offsetY.dp)
