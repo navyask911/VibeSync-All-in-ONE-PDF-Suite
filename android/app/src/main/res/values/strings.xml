@@ -439,7 +439,7 @@
     <string name="signature_manager_name_required">Enter a unique, non-empty signature name.</string>
     <string name="signature_manager_delete_title">Delete selected signature?</string>
     <string name="signature_manager_drag_hint">Drag to position, then adjust size and rotation.</string>
-    <string name="signature_manager_open_editor_hint">Open a PDF with Edit & Sign to place this signature.</string>
+    <string name="signature_manager_open_editor_hint">Open a PDF with Edit &amp; Sign to place this signature.</string>
     <string name="vault_title">Vault</string>
     <string name="vault_subtitle">Keep private documents behind device authentication.</string>
     <string name="vault_locked_message">Authenticate to view private vault files.</string>
