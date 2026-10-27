@@ -404,4 +404,8 @@
     <string name="pdf_folder_picker_message">VibeSync ya no examina todo el dispositivo. Elige una carpeta para mostrar los PDF de esa carpeta y sus subcarpetas. Solo se indexa la ubicación seleccionada.</string>
     <string name="pdf_folder_picker_hint">Elige una carpeta para ver PDF aquí. VibeSync no examina el resto del dispositivo.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

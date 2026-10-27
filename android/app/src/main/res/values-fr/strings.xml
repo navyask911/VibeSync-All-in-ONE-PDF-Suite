@@ -404,4 +404,8 @@
     <string name="pdf_folder_picker_message">VibeSync n’analyse plus tout l’appareil. Choisissez un dossier pour afficher les PDF qu’il contient et ceux de ses sous-dossiers. Seul l’emplacement sélectionné est indexé.</string>
     <string name="pdf_folder_picker_hint">Choisissez un dossier pour afficher des PDF ici. VibeSync n’analyse pas le reste de l’appareil.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

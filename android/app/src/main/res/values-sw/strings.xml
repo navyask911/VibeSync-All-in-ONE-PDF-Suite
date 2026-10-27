@@ -144,4 +144,8 @@
     <string name="pdf_folder_picker_message">VibeSync haichanganui tena kifaa chote. Chagua folda ili kuonyesha PDF zilizo ndani yake na folda zake ndogo. Ni eneo ulilochagua pekee linaloorodheshwa.</string>
     <string name="pdf_folder_picker_hint">Chagua folda ili kuona PDF hapa. VibeSync haichanganui sehemu nyingine ya kifaa.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

@@ -404,4 +404,8 @@
     <string name="pdf_folder_picker_message">VibeSync больше не сканирует всё устройство. Выберите папку, чтобы показывать PDF из неё и её подпапок. Индексируется только выбранное расположение.</string>
     <string name="pdf_folder_picker_hint">Выберите папку, чтобы видеть здесь PDF. VibeSync не сканирует остальную часть устройства.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

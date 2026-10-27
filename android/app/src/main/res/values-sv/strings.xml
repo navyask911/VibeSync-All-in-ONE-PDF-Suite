@@ -144,4 +144,8 @@
     <string name="pdf_folder_picker_message">VibeSync söker inte längre igenom hela enheten. Välj en mapp för att visa PDF-filer i mappen och dess undermappar. Endast den valda platsen indexeras.</string>
     <string name="pdf_folder_picker_hint">Välj en mapp för att visa PDF-filer här. VibeSync söker inte igenom resten av enheten.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

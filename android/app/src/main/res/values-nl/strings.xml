@@ -144,4 +144,8 @@
     <string name="pdf_folder_picker_message">VibeSync scant niet langer het hele apparaat. Kies een map om PDF\'s in die map en de onderliggende mappen te tonen. Alleen de gekozen locatie wordt geïndexeerd.</string>
     <string name="pdf_folder_picker_hint">Kies een map om hier PDF\'s te tonen. VibeSync scant de rest van het apparaat niet.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

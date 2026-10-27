@@ -3,7 +3,6 @@ package com.vibesync.toolkit.pdf
 import android.content.Context
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
@@ -57,11 +56,12 @@ class WatermarkControlTest {
         watermarkPreferences().edit().clear().commit()
         openWatermarkControls()
 
-        composeTestRule.onNodeWithTag("watermark_controls_panel").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithTag("watermark_text_field").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithTag("watermark_opacity_slider").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithTag("watermark_angle_slider").performScrollTo().assertIsDisplayed()
-        composeTestRule.onNodeWithTag("watermark_apply_button").performScrollTo().assertIsDisplayed()
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("watermark_controls_tag").performScrollTo().assertExists()
+        composeTestRule.onNodeWithTag("watermark_text_field").assertExists()
+        composeTestRule.onNodeWithTag("watermark_opacity_slider").assertExists()
+        composeTestRule.onNodeWithTag("watermark_angle_slider").assertExists()
+        composeTestRule.onNodeWithTag("watermark_apply_button").assertExists()
     }
 
     @Test

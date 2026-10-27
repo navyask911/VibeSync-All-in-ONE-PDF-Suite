@@ -144,4 +144,8 @@
     <string name="pdf_folder_picker_message">VibeSync nie skanuje już całego urządzenia. Wybierz folder, aby wyświetlić pliki PDF z niego i jego podfolderów. Indeksowana jest tylko wybrana lokalizacja.</string>
     <string name="pdf_folder_picker_hint">Wybierz folder, aby wyświetlić tutaj pliki PDF. VibeSync nie skanuje reszty urządzenia.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

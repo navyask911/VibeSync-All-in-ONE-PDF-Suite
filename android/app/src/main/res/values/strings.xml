@@ -413,4 +413,8 @@
     <string name="pdf_folder_picker_message">VibeSync no longer scans your whole device. Choose a folder to list PDFs in that folder and its subfolders. Only the selected location is indexed.</string>
     <string name="pdf_folder_picker_hint">Choose a folder to show PDFs here. VibeSync does not scan the rest of your device.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

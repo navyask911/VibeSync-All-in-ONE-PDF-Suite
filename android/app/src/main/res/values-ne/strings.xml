@@ -144,4 +144,8 @@
     <string name="pdf_folder_picker_message">VibeSync ले अब सम्पूर्ण उपकरण स्क्यान गर्दैन। त्यो फोल्डर र यसका उपफोल्डरका PDF देखाउन फोल्डर छान्नुहोस्। छानिएको स्थान मात्र सूचीबद्ध हुन्छ।</string>
     <string name="pdf_folder_picker_hint">यहाँ PDF देखाउन फोल्डर छान्नुहोस्। VibeSync ले उपकरणको बाँकी भाग स्क्यान गर्दैन।</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

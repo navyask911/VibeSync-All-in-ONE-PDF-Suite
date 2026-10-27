@@ -144,4 +144,8 @@
     <string name="pdf_folder_picker_message">Hindi na ini-scan ng VibeSync ang buong device. Pumili ng folder upang makita ang mga PDF sa folder at mga subfolder nito. Ang napiling lokasyon lang ang ini-index.</string>
     <string name="pdf_folder_picker_hint">Pumili ng folder para makita ang mga PDF dito. Hindi ini-scan ng VibeSync ang natitirang bahagi ng device.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

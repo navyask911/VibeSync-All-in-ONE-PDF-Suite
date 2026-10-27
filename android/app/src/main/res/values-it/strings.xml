@@ -394,4 +394,8 @@
     <string name="pdf_folder_picker_message">VibeSync non esegue più la scansione dell’intero dispositivo. Scegli una cartella per mostrare i PDF al suo interno e nelle sottocartelle. Viene indicizzata solo la posizione selezionata.</string>
     <string name="pdf_folder_picker_hint">Scegli una cartella per visualizzare qui i PDF. VibeSync non esegue la scansione del resto del dispositivo.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

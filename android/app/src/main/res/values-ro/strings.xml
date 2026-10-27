@@ -144,4 +144,8 @@
     <string name="pdf_folder_picker_message">VibeSync nu mai scanează întregul dispozitiv. Alegeți un folder pentru a afișa PDF-urile din acesta și din subfolderele sale. Doar locația selectată este indexată.</string>
     <string name="pdf_folder_picker_hint">Alegeți un folder pentru a vedea PDF-uri aici. VibeSync nu scanează restul dispozitivului.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

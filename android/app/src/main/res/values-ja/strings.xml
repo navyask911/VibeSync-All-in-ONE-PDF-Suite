@@ -394,4 +394,8 @@
     <string name="pdf_folder_picker_message">VibeSync は端末全体をスキャンしなくなりました。フォルダとそのサブフォルダ内の PDF を表示するには、フォルダを選択してください。選択した場所だけが索引に登録されます。</string>
     <string name="pdf_folder_picker_hint">ここに PDF を表示するにはフォルダを選択してください。VibeSync は端末のほかの場所をスキャンしません。</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

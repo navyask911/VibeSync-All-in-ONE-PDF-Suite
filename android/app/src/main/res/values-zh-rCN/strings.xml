@@ -394,4 +394,8 @@
     <string name="pdf_folder_picker_message">VibeSync 不再扫描整个设备。选择一个文件夹，即可显示该文件夹及其子文件夹中的 PDF。系统只会为所选位置建立索引。</string>
     <string name="pdf_folder_picker_hint">选择文件夹以在此显示 PDF。VibeSync 不会扫描设备的其他位置。</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

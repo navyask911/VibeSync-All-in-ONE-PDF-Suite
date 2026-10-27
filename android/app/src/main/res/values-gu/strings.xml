@@ -144,4 +144,8 @@
     <string name="pdf_folder_picker_message">VibeSync હવે આખા ઉપકરણને સ્કેન કરતું નથી. તે ફોલ્ડર અને તેના સબફોલ્ડરમાંથી PDF જોવા માટે ફોલ્ડર પસંદ કરો. ફક્ત પસંદ કરેલું સ્થાન જ સૂચિબદ્ધ થાય છે.</string>
     <string name="pdf_folder_picker_hint">અહીં PDF જોવા માટે ફોલ્ડર પસંદ કરો. VibeSync ઉપકરણના બાકીના ભાગને સ્કેન કરતું નથી.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

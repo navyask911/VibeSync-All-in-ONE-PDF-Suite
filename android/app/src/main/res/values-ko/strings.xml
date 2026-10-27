@@ -394,4 +394,8 @@
     <string name="pdf_folder_picker_message">VibeSync는 더 이상 기기 전체를 검색하지 않습니다. 폴더와 하위 폴더의 PDF를 표시할 폴더를 선택하세요. 선택한 위치만 색인화됩니다.</string>
     <string name="pdf_folder_picker_hint">여기에 PDF를 표시할 폴더를 선택하세요. VibeSync는 기기의 나머지 영역을 검색하지 않습니다.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

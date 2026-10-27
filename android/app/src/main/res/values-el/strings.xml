@@ -144,4 +144,8 @@
     <string name="pdf_folder_picker_message">Το VibeSync δεν σαρώνει πλέον ολόκληρη τη συσκευή. Επιλέξτε φάκελο για να εμφανίζονται τα PDF αυτού του φακέλου και των υποφακέλων του. Ευρετηριάζεται μόνο η επιλεγμένη τοποθεσία.</string>
     <string name="pdf_folder_picker_hint">Επιλέξτε φάκελο για να εμφανίζονται εδώ PDF. Το VibeSync δεν σαρώνει την υπόλοιπη συσκευή.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

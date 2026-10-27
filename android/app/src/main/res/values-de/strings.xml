@@ -404,4 +404,8 @@
     <string name="pdf_folder_picker_message">VibeSync durchsucht nicht mehr das gesamte Gerät. Wählen Sie einen Ordner aus, um PDFs darin und in seinen Unterordnern anzuzeigen. Nur der ausgewählte Speicherort wird indiziert.</string>
     <string name="pdf_folder_picker_hint">Wählen Sie einen Ordner, um hier PDFs anzuzeigen. VibeSync durchsucht nicht den Rest Ihres Geräts.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

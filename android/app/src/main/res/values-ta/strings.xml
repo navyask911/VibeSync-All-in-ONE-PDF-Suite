@@ -144,4 +144,8 @@
     <string name="pdf_folder_picker_message">VibeSync இனி உங்கள் முழு சாதனத்தையும் ஸ்கேன் செய்யாது. அந்தக் கோப்புறையிலும் அதன் துணைக் கோப்புறைகளிலும் உள்ள PDFகளைப் பார்க்க ஒரு கோப்புறையைத் தேர்ந்தெடுக்கவும். தேர்ந்தெடுத்த இடம் மட்டுமே பட்டியலிடப்படும்.</string>
     <string name="pdf_folder_picker_hint">இங்கே PDFகளைப் பார்க்க ஒரு கோப்புறையைத் தேர்ந்தெடுக்கவும். VibeSync சாதனத்தின் மற்ற பகுதிகளை ஸ்கேன் செய்யாது.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

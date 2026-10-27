@@ -144,4 +144,8 @@
     <string name="pdf_folder_picker_message">VibeSync ఇకపై మీ మొత్తం పరికరాన్ని స్కాన్ చేయదు. ఆ ఫోల్డర్ మరియు దాని ఉపఫోల్డర్లలోని PDFలను చూపడానికి ఫోల్డర్‌ను ఎంచుకోండి. ఎంచుకున్న స్థానం మాత్రమే సూచికలో చేర్చబడుతుంది.</string>
     <string name="pdf_folder_picker_hint">ఇక్కడ PDFలను చూడటానికి ఫోల్డర్‌ను ఎంచుకోండి. VibeSync పరికరంలోని మిగతా భాగాన్ని స్కాన్ చేయదు.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

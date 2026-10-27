@@ -144,4 +144,8 @@
     <string name="pdf_folder_picker_message">VibeSync 不再掃描整個裝置。選擇資料夾即可顯示該資料夾及其子資料夾中的 PDF。系統只會為所選位置建立索引。</string>
     <string name="pdf_folder_picker_hint">選擇資料夾以在此顯示 PDF。VibeSync 不會掃描裝置的其他位置。</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

@@ -144,4 +144,8 @@
     <string name="pdf_folder_picker_message">VibeSync තවදුරටත් මුළු උපාංගයම ස්කෑන් නොකරයි. එම ෆෝල්ඩරයේ සහ එහි උපෆෝල්ඩරවල PDF පෙන්වීමට ෆෝල්ඩරයක් තෝරන්න. තෝරාගත් ස්ථානය පමණක් දර්ශකගත වේ.</string>
     <string name="pdf_folder_picker_hint">මෙහි PDF පෙන්වීමට ෆෝල්ඩරයක් තෝරන්න. VibeSync උපාංගයේ ඉතිරි කොටස ස්කෑන් නොකරයි.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

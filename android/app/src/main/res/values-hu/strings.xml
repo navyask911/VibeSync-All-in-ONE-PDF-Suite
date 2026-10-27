@@ -144,4 +144,8 @@
     <string name="pdf_folder_picker_message">A VibeSync már nem vizsgálja át az egész eszközt. Válasszon egy mappát, hogy az abban és almappáiban található PDF-ek megjelenjenek. Csak a kiválasztott hely kerül indexelésre.</string>
     <string name="pdf_folder_picker_hint">Válasszon mappát a PDF-ek megjelenítéséhez. A VibeSync nem vizsgálja át az eszköz többi részét.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>

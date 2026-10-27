@@ -84,7 +84,7 @@ fun PdfDocumentActionsSheet(
     onPrint: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val defaultWatermarkText = stringResource(R.string.pdf_watermark_text)
+    val defaultWatermarkText = stringResource(R.string.watermark_default_seal)
     var showWatermarkSettings by remember(documentName) { mutableStateOf(false) }
     var watermarkText by remember(documentName) { mutableStateOf(defaultWatermarkText) }
     var watermarkOpacity by remember(documentName) { mutableStateOf(150f / 255f) }
@@ -149,24 +149,24 @@ fun PdfDocumentActionsSheet(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 12.dp)
-                            .testTag("watermark_controls_panel"),
+                            .testTag("watermark_controls_tag"),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         OutlinedTextField(
                             value = watermarkText,
                             onValueChange = { watermarkText = it },
-                            label = { Text("Watermark text") },
+                            label = { Text(stringResource(R.string.watermark_custom_text_label)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth().testTag("watermark_text_field")
                         )
-                        Text("Opacity: ${(watermarkOpacity * 100f).roundToInt()}%", style = MaterialTheme.typography.bodyMedium)
+                        Text("${stringResource(R.string.watermark_opacity_label)}: ${(watermarkOpacity * 100f).roundToInt()}%", style = MaterialTheme.typography.bodyMedium)
                         Slider(
                             value = watermarkOpacity,
                             onValueChange = { watermarkOpacity = it },
                             valueRange = 0f..1f,
                             modifier = Modifier.fillMaxWidth().testTag("watermark_opacity_slider")
                         )
-                        Text("Angle: ${watermarkAngle.roundToInt()}°", style = MaterialTheme.typography.bodyMedium)
+                        Text("${stringResource(R.string.watermark_angle_label)}: ${watermarkAngle.roundToInt()}°", style = MaterialTheme.typography.bodyMedium)
                         Slider(
                             value = watermarkAngle,
                             onValueChange = { watermarkAngle = it },
@@ -189,7 +189,7 @@ fun PdfDocumentActionsSheet(
                             enabled = watermarkText.isNotBlank(),
                             modifier = Modifier.fillMaxWidth().testTag("watermark_apply_button")
                         ) {
-                            Text("Apply watermark")
+                            Text(stringResource(R.string.action_watermark_pdf))
                         }
                     }
                 }

@@ -144,4 +144,8 @@
     <string name="pdf_folder_picker_message">VibeSync כבר לא סורק את המכשיר כולו. בחרו תיקייה כדי להציג קובצי PDF שבה ובתיקיות המשנה שלה. רק המיקום שנבחר מתווסף לאינדקס.</string>
     <string name="pdf_folder_picker_hint">בחרו תיקייה כדי להציג כאן קובצי PDF. VibeSync לא סורק את שאר המכשיר.</string>
 
+    <string name="watermark_default_seal">VibeSync Security Seal</string>
+    <string name="watermark_opacity_label">Opacity</string>
+    <string name="watermark_angle_label">Angle</string>
+    <string name="watermark_custom_text_label">Custom Text</string>
 </resources>
