@@ -2,8 +2,6 @@ package com.vibesync.toolkit.pdf
 
 import android.content.Context
 import androidx.biometric.BiometricPrompt
-import androidx.compose.ui.test.assertDoesNotExist
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
