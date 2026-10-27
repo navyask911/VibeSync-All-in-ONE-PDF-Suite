@@ -44,6 +44,8 @@ import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.pdf.createWhiteBackgroundBitmap
 import com.vibesync.toolkit.pdf.data.ocr.MlKitOcrEngine
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -70,7 +72,7 @@ fun ExportMenu(
     onSafLaunch: ((mimeType: String, displayName: String) -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val coroutineScope = rememberCoroutineScope()
     var expanded by remember { mutableStateOf(false) }
     var running by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
@@ -95,7 +97,7 @@ fun ExportMenu(
     }
 
     val pdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { target ->
-        if (target != null) scope.launch {
+        if (target != null) coroutineScope.launch {
             runExport(context, { copyPdfToSaf(context, sourceUri, target) }, onDone = {
                 Toast.makeText(context, context.getString(R.string.export_saved_pdf), Toast.LENGTH_LONG).show()
             }, onError = { showExportError(context, it) })
@@ -107,7 +109,7 @@ fun ExportMenu(
         if (target == null || pageIndex == null) {
             queuedJpgPages = emptyList()
         } else {
-            scope.launch {
+            coroutineScope.launch {
                 runExport(context, { exportPageJpg(context, sourceUri, target, pageIndex, null) }, onDone = {
                     queuedJpgPages = queuedJpgPages.drop(1)
                     val nextPage = queuedJpgPages.firstOrNull()
@@ -127,7 +129,7 @@ fun ExportMenu(
     jpgLaunchRef[0] = { name -> jpgLauncher.launch(name) }
     val zipLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { target ->
         if (target != null) {
-            activeJob = scope.launch {
+            activeJob = coroutineScope.launch {
                 running = true
                 progress = 0f
                 completedPages = 0
@@ -153,7 +155,7 @@ fun ExportMenu(
         if (target != null) {
             pendingTextTarget = target
             startTextExport(
-                scope = scope,
+                scope = coroutineScope,
                 context = context,
                 sourceUri = sourceUri,
                 targetUri = target,
@@ -207,7 +209,7 @@ fun ExportMenu(
                     modifier = Modifier.testTag("export_jpg_separate"),
                     onClick = {
                         expanded = false
-                        scope.launch {
+                        coroutineScope.launch {
                             try {
                                 val count = withContext(Dispatchers.IO) { pageCount(context, sourceUri, null) }
                                 queuedJpgPages = (0 until count).toList()
@@ -276,7 +278,11 @@ fun ExportMenu(
                         val target = pendingTextTarget ?: return@TextButton
                         passwordDialog = false
                         startTextExport(
-                            scope, context, sourceUri, target, password,
+                            scope = coroutineScope,
+                            context = context,
+                            sourceUri = sourceUri,
+                            targetUri = target,
+                            passwordValue = password,
                             onStart = { job -> activeJob = job; running = true },
                             onProgress = { complete, total ->
                                 completedPages = complete
@@ -306,7 +312,7 @@ fun ExportMenu(
 }
 
 private fun startTextExport(
-    scope: kotlinx.coroutines.CoroutineScope,
+    scope: CoroutineScope,
     context: Context,
     sourceUri: Uri,
     targetUri: Uri,
@@ -318,12 +324,12 @@ private fun startTextExport(
     onError: (Throwable) -> Unit
 ) {
     // This caller-owned scope is cancelled when ExportMenu leaves composition.
-    val job = scope.launch {
+    val job = scope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
         try {
             val source = withContext(Dispatchers.IO) { stagePdf(context, sourceUri) }
             try {
                 val pageTotal = withContext(Dispatchers.IO) { pageCountFromFile(source, passwordValue) }
-                onProgress(0, pageTotal)
+                withContext(Dispatchers.Main.immediate) { onProgress(0, pageTotal) }
                 val allText = buildString {
                     MlKitOcrEngine(context).use { engine ->
                         for (index in 0 until pageTotal) {
@@ -336,7 +342,7 @@ private fun startTextExport(
                             } finally {
                                 bitmap.recycle()
                             }
-                            onProgress(index + 1, pageTotal)
+                            withContext(Dispatchers.Main.immediate) { onProgress(index + 1, pageTotal) }
                         }
                     }
                 }
@@ -345,17 +351,23 @@ private fun startTextExport(
                         it.write(allText)
                     } ?: throw IOException("The selected destination could not be opened.")
                 }
-                onDone()
+                withContext(Dispatchers.Main.immediate) { onDone() }
             } finally {
                 source.delete()
             }
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
-            if (error is ExportPasswordRequiredException || error is InvalidPasswordException) onPasswordRequired()
-            else onError(error)
+            withContext(Dispatchers.Main.immediate) {
+                if (error is ExportPasswordRequiredException || error is InvalidPasswordException) {
+                    onPasswordRequired()
+                } else {
+                    onError(error)
+                }
+            }
         }
     }
     onStart(job)
+    job.start()
 }
 
 private suspend fun runExport(

@@ -55,3 +55,9 @@
 -keepclassmembers class androidx.compose.runtime.Recomposer {
     private void <init>(...);
 }
+
+# Keep VibeSync PDF Bitmap Utilities
+-keep class com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils { *; }
+-keepclassmembers class com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils {
+    public static *;
+}

@@ -2,6 +2,7 @@ package com.vibesync.toolkit.pdf
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
@@ -15,8 +16,7 @@ import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.pdf.IdPhotoExporter
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
-import com.vibesync.toolkit.pdf.data.pdf.createWhiteBackgroundBitmap
-import com.vibesync.toolkit.pdf.data.pdf.flattenBitmapOnWhiteBackground
+import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -49,7 +49,7 @@ class PdfOperationsHotfixTest {
 
     @Test
     fun generatedPageBitmapHasActualOpaqueWhitePixels() {
-        val bitmap = createWhiteBackgroundBitmap(8, 8)
+        val bitmap = PdfBitmapUtils.createWhiteBackgroundBitmap(8, 8)
         try {
             for (y in 0 until bitmap.height) {
                 for (x in 0 until bitmap.width) {
@@ -65,27 +65,36 @@ class PdfOperationsHotfixTest {
     @Test
     fun jpegExportFlattensTransparencyToWhiteAndWritesJpegBytes() {
         val transparentBitmap = Bitmap.createBitmap(8, 8, Bitmap.Config.ARGB_8888)
-        val flattened = try {
-            transparentBitmap.eraseColor(Color.TRANSPARENT)
-            flattenBitmapOnWhiteBackground(transparentBitmap)
-        } catch (error: Throwable) {
-            transparentBitmap.recycle()
-            throw error
-        }
         try {
-            for (y in 0 until flattened.height) {
-                for (x in 0 until flattened.width) {
-                    val pixel = flattened.getPixel(x, y)
-                    assertEquals("pixel ($x,$y) should be white", Color.WHITE, pixel)
-                    assertEquals(255, Color.alpha(pixel))
-                }
-            }
+            transparentBitmap.eraseColor(Color.TRANSPARENT)
+            // Exercise the public utility API as well as the actual JPEG encoding path.
+            PdfBitmapUtils.flattenBitmapOnWhiteBackground(transparentBitmap).recycle()
+
             val bytes = IdPhotoExporter.jpegBytesWithDpi(transparentBitmap)
             assertTrue("JPEG output should contain a complete image payload.", bytes.size > 100)
             assertEquals(0xff, bytes[0].toInt() and 0xff)
             assertEquals(0xd8, bytes[1].toInt() and 0xff)
+
+            val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+            assertNotNull("Encoded JPEG should decode into an actual bitmap.", decoded)
+            val generatedBitmap = requireNotNull(decoded)
+            try {
+                for (y in 0 until generatedBitmap.height) {
+                    for (x in 0 until generatedBitmap.width) {
+                        val pixel = generatedBitmap.getPixel(x, y)
+                        assertTrue(
+                            "JPEG pixel ($x,$y) should have a white background (pixel=$pixel).",
+                            Color.red(pixel) >= 250 &&
+                                Color.green(pixel) >= 250 &&
+                                Color.blue(pixel) >= 250
+                        )
+                        assertEquals(255, Color.alpha(pixel))
+                    }
+                }
+            } finally {
+                generatedBitmap.recycle()
+            }
         } finally {
-            flattened.recycle()
             transparentBitmap.recycle()
         }
     }
