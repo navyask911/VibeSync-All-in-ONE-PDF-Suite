@@ -147,7 +147,7 @@ object UriUtils {
      * Converts a local File into a shareable FileProvider Uri.
      */
     fun getShareableUri(context: Context, file: File): Uri {
-        val authority = "${context.packageName}.provider"
+        val authority = "${context.packageName}.fileprovider"
         return FileProvider.getUriForFile(context, authority, file)
     }
 

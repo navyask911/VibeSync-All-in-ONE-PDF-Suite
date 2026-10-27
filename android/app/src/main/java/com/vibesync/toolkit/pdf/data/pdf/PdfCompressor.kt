@@ -191,7 +191,7 @@ class PdfCompressor(private val context: Context) {
         renderer.openPage(index).use { page ->
             val width = ceil(page.width.toDouble() * dpi / 72.0).toInt().coerceAtLeast(1)
             val height = ceil(page.height.toDouble() * dpi / 72.0).toInt().coerceAtLeast(1)
-            val candidate = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val candidate = createWhiteBackgroundBitmap(width, height)
             try {
                 page.render(candidate, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
                 return normalizeRenderedRotation(candidate, rotation)

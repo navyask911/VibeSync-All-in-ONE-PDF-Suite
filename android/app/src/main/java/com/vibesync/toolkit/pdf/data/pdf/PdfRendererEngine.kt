@@ -334,8 +334,7 @@ class PdfRendererEngine(private val context: Context) {
                 requestedScale,
                 config
             )
-            bitmap = Bitmap.createBitmap(dimensions.width, dimensions.height, config)
-            bitmap.eraseColor(Color.WHITE)
+            bitmap = createWhiteBackgroundBitmap(dimensions.width, dimensions.height, config)
             val matrix = Matrix().apply {
                 setScale(dimensions.effectiveScale, dimensions.effectiveScale)
             }

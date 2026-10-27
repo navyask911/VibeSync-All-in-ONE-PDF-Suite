@@ -41,6 +41,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.util.UriUtils
+import com.vibesync.toolkit.pdf.data.pdf.createWhiteBackgroundBitmap
 import com.vibesync.toolkit.pdf.data.ocr.MlKitOcrEngine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -152,6 +153,7 @@ fun ExportMenu(
         if (target != null) {
             pendingTextTarget = target
             startTextExport(
+                scope = scope,
                 context = context,
                 sourceUri = sourceUri,
                 targetUri = target,
@@ -274,7 +276,7 @@ fun ExportMenu(
                         val target = pendingTextTarget ?: return@TextButton
                         passwordDialog = false
                         startTextExport(
-                            context, sourceUri, target, password,
+                            scope, context, sourceUri, target, password,
                             onStart = { job -> activeJob = job; running = true },
                             onProgress = { complete, total ->
                                 completedPages = complete
@@ -304,6 +306,7 @@ fun ExportMenu(
 }
 
 private fun startTextExport(
+    scope: kotlinx.coroutines.CoroutineScope,
     context: Context,
     sourceUri: Uri,
     targetUri: Uri,
@@ -314,7 +317,7 @@ private fun startTextExport(
     onDone: () -> Unit,
     onError: (Throwable) -> Unit
 ) {
-    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main)
+    // This caller-owned scope is cancelled when ExportMenu leaves composition.
     val job = scope.launch {
         try {
             val source = withContext(Dispatchers.IO) { stagePdf(context, sourceUri) }
@@ -508,10 +511,9 @@ private fun renderPage(file: File, pageIndex: Int, password: String?): Bitmap {
             require(pageIndex in 0 until renderer.pageCount) { "The requested PDF page does not exist." }
             renderer.openPage(pageIndex).use { page ->
                 val scale = minOf(2.5, 2400.0 / page.width.coerceAtLeast(1), 3200.0 / page.height.coerceAtLeast(1))
-                val bitmap = Bitmap.createBitmap(
+                val bitmap = createWhiteBackgroundBitmap(
                     (page.width * scale).toInt().coerceAtLeast(1),
-                    (page.height * scale).toInt().coerceAtLeast(1),
-                    Bitmap.Config.ARGB_8888
+                    (page.height * scale).toInt().coerceAtLeast(1)
                 )
                 try {
                     page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)

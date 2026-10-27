@@ -75,6 +75,7 @@ import com.vibesync.toolkit.pdf.core.util.EngagementPolicy
 import com.vibesync.toolkit.pdf.core.util.ReviewEligibilityTracker
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
+import com.vibesync.toolkit.pdf.data.pdf.createWhiteBackgroundBitmap
 import com.vibesync.toolkit.pdf.presentation.dashboard.DashboardScreen
 import com.vibesync.toolkit.pdf.presentation.dashboard.DashboardViewModel
 import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
@@ -886,9 +887,8 @@ class MainActivity : AppCompatActivity() {
                                 )
                                 val width = (page.width * scale).toInt().coerceAtLeast(1)
                                 val height = (page.height * scale).toInt().coerceAtLeast(1)
-                                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                                val bitmap = createWhiteBackgroundBitmap(width, height)
                                 try {
-                                    bitmap.eraseColor(android.graphics.Color.WHITE)
                                     val matrix = Matrix().apply {
                                         postScale(width.toFloat() / page.width.toFloat().coerceAtLeast(1f), height.toFloat() / page.height.toFloat().coerceAtLeast(1f))
                                     }
@@ -1131,6 +1131,7 @@ class MainActivity : AppCompatActivity() {
             setSingleLine(true)
         }
 
+        var profileSelector: ComposeView? = null
         val dialogContent = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             addView(input, LinearLayout.LayoutParams(
@@ -1138,7 +1139,7 @@ class MainActivity : AppCompatActivity() {
                 android.view.ViewGroup.LayoutParams.WRAP_CONTENT
             ))
             if (mimeType == "application/pdf") {
-                val profileSelector = ComposeView(this@MainActivity).apply {
+                profileSelector = ComposeView(this@MainActivity).apply {
                     setViewTreeLifecycleOwner(this@MainActivity)
                     setViewTreeViewModelStoreOwner(this@MainActivity)
                     setViewTreeSavedStateRegistryOwner(this@MainActivity)
@@ -1151,23 +1152,25 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 }
-                addView(profileSelector, LinearLayout.LayoutParams(
+                addView(requireNotNull(profileSelector), LinearLayout.LayoutParams(
                     android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                     (156 * resources.displayMetrics.density).toInt()
                 ))
             }
         }
 
-        android.app.AlertDialog.Builder(this)
+        val dialog = android.app.AlertDialog.Builder(this)
             .setTitle(getString(R.string.output_name_dialog_title))
             .setMessage(getString(R.string.output_name_dialog_message))
             .setView(dialogContent)
             .setNegativeButton(getString(R.string.cancel), null)
             .setPositiveButton(getString(R.string.continue_label)) { _, _ ->
+                if (isFinishing || isDestroyed) return@setPositiveButton
                 val requested = sanitizeOutputBaseName(input.text?.toString().orEmpty(), defaultName)
                 lifecycleScope.launch(Dispatchers.IO) {
                     val renamedFiles = renameOutputFiles(validFiles, requested, extension)
                     launch(Dispatchers.Main) {
+                        if (isFinishing || isDestroyed) return@launch
                         if (renamedFiles.isEmpty()) {
                             Toast.makeText(this@MainActivity, getString(R.string.error_rename_output_files), Toast.LENGTH_LONG).show()
                             return@launch
@@ -1176,7 +1179,17 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
-            .show()
+            .create()
+        dialog.setOnDismissListener {
+            profileSelector?.disposeComposition()
+            profileSelector = null
+        }
+        if (isFinishing || isDestroyed || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+            profileSelector?.disposeComposition()
+            profileSelector = null
+            return
+        }
+        dialog.show()
     }
 
     private fun shareRenamedFiles(
@@ -1184,6 +1197,7 @@ class MainActivity : AppCompatActivity() {
         mimeType: String,
         forceMultiple: Boolean = false
     ) {
+        if (isFinishing || isDestroyed || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
         val uris = files.map { UriUtils.getShareableUri(this, it) }
         val clipData = ClipData.newUri(contentResolver, "VibeSync output", uris.first())
         uris.drop(1).forEach { clipData.addItem(ClipData.Item(it)) }

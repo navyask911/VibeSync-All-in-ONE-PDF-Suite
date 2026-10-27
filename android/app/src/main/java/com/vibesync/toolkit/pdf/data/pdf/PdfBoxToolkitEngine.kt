@@ -116,6 +116,9 @@ class PdfBoxToolkitEngine(private val context: Context) {
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
         val tempFiles = mutableListOf<File>()
+        // Imported pages can retain COSStream references owned by source documents.
+        // Keep sources open until the destination has completed save().
+        val sourceDocuments = mutableListOf<PDDocument>()
         val mergedDocument = PDDocument()
         try {
             if (sourceUris.isEmpty()) {
@@ -126,18 +129,14 @@ class PdfBoxToolkitEngine(private val context: Context) {
             for (uri in sourceUris) {
                 val tempFile = UriUtils.copyUriToCacheFile(context, uri, "merge_src_")
                 tempFiles.add(tempFile)
+                val sourceDocument = PDDocument.load(tempFile)
+                sourceDocuments.add(sourceDocument)
 
-                PDDocument.load(tempFile).use { sourceDocument ->
-                    for (pageIndex in 0 until sourceDocument.numberOfPages) {
-                        val sourcePage = sourceDocument.getPage(pageIndex)
-                        val importedPage = mergedDocument.importPage(sourcePage)
-
-                        // Preserve inherited resources when present.
-                        sourcePage.resources?.let { importedPage.resources = it }
-
-                        // Preserve the source page's clockwise rotation exactly.
-                        importedPage.rotation = normalizePageRotation(sourcePage.rotation)
-                    }
+                for (pageIndex in 0 until sourceDocument.numberOfPages) {
+                    val sourcePage = sourceDocument.getPage(pageIndex)
+                    val importedPage = mergedDocument.importPage(sourcePage)
+                    sourcePage.resources?.let { importedPage.resources = it }
+                    importedPage.rotation = normalizePageRotation(sourcePage.rotation)
                 }
             }
 
@@ -152,7 +151,8 @@ class PdfBoxToolkitEngine(private val context: Context) {
             Log.e(TAG, "Failed to merge PDFs", e)
             Result.failure(e)
         } finally {
-            mergedDocument.close()
+            runCatching { mergedDocument.close() }
+            sourceDocuments.asReversed().forEach { source -> runCatching { source.close() } }
             tempFiles.forEach { it.delete() }
         }
     }

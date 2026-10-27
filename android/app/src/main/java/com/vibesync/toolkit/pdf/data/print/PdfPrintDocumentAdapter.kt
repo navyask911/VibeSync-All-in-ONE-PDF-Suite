@@ -129,6 +129,7 @@ class PdfPrintDocumentAdapter(
                         bitmapHeight,
                         android.graphics.Bitmap.Config.ARGB_8888
                     )
+                    bitmap.eraseColor(android.graphics.Color.WHITE)
                     try {
                         sourcePage.render(
                             bitmap,

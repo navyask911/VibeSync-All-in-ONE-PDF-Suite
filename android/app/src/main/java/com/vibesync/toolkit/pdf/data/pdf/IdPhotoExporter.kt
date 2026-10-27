@@ -76,21 +76,27 @@ object IdPhotoExporter {
     }
 
     internal fun jpegBytesWithDpi(bitmap: Bitmap, quality: Int = 88): ByteArray {
-        val encoded = ByteArrayOutputStream()
-        if (!bitmap.compress(Bitmap.CompressFormat.JPEG, quality, encoded)) {
-            throw IOException("Could not encode the JPEG image.")
-        }
-        val jpeg = encoded.toByteArray()
-        require(jpeg.size >= 2 && jpeg[0] == 0xff.toByte() && jpeg[1] == 0xd8.toByte())
-        val jfif = byteArrayOf(
-            0xff.toByte(), 0xe0.toByte(), 0x00, 0x10,
-            0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x02,
-            0x01, 0x01, 0x2c, 0x01, 0x2c, 0x00, 0x00
-        )
-        return ByteArray(jpeg.size + jfif.size).also { out ->
-            jpeg.copyInto(out, 0, 0, 2)
-            jfif.copyInto(out, 2)
-            jpeg.copyInto(out, 2 + jfif.size, 2)
+        // JPEG cannot represent alpha; flatten transparent pixels onto white before encoding.
+        val opaqueBitmap = flattenBitmapOnWhiteBackground(bitmap)
+        try {
+            val encoded = ByteArrayOutputStream()
+            if (!opaqueBitmap.compress(Bitmap.CompressFormat.JPEG, quality, encoded)) {
+                throw IOException("Could not encode the JPEG image.")
+            }
+            val jpeg = encoded.toByteArray()
+            require(jpeg.size >= 2 && jpeg[0] == 0xff.toByte() && jpeg[1] == 0xd8.toByte())
+            val jfif = byteArrayOf(
+                0xff.toByte(), 0xe0.toByte(), 0x00, 0x10,
+                0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x02,
+                0x01, 0x01, 0x2c, 0x01, 0x2c, 0x00, 0x00
+            )
+            return ByteArray(jpeg.size + jfif.size).also { out ->
+                jpeg.copyInto(out, 0, 0, 2)
+                jfif.copyInto(out, 2)
+                jpeg.copyInto(out, 2 + jfif.size, 2)
+            }
+        } finally {
+            if (!opaqueBitmap.isRecycled) opaqueBitmap.recycle()
         }
     }
 }
