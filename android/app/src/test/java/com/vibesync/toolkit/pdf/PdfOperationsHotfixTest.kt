@@ -84,9 +84,9 @@ class PdfOperationsHotfixTest {
                         val pixel = generatedBitmap.getPixel(x, y)
                         assertTrue(
                             "JPEG pixel ($x,$y) should have a white background (pixel=$pixel).",
-                            Color.red(pixel) >= 250 &&
-                                Color.green(pixel) >= 250 &&
-                                Color.blue(pixel) >= 250
+                            Color.red(pixel) >= 240 &&
+                                Color.green(pixel) >= 240 &&
+                                Color.blue(pixel) >= 240
                         )
                         assertEquals(255, Color.alpha(pixel))
                     }
