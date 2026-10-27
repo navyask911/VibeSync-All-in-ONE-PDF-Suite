@@ -23,7 +23,6 @@ import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.data.pdf.DiscoveredPdf
 import com.vibesync.toolkit.pdf.presentation.dashboard.DashboardUiState
 import com.vibesync.toolkit.pdf.presentation.dashboard.DashboardViewModel
-import com.vibesync.toolkit.pdf.presentation.common.PdfWatermarkOptions
 import com.vibesync.toolkit.pdf.presentation.dashboard.DashboardScreen
 import io.mockk.every
 import io.mockk.mockk
@@ -251,53 +250,6 @@ class DashboardScreenTest {
         composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasText("sample_1.pdf"))
         composeTestRule.onNodeWithText("sample_1.pdf").assertIsDisplayed()
         assertEquals(true, context.getSharedPreferences("dashboard_pdf_section_preferences", Context.MODE_PRIVATE).getBoolean("pdf_section_visible", false))
-    }
-
-    @Test
-    fun watermarkControlsExposeTextOpacityAndAngleAndReturnSelectedOptions() {
-        val pdf = DiscoveredPdf(
-            id = 1L,
-            name = "watermark_sample.pdf",
-            uri = android.net.Uri.parse("content://test/documents/watermark_sample.pdf"),
-            sizeBytes = 1024L,
-            sizeFormatted = "1 KB",
-            lastModified = 100L,
-            formattedDate = "Oct 24, 2026"
-        )
-        val viewModel = mockk<DashboardViewModel>(relaxed = true)
-        every { viewModel.uiState } returns MutableStateFlow(DashboardUiState(discoveredPdfs = listOf(pdf)))
-        var appliedWatermark: Pair<android.net.Uri, PdfWatermarkOptions>? = null
-
-        composeTestRule.setContent {
-            VibeSyncPdfTheme {
-                DashboardScreen(
-                    viewModel = viewModel,
-                    onNavigateToViewer = {},
-                    onNavigateToEditor = {},
-                    onNavigateToTool = {},
-                    onLaunchScanner = {},
-                    onApplyWatermark = { uri, options -> appliedWatermark = uri to options }
-                )
-            }
-        }
-
-        composeTestRule.onNodeWithTag("dashboard_list")
-            .performScrollToNode(hasTestTag("pdf_item_watermark_sample.pdf"))
-        composeTestRule.onNodeWithTag("pdf_item_watermark_sample.pdf").performTouchInput { longClick() }
-        composeTestRule.onNodeWithTag("document_action_watermark").performScrollTo().performClick()
-        composeTestRule.onNodeWithTag("watermark_controls_panel").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("watermark_text_field").performScrollTo()
-            .performTextClearance()
-            .performTextInput("CONFIDENTIAL")
-        composeTestRule.onNodeWithTag("watermark_opacity_slider").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("watermark_angle_slider").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("watermark_apply_button").performScrollTo().performClick()
-
-        val applied = requireNotNull(appliedWatermark)
-        assertEquals(pdf.uri, applied.first)
-        assertEquals("CONFIDENTIAL", applied.second.text)
-        assertEquals(150f / 255f, applied.second.opacity, 0.02f)
-        assertEquals(0f, applied.second.angleDegrees, 0.01f)
     }
 
 }

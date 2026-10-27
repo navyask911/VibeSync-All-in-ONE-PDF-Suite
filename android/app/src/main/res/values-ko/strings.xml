@@ -253,10 +253,4 @@
     <string name="document_rename_success">문서 이름이 변경되었습니다.</string>
     <string name="document_delete_success">문서가 삭제되었습니다.</string>
     <string name="document_action_failed">문서 작업을 완료하지 못했습니다. 다시 시도하세요.</string>
-
-    <!-- PDF watermark controls -->
-    <string name="watermark_text_label">워터마크 텍스트</string>
-    <string name="watermark_opacity_label">불투명도</string>
-    <string name="watermark_angle_label">각도</string>
-    <string name="watermark_apply_action">워터마크 적용</string>
 </resources>

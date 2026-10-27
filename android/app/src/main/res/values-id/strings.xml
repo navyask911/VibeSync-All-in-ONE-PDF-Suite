@@ -253,10 +253,4 @@
     <string name="document_rename_success">Nama dokumen diubah.</string>
     <string name="document_delete_success">Dokumen dihapus.</string>
     <string name="document_action_failed">Tindakan dokumen gagal diselesaikan. Coba lagi.</string>
-
-    <!-- PDF watermark controls -->
-    <string name="watermark_text_label">Teks tanda air</string>
-    <string name="watermark_opacity_label">Opasitas</string>
-    <string name="watermark_angle_label">Sudut</string>
-    <string name="watermark_apply_action">Terapkan tanda air</string>
 </resources>

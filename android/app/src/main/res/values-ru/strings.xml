@@ -263,10 +263,4 @@
     <string name="document_rename_success">Документ переименован.</string>
     <string name="document_delete_success">Документ удалён.</string>
     <string name="document_action_failed">Не удалось выполнить действие с документом. Повторите попытку.</string>
-
-    <!-- PDF watermark controls -->
-    <string name="watermark_text_label">Текст водяного знака</string>
-    <string name="watermark_opacity_label">Непрозрачность</string>
-    <string name="watermark_angle_label">Угол</string>
-    <string name="watermark_apply_action">Применить водяной знак</string>
 </resources>

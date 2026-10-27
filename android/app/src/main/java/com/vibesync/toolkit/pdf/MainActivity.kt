@@ -66,7 +66,6 @@ import com.google.android.play.core.install.model.UpdateAvailability
 import com.google.android.play.core.review.ReviewManagerFactory
 import com.vibesync.toolkit.pdf.BuildConfig
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
-import com.vibesync.toolkit.pdf.presentation.common.PdfWatermarkOptions
 import com.vibesync.toolkit.pdf.core.util.EngagementPolicy
 import com.vibesync.toolkit.pdf.core.util.ReviewEligibilityTracker
 import com.vibesync.toolkit.pdf.core.util.UriUtils
@@ -423,14 +422,6 @@ class MainActivity : AppCompatActivity() {
                                 onDeleteDocument = { uri -> deletePdfDocument(uri) },
                                 onNavigateToPdfTool = { route, uri ->
                                     navController.navigate("$route/${encodeUriRoute(uri)}")
-                                },
-                                onApplyWatermark = { uri, options ->
-                                    navController.currentBackStackEntry?.savedStateHandle?.apply {
-                                        set("pdf_watermark_text", options.text)
-                                        set("pdf_watermark_opacity", options.opacity)
-                                        set("pdf_watermark_angle", options.angleDegrees)
-                                    }
-                                    navController.navigate("watermark/${encodeUriRoute(uri)}")
                                 }
                             )
                         }
@@ -456,15 +447,7 @@ class MainActivity : AppCompatActivity() {
                                 onShareImages = { file -> shareScanImages(file) },
                                 onSaveToDownloads = { file -> saveScanToDownloads(file) },
                                 onNavigateToEditor = { uri -> navController.navigate("editor/${encodeUriRoute(uri)}") },
-                                onNavigateToPdfTool = { route, uri -> navController.navigate("$route/${encodeUriRoute(uri)}") },
-                                onApplyWatermark = { uri, options ->
-                                    navController.currentBackStackEntry?.savedStateHandle?.apply {
-                                        set("pdf_watermark_text", options.text)
-                                        set("pdf_watermark_opacity", options.opacity)
-                                        set("pdf_watermark_angle", options.angleDegrees)
-                                    }
-                                    navController.navigate("watermark/${encodeUriRoute(uri)}")
-                                }
+                                onNavigateToPdfTool = { route, uri -> navController.navigate("$route/${encodeUriRoute(uri)}") }
                             )
                         }
 
@@ -643,18 +626,10 @@ class MainActivity : AppCompatActivity() {
                             route = "watermark/{encodedUri}",
                             arguments = listOf(navArgument("encodedUri") { type = NavType.StringType })
                         ) { entry ->
-                            val watermarkState = navController.previousBackStackEntry?.savedStateHandle
-                            val watermarkText = watermarkState?.get<String>("pdf_watermark_text")
-                                ?.takeIf { it.isNotBlank() } ?: this@MainActivity.getString(R.string.pdf_watermark_text)
-                            val watermarkOpacity = watermarkState?.get<Float>("pdf_watermark_opacity") ?: (150f / 255f)
-                            val watermarkAngle = watermarkState?.get<Float>("pdf_watermark_angle") ?: 0f
                             PdfQuickActionScreen(
                                 mode = "watermark",
                                 initialUri = decodeUriRoute(entry.arguments?.getString("encodedUri") ?: ""),
                                 onNavigateBack = { navController.popBackStack() },
-                                watermarkText = watermarkText,
-                                watermarkOpacity = watermarkOpacity,
-                                watermarkAngleDegrees = watermarkAngle,
                                 onSuccess = { output ->
                                     recordSuccessfulPdfOperation()
                                     shareFiles(listOf(output), "application/pdf", "VibeSync_Watermarked_Document")

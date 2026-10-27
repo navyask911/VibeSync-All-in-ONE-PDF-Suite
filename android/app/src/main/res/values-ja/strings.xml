@@ -253,10 +253,4 @@
     <string name="document_rename_success">ドキュメント名を変更しました。</string>
     <string name="document_delete_success">ドキュメントを削除しました。</string>
     <string name="document_action_failed">ドキュメントの操作を完了できませんでした。もう一度お試しください。</string>
-
-    <!-- PDF watermark controls -->
-    <string name="watermark_text_label">透かしテキスト</string>
-    <string name="watermark_opacity_label">不透明度</string>
-    <string name="watermark_angle_label">角度</string>
-    <string name="watermark_apply_action">透かしを適用</string>
 </resources>

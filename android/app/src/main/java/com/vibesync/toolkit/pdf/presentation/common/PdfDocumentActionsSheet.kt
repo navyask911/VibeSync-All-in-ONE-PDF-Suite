@@ -20,20 +20,14 @@ import androidx.compose.material.icons.filled.DriveFileRenameOutline
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.SaveAlt
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -43,20 +37,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vibesync.toolkit.pdf.R
-import kotlin.math.roundToInt
-
-data class PdfWatermarkOptions(
-    val text: String,
-    val opacity: Float,
-    val angleDegrees: Float
-)
 
 private data class PdfDocumentActionItem(
     val label: String,
     val tag: String,
     val icon: androidx.compose.ui.graphics.vector.ImageVector,
     val destructive: Boolean = false,
-    val expandsWatermarkSettings: Boolean = false,
     val onClick: () -> Unit
 )
 
@@ -73,17 +59,11 @@ fun PdfDocumentActionsSheet(
     onShareImages: () -> Unit,
     onSplit: () -> Unit,
     onCompress: () -> Unit,
-    onWatermark: (PdfWatermarkOptions) -> Unit,
+    onWatermark: () -> Unit,
     onEncrypt: () -> Unit,
     onDelete: () -> Unit,
     onSaveToDownloads: (() -> Unit)? = null
 ) {
-    val defaultWatermarkText = stringResource(R.string.pdf_watermark_text)
-    var showWatermarkSettings by remember(documentName) { mutableStateOf(false) }
-    var watermarkText by remember(documentName) { mutableStateOf(defaultWatermarkText) }
-    var watermarkOpacity by remember(documentName) { mutableStateOf(150f / 255f) }
-    var watermarkAngle by remember(documentName) { mutableStateOf(0f) }
-
     val actions = listOf(
         PdfDocumentActionItem(stringResource(R.string.action_open_view_pdf), "open", Icons.Default.PictureAsPdf, onClick = onOpen),
         PdfDocumentActionItem(stringResource(R.string.edit_sign_action), "edit", Icons.Default.Draw, onClick = onEdit),
@@ -95,13 +75,7 @@ fun PdfDocumentActionsSheet(
     } ?: emptyList()) + listOf(
         PdfDocumentActionItem(stringResource(R.string.tool_split_document), "split", Icons.Default.CallSplit, onClick = onSplit),
         PdfDocumentActionItem(stringResource(R.string.action_compress_pdf), "compress", Icons.Default.Tune, onClick = onCompress),
-        PdfDocumentActionItem(
-            stringResource(R.string.action_watermark_pdf),
-            "watermark",
-            Icons.Default.Brush,
-            expandsWatermarkSettings = true,
-            onClick = {}
-        ),
+        PdfDocumentActionItem(stringResource(R.string.action_watermark_pdf), "watermark", Icons.Default.Brush, onClick = onWatermark),
         PdfDocumentActionItem(stringResource(R.string.title_encrypt), "encrypt", Icons.Default.Lock, onClick = onEncrypt),
         PdfDocumentActionItem(stringResource(R.string.scan_delete), "delete", Icons.Default.DeleteOutline, destructive = true, onClick = onDelete)
     )
@@ -122,14 +96,7 @@ fun PdfDocumentActionsSheet(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(12.dp))
-                        .clickable {
-                            if (action.expandsWatermarkSettings) {
-                                showWatermarkSettings = !showWatermarkSettings
-                            } else {
-                                onDismissRequest()
-                                action.onClick()
-                            }
-                        }
+                        .clickable { onDismissRequest(); action.onClick() }
                         .testTag("document_action_${action.tag}")
                         .padding(horizontal = 12.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -141,59 +108,6 @@ fun PdfDocumentActionsSheet(
                         style = MaterialTheme.typography.bodyLarge,
                         color = if (action.destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                     )
-                }
-                if (action.expandsWatermarkSettings && showWatermarkSettings) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 12.dp)
-                            .testTag("watermark_controls_panel"),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = watermarkText,
-                            onValueChange = { watermarkText = it },
-                            label = { Text(stringResource(R.string.watermark_text_label)) },
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth().testTag("watermark_text_field")
-                        )
-                        Text(
-                            "${stringResource(R.string.watermark_opacity_label)} ${(watermarkOpacity * 100f).roundToInt()}%",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Slider(
-                            value = watermarkOpacity,
-                            onValueChange = { watermarkOpacity = it },
-                            valueRange = 0f..1f,
-                            modifier = Modifier.fillMaxWidth().testTag("watermark_opacity_slider")
-                        )
-                        Text(
-                            "${stringResource(R.string.watermark_angle_label)} ${watermarkAngle.roundToInt()}°",
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Slider(
-                            value = watermarkAngle,
-                            onValueChange = { watermarkAngle = it },
-                            valueRange = -180f..180f,
-                            steps = 23,
-                            modifier = Modifier.fillMaxWidth().testTag("watermark_angle_slider")
-                        )
-                        Button(
-                            onClick = {
-                                val options = PdfWatermarkOptions(
-                                    text = watermarkText.trim(),
-                                    opacity = watermarkOpacity.coerceIn(0f, 1f),
-                                    angleDegrees = watermarkAngle.coerceIn(-180f, 180f)
-                                )
-                                onDismissRequest()
-                                onWatermark(options)
-                            },
-                            enabled = watermarkText.isNotBlank(),
-                            modifier = Modifier.fillMaxWidth().testTag("watermark_apply_button")
-                        ) {
-                            Text(stringResource(R.string.watermark_apply_action))
-                        }
-                    }
                 }
             }
             Spacer(Modifier.height(16.dp))
