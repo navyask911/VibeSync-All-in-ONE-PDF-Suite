@@ -2,6 +2,8 @@ package com.vibesync.toolkit.pdf.presentation.tools
 
 import android.app.Activity
 import android.net.Uri
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -32,9 +34,18 @@ import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.presentation.common.rememberUriDisplayName
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
+import com.vibesync.toolkit.pdf.presentation.settings.ResolutionProfilePreferencePanel
 import com.vibesync.toolkit.pdf.presentation.monetization.AdMobManager
 import kotlinx.coroutines.launch
 import java.io.File
+
+@Composable
+internal fun rememberPhotoPickerImportLauncher(
+    onImagesPicked: (List<Uri>) -> Unit
+): ActivityResultLauncher<PickVisualMediaRequest> =
+    rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickMultipleVisualMedia()
+    ) { uris -> onImagesPicked(uris) }
 
 // ==========================================
 // 1. SPLIT PDF SCREEN
@@ -459,9 +470,7 @@ fun ConvertImagesScreen(
     var isConverting by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
-    val imagePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenMultipleDocuments()
-    ) { uris ->
+    val imagePicker = rememberPhotoPickerImportLauncher { uris ->
         uris.forEach { UriUtils.persistReadPermission(context, it) }
         selectedUris.clear()
         selectedUris.addAll(uris)
@@ -487,8 +496,13 @@ fun ConvertImagesScreen(
                 .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            ResolutionProfilePreferencePanel(
+                modifier = Modifier.fillMaxWidth(),
+                testTag = "resolution_profile_images_to_pdf_selector"
+            )
+
             Button(
-                onClick = { imagePicker.launch(arrayOf("image/*")) },
+                onClick = { imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
                 enabled = !isConverting,
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)

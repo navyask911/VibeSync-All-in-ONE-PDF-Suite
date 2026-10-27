@@ -55,6 +55,35 @@ class SecurityVault(context: Context) {
         }
     }
 
+    /** Lists saved signature identifiers without exposing their encrypted payloads. */
+    fun listSignatures(): List<SavedSignature> =
+        encryptedPrefs.all.keys
+            .asSequence()
+            .filter { it.startsWith("$KEY_SIGNATURE_PREFIX" + "_") }
+            .map { SavedSignature(it.removePrefix("$KEY_SIGNATURE_PREFIX" + "_")) }
+            .filter { it.id.isNotBlank() }
+            .sortedBy { it.id }
+            .toList()
+
+    /** Renames a saved signature while keeping its bitmap encrypted at rest. */
+    fun renameSignature(signatureId: String, newSignatureId: String): Boolean {
+        val oldId = signatureId.trim()
+        val newId = newSignatureId.trim()
+        if (oldId.isBlank() || newId.isBlank() || oldId == newId) return false
+        val oldKey = "${KEY_SIGNATURE_PREFIX}_$oldId"
+        val newKey = "${KEY_SIGNATURE_PREFIX}_$newId"
+        val encoded = encryptedPrefs.getString(oldKey, null) ?: return false
+        if (encryptedPrefs.contains(newKey)) return false
+        return encryptedPrefs.edit().putString(newKey, encoded).remove(oldKey).commit()
+    }
+
+    /** Deletes one saved signature; other encrypted entries are untouched. */
+    fun deleteSignature(signatureId: String): Boolean {
+        val key = "${KEY_SIGNATURE_PREFIX}_${signatureId.trim()}"
+        if (!encryptedPrefs.contains(key)) return false
+        return encryptedPrefs.edit().remove(key).commit()
+    }
+
     /**
      * Checks if a default signature exists in the encrypted vault.
      */
@@ -86,6 +115,8 @@ class SecurityVault(context: Context) {
             .forEach { editor.remove(it) }
         editor.apply()
     }
+
+    data class SavedSignature(val id: String)
 
     companion object {
         private const val SECURE_PREFS_FILE = "vibesync_encrypted_vault"

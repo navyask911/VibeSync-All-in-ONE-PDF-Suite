@@ -10,22 +10,28 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.res.stringResource
 import com.vibesync.toolkit.pdf.R
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.ui.unit.IntSize
@@ -47,12 +53,22 @@ fun VectorCanvasOverlay(
     modifier: Modifier = Modifier
 ) {
     var activePoints by remember { mutableStateOf<List<Point2D>>(emptyList()) }
+    var eraserEnabled by remember { mutableStateOf(toolMode == ToolMode.ERASER) }
+    LaunchedEffect(toolMode) {
+        eraserEnabled = toolMode == ToolMode.ERASER
+    }
+    val activeToolMode = when {
+        eraserEnabled -> ToolMode.ERASER
+        toolMode == ToolMode.ERASER -> ToolMode.PEN
+        else -> toolMode
+    }
+    val eraserRadiusPx = with(LocalDensity.current) { 8.dp.toPx() }
 
-    val inputModifier = when (toolMode) {
+    val inputModifier = when (activeToolMode) {
         ToolMode.TEXT -> modifier.pointerInput(Unit) {
             detectTapGestures { offset -> onTap(offset) }
         }
-        ToolMode.PEN, ToolMode.HIGHLIGHTER -> modifier.pointerInput(toolMode, strokeColor, strokeWidth) {
+        ToolMode.PEN, ToolMode.HIGHLIGHTER -> modifier.pointerInput(activeToolMode, strokeColor, strokeWidth) {
             detectDragGestures(
                 onDragStart = { offset ->
                     activePoints = listOf(Point2D(offset.x, offset.y))
@@ -69,7 +85,7 @@ fun VectorCanvasOverlay(
                                 points = activePoints,
                                 colorArgb = strokeColor.toArgb(),
                                 strokeWidth = strokeWidth,
-                                isHighlighter = toolMode == ToolMode.HIGHLIGHTER
+                                isHighlighter = activeToolMode == ToolMode.HIGHLIGHTER
                             )
                         )
                     }
@@ -80,10 +96,41 @@ fun VectorCanvasOverlay(
                 }
             )
         }
+        ToolMode.ERASER -> modifier.pointerInput(activeToolMode, eraserRadiusPx, onStrokeAdded) {
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                val pathPoints = mutableListOf(Point2D(down.position.x, down.position.y))
+                var lastPosition = down.position
+                down.consume()
+
+                do {
+                    val event = awaitPointerEvent()
+                    val change = event.changes.firstOrNull { it.id == down.id }
+                    if (change != null) {
+                        if (change.position != lastPosition) {
+                            pathPoints.add(Point2D(change.position.x, change.position.y))
+                            lastPosition = change.position
+                        }
+                        if (change.pressed) change.consume()
+                    }
+                } while (event.changes.any { it.pressed })
+
+                // The ViewModel consumes this marker; it never becomes a saved drawing stroke.
+                onStrokeAdded(
+                    VectorStroke(
+                        id = EditorViewModel.ERASER_GESTURE_ID,
+                        points = pathPoints,
+                        colorArgb = Color.Transparent.toArgb(),
+                        strokeWidth = eraserRadiusPx
+                    )
+                )
+            }
+        }
         else -> modifier
     }
 
-    Canvas(modifier = inputModifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        Canvas(modifier = inputModifier.fillMaxSize()) {
         existingStrokes.forEach { stroke ->
             val points = stroke.points
             val width = if (stroke.isHighlighter) stroke.strokeWidth * 2.5f else stroke.strokeWidth
@@ -101,12 +148,12 @@ fun VectorCanvasOverlay(
 
         val active = activePoints
         if (active.size >= 2) {
-            val color = if (toolMode == ToolMode.HIGHLIGHTER) {
+            val color = if (activeToolMode == ToolMode.HIGHLIGHTER) {
                 strokeColor.copy(alpha = 0.35f)
             } else {
                 strokeColor
             }
-            val width = if (toolMode == ToolMode.HIGHLIGHTER) strokeWidth * 2.5f else strokeWidth
+            val width = if (activeToolMode == ToolMode.HIGHLIGHTER) strokeWidth * 2.5f else strokeWidth
             for (index in 1 until active.size) {
                 drawLine(
                     color = color,
@@ -116,6 +163,14 @@ fun VectorCanvasOverlay(
                     cap = StrokeCap.Round
                 )
             }
+        }
+        }
+
+        TextButton(
+            onClick = { eraserEnabled = !eraserEnabled },
+            modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)
+        ) {
+            Text(if (eraserEnabled) "Eraser on" else "Erase")
         }
     }
 }

@@ -1,5 +1,6 @@
 package com.vibesync.toolkit.pdf.presentation.viewer
 
+import android.content.Context
 import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
@@ -38,6 +39,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
 import com.vibesync.toolkit.pdf.core.util.BitmapCache
+import com.vibesync.toolkit.pdf.presentation.common.launchSystemPdfPrint
 import com.vibesync.toolkit.pdf.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
@@ -56,8 +58,12 @@ fun PdfViewerScreen(
     onShareScanPdf: () -> Unit = {},
     onShareScanImages: () -> Unit = {},
     onSaveScanToDownloads: () -> Unit = {},
-    onDeleteScan: () -> Unit = {}
+    onDeleteScan: () -> Unit = {},
+    onLaunchPrint: (Context, Uri, String) -> Unit = { printContext, uri, jobName ->
+        launchSystemPdfPrint(printContext, uri, jobName)
+    }
 ) {
+    val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
@@ -175,6 +181,31 @@ fun PdfViewerScreen(
                     IconButton(onClick = { onNavigateToEditor(documentUri) }) {
                         Icon(Icons.Default.Draw, contentDescription = stringResource(R.string.edit_sign_action), tint = VibeSyncCrimsonPrimary)
                     }
+                    IconButton(
+                        onClick = {
+                            runCatching {
+                                onLaunchPrint(
+                                    context,
+                                    documentUri,
+                                    context.getString(R.string.print_job_name, uiState.fileName)
+                                )
+                            }.onFailure {
+                                android.widget.Toast.makeText(
+                                    context,
+                                    it.localizedMessage ?: context.getString(R.string.print_failed),
+                                    android.widget.Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        },
+                        modifier = Modifier.testTag("viewer_print")
+                    ) {
+                        Icon(Icons.Default.Print, contentDescription = stringResource(R.string.print_action))
+                    }
+                    ExportMenu(
+                        sourceUri = documentUri,
+                        currentPageIndex = uiState.currentPageIndex,
+                        testTag = "viewer_export_menu"
+                    )
                     if (isManagedScan) {
                         Box {
                             IconButton(onClick = { scanMenuExpanded = true }) {

@@ -38,6 +38,11 @@ import com.tom_roush.pdfbox.pdmodel.interactive.form.PDTextField
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import java.io.IOException
+import com.vibesync.toolkit.pdf.data.pdf.filters.FilterEngine
+import com.vibesync.toolkit.pdf.data.pdf.filters.FilterId
 import java.io.File
 import java.io.FileOutputStream
 import java.io.InputStream
@@ -290,6 +295,116 @@ class PdfBoxToolkitEngine(private val context: Context) {
     }
 
     /**
+     * Compiles captured page rasters in their requested order. Only one decoded/transformed
+     * bitmap is held at a time; the output is written to a sibling temporary file and published
+     * only after PDFBox has closed and saved the complete document.
+     */
+    suspend fun assembleBatchPages(
+        pageFiles: List<File>,
+        outputFile: File,
+        profile: ResolutionProfile,
+        filterId: FilterId? = null,
+        onProgress: (Float) -> Unit = {}
+    ): Result<PdfBatchAssemblyResult> = withContext(Dispatchers.IO) {
+        var document: PDDocument? = null
+        var temporaryOutput: File? = null
+        try {
+            require(pageFiles.isNotEmpty()) { context.getString(R.string.batch_no_pages) }
+            val memoryLimit = Runtime.getRuntime().maxMemory() / 4L
+            var estimatedBytes = 0L
+            pageFiles.forEach { file ->
+                currentCoroutineContext().ensureActive()
+                require(file.isFile && file.length() > 0L) { context.getString(R.string.batch_page_missing) }
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(file.absolutePath, bounds)
+                require(bounds.outWidth > 0 && bounds.outHeight > 0) { context.getString(R.string.batch_page_decode_failed) }
+                val pageBytes = bounds.outWidth.toLong() * bounds.outHeight.toLong() * 4L
+                if (pageBytes > memoryLimit || estimatedBytes > memoryLimit - pageBytes) {
+                    throw IOException(context.getString(R.string.batch_memory_limit))
+                }
+                estimatedBytes += pageBytes
+            }
+
+            val parent = outputFile.parentFile ?: context.cacheDir
+            if (!parent.exists() && !parent.mkdirs()) throw IOException("Could not create output directory.")
+            temporaryOutput = File.createTempFile("batch_compile_", ".pdf", parent)
+            document = PDDocument()
+            val filterEngine = if (filterId == null) null else FilterEngine()
+            var fellBack = false
+
+            pageFiles.forEachIndexed { index, file ->
+                currentCoroutineContext().ensureActive()
+                var bitmap: Bitmap? = BitmapFactory.decodeFile(file.absolutePath)
+                    ?: throw IOException(context.getString(R.string.batch_page_decode_failed))
+                try {
+                    val source = requireNotNull(bitmap)
+                    val spec = profile.spec(Runtime.getRuntime().maxMemory(), source.width, source.height)
+                    fellBack = fellBack || spec.fellBack
+                    val scaled = spec.scaleBitmap(source)
+                    if (scaled !== source) source.recycle()
+                    bitmap = scaled
+
+                    val selectedFilterEngine = filterEngine
+                    if (filterId != null && selectedFilterEngine != null) {
+                        val working = requireNotNull(bitmap)
+                        val pixels = IntArray(working.width * working.height)
+                        working.getPixels(pixels, 0, working.width, 0, 0, working.width, working.height)
+                        val filteredPixels = selectedFilterEngine.apply(filterId, pixels, working.width, working.height)
+                        val filtered = Bitmap.createBitmap(working.width, working.height, Bitmap.Config.ARGB_8888)
+                        filtered.setPixels(filteredPixels, 0, filtered.width, 0, 0, filtered.width, filtered.height)
+                        working.recycle()
+                        bitmap = filtered
+                    }
+
+                    val page = PDPage(PDRectangle.A4)
+                    requireNotNull(document).addPage(page)
+                    val image = LosslessFactory.createFromImage(requireNotNull(document), requireNotNull(bitmap))
+                    val margin = 36f
+                    val availableWidth = PDRectangle.A4.width - margin * 2f
+                    val availableHeight = PDRectangle.A4.height - margin * 2f
+                    val scale = minOf(
+                        availableWidth / requireNotNull(bitmap).width.toFloat(),
+                        availableHeight / requireNotNull(bitmap).height.toFloat()
+                    )
+                    val drawWidth = requireNotNull(bitmap).width * scale
+                    val drawHeight = requireNotNull(bitmap).height * scale
+                    val x = margin + (availableWidth - drawWidth) / 2f
+                    val y = margin + (availableHeight - drawHeight) / 2f
+                    PDPageContentStream(requireNotNull(document), page).use { stream ->
+                        stream.drawImage(image, x, y, drawWidth, drawHeight)
+                    }
+                } finally {
+                    bitmap?.let { if (!it.isRecycled) it.recycle() }
+                }
+                onProgress((index + 1).toFloat() / pageFiles.size.toFloat())
+            }
+
+            currentCoroutineContext().ensureActive()
+            requireNotNull(document).save(requireNotNull(temporaryOutput))
+            document.close()
+            document = null
+            currentCoroutineContext().ensureActive()
+            if (outputFile.exists() && !outputFile.delete()) throw IOException("Could not replace the previous batch PDF.")
+            if (!requireNotNull(temporaryOutput).renameTo(outputFile)) {
+                requireNotNull(temporaryOutput).copyTo(outputFile, overwrite = true)
+                requireNotNull(temporaryOutput).delete()
+            }
+            Result.success(PdfBatchAssemblyResult(outputFile, pageFiles.size, fellBack))
+        } catch (cancelled: CancellationException) {
+            temporaryOutput?.delete()
+            outputFile.delete()
+            throw cancelled
+        } catch (error: Exception) {
+            temporaryOutput?.delete()
+            outputFile.delete()
+            Log.e(TAG, "Failed to assemble captured pages", error)
+            Result.failure(error)
+        } finally {
+            runCatching { document?.close() }
+        }
+    }
+
+    /**
      * Encrypts a PDF document with AES-128/256 standard security and permission flags.
      */
     suspend fun encryptPdf(
@@ -425,14 +540,118 @@ class PdfBoxToolkitEngine(private val context: Context) {
     suspend fun watermarkPdf(
         sourceUri: Uri,
         watermarkText: String,
-        outputFile: File
+        outputFile: File,
+        opacity: Float = 150f / 255f,
+        angleDegrees: Float = 0f
     ): Result<File> = withContext(Dispatchers.IO) {
         var sourceFileToDelete: File? = null
+        val watermarkPreferences = context.getSharedPreferences("pdf_watermark_options", Context.MODE_PRIVATE)
+        val useCustomOptions = watermarkPreferences.getBoolean("watermark_custom_enabled", false)
+        val effectiveText = if (useCustomOptions) {
+            watermarkPreferences.getString("watermark_text", watermarkText)?.takeIf { it.isNotBlank() } ?: watermarkText
+        } else {
+            watermarkText
+        }
+        val effectiveOpacity = (if (useCustomOptions) {
+            watermarkPreferences.getFloat("watermark_opacity", opacity)
+        } else {
+            opacity
+        }).coerceIn(0f, 1f)
+        val effectiveAngle = (if (useCustomOptions) {
+            watermarkPreferences.getFloat("watermark_angle", angleDegrees)
+        } else {
+            angleDegrees
+        }).coerceIn(0f, 90f)
+        if (useCustomOptions) {
+            watermarkPreferences.edit().putBoolean("watermark_custom_enabled", false).apply()
+        }
+
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "watermark_src_")
             sourceFileToDelete = sourceFile
             PDDocument.load(sourceFile).use { document ->
-                applyVibeSyncWatermark(document, watermarkText)
+                val documentInfo = document.documentInformation
+                if (
+                    documentInfo.getCustomMetadataValue(WATERMARK_METADATA_KEY) != WATERMARK_METADATA_VALUE &&
+                    effectiveText.isNotBlank()
+                ) {
+                    // Android text layout shapes scripts that PDFBox's built-in fonts cannot encode.
+                    val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = Color.rgb(142, 0, 0)
+                        typeface = Typeface.create("sans-serif", Typeface.BOLD)
+                        textSize = 28f
+                    }
+                    val measuredTextWidth = ceil(paint.measureText(effectiveText)).toInt().coerceAtLeast(1)
+                    val bitmap = Bitmap.createBitmap(
+                        measuredTextWidth + 16,
+                        (ceil(paint.fontMetrics.descent - paint.fontMetrics.ascent).toInt() + 8).coerceAtLeast(1),
+                        Bitmap.Config.ARGB_8888
+                    )
+                    try {
+                        val textLayout = StaticLayout.Builder
+                            .obtain(effectiveText, 0, effectiveText.length, paint, measuredTextWidth)
+                            .setAlignment(Layout.Alignment.ALIGN_CENTER)
+                            .setTextDirection(TextDirectionHeuristics.FIRSTSTRONG_LTR)
+                            .setIncludePad(true)
+                            .setMaxLines(1)
+                            .build()
+                        Canvas(bitmap).apply {
+                            save()
+                            translate(8f, ((bitmap.height - textLayout.height) / 2f).coerceAtLeast(0f))
+                            textLayout.draw(this)
+                            restore()
+                        }
+
+                        val watermarkBitmap = if (effectiveAngle == 0f) {
+                            bitmap
+                        } else {
+                            Bitmap.createBitmap(
+                                bitmap,
+                                0,
+                                0,
+                                bitmap.width,
+                                bitmap.height,
+                                android.graphics.Matrix().apply { postRotate(effectiveAngle) },
+                                true
+                            )
+                        }
+                        try {
+                            val watermarkImage = LosslessFactory.createFromImage(document, watermarkBitmap)
+                            for (page in document.pages) {
+                                val mediaBox = page.mediaBox
+                                val maxWidthPt = mediaBox.width * 0.85f
+                                val maxHeightPt = mediaBox.height * 0.72f
+                                val scale = minOf(
+                                    maxWidthPt / watermarkBitmap.width.toFloat().coerceAtLeast(1f),
+                                    maxHeightPt / watermarkBitmap.height.toFloat().coerceAtLeast(1f)
+                                )
+                                val targetWidthPt = watermarkBitmap.width * scale
+                                val targetHeightPt = watermarkBitmap.height * scale
+                                val x = mediaBox.lowerLeftX + (mediaBox.width - targetWidthPt) / 2f
+                                val y = mediaBox.lowerLeftY + (mediaBox.height - targetHeightPt) / 2f
+                                val graphicsState = PDExtendedGraphicsState().apply {
+                                    nonStrokingAlphaConstant = effectiveOpacity
+                                    strokingAlphaConstant = effectiveOpacity
+                                }
+                                PDPageContentStream(
+                                    document,
+                                    page,
+                                    PDPageContentStream.AppendMode.APPEND,
+                                    true,
+                                    true
+                                ).use { stream ->
+                                    stream.setGraphicsStateParameters(graphicsState)
+                                    stream.drawImage(watermarkImage, x, y, targetWidthPt, targetHeightPt)
+                                }
+                            }
+                        } finally {
+                            if (watermarkBitmap !== bitmap && !watermarkBitmap.isRecycled) watermarkBitmap.recycle()
+                        }
+                    } finally {
+                        if (!bitmap.isRecycled) bitmap.recycle()
+                    }
+                    documentInfo.setCustomMetadataValue(WATERMARK_METADATA_KEY, WATERMARK_METADATA_VALUE)
+                }
                 document.save(outputFile)
             }
             Result.success(outputFile)
@@ -447,6 +666,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
             sourceFileToDelete?.delete()
         }
     }
+
     /**
      * Flattens and bakes real-time vector annotations, highlighters, text boxes,
      * and digital signatures onto the original PDF stream mapped precisely at 72 DPI.
@@ -787,3 +1007,6 @@ class PdfBoxToolkitEngine(private val context: Context) {
         private const val WATERMARK_METADATA_VALUE = "true"
     }
 }
+
+/** Result details for the batch PDF compiler. */
+data class PdfBatchAssemblyResult(val file: File, val pageCount: Int, val fellBack: Boolean)

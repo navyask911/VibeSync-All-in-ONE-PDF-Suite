@@ -2,6 +2,8 @@ package com.vibesync.toolkit.pdf
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -137,7 +139,6 @@ class DashboardScreenTest {
                     onNavigateToEditor = {},
                     onNavigateToTool = { routes.add(it) },
                     onLaunchScanner = { scannerLaunched = true },
-                    onRequestStoragePermission = {}
                 )
             }
         }
@@ -191,6 +192,40 @@ class DashboardScreenTest {
         composeTestRule.onNodeWithText("ગુજરાતી").assertExists()
         composeTestRule.onNodeWithText("עברית").assertExists()
         composeTestRule.onNodeWithText("ไทย").assertExists()
+    }
+
+    @Test
+    fun pdfDiscoveryExplainsThatOnlyTheSelectedFolderIsIndexed() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val choosePdfFolderLabel = context.getString(R.string.choose_pdf_folder)
+        val folderPickerTitle = context.getString(R.string.pdf_folder_picker_title)
+        val folderPickerMessage = context.getString(R.string.pdf_folder_picker_message)
+        val selectFilesManuallyLabel = context.getString(R.string.select_files_manually)
+        context.getSharedPreferences("document_picker_preferences", Context.MODE_PRIVATE)
+            .edit().clear().commit()
+        val viewModel = DashboardViewModel(
+            ApplicationProvider.getApplicationContext<android.app.Application>()
+        )
+
+        composeTestRule.setContent {
+            VibeSyncPdfTheme {
+                DashboardScreen(
+                    viewModel = viewModel,
+                    onNavigateToViewer = {},
+                    onNavigateToEditor = {},
+                    onNavigateToTool = {},
+                    onLaunchScanner = {}
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasText(choosePdfFolderLabel))
+        composeTestRule.onNodeWithText(choosePdfFolderLabel).performClick()
+        // Scope assertions to the dialog window, not the underlying dashboard semantics.
+        composeTestRule.onNode(isDialog()).assertExists()
+        composeTestRule.onNode(hasText(folderPickerTitle) and hasAnyAncestor(isDialog())).assertIsDisplayed()
+        composeTestRule.onNode(hasText(folderPickerMessage) and hasAnyAncestor(isDialog())).assertIsDisplayed()
+        composeTestRule.onNode(hasText(selectFilesManuallyLabel) and hasAnyAncestor(isDialog())).assertIsDisplayed()
     }
 
     @Test

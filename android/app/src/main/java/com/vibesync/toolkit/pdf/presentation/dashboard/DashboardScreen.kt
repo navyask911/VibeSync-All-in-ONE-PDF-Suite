@@ -67,7 +67,6 @@ fun DashboardScreen(
     onNavigateToEditor: (Uri) -> Unit,
     onNavigateToTool: (String) -> Unit,
     onLaunchScanner: () -> Unit,
-    onRequestStoragePermission: () -> Unit = {},
     onSelectLanguage: (String) -> Unit = {},
     onSharePdfDocument: (Uri) -> Unit = {},
     onShareJpgImages: (Uri) -> Unit = {},
@@ -169,7 +168,15 @@ fun DashboardScreen(
             ToolItem(context.getString(R.string.tool_merge_documents), context.getString(R.string.tool_merge_documents_subtitle), Icons.Default.MergeType, "merge", Color(0xFF8E0000)),
             ToolItem(context.getString(R.string.tool_images_to_pdf), context.getString(R.string.tool_images_to_pdf_subtitle), Icons.Default.AddPhotoAlternate, "convert", Color(0xFFB71C1C)),
             ToolItem(context.getString(R.string.tool_extract_images), context.getString(R.string.tool_extract_images_subtitle), Icons.Default.Image, "extract", Color(0xFFE53935)),
-            ToolItem(context.getString(R.string.tool_encrypt_protect), context.getString(R.string.tool_encrypt_protect_subtitle), Icons.Default.Lock, "encrypt", Color(0xFF5F0000))
+            ToolItem(context.getString(R.string.tool_encrypt_protect), context.getString(R.string.tool_encrypt_protect_subtitle), Icons.Default.Lock, "encrypt", Color(0xFF5F0000)),
+            ToolItem(context.getString(R.string.tool_batch_scan), context.getString(R.string.tool_batch_scan_subtitle), Icons.Default.DocumentScanner, "batch_scan", VibeSyncCrimsonPrimary),
+            ToolItem(context.getString(R.string.tool_book_split), context.getString(R.string.tool_book_split_subtitle), Icons.Default.MenuBook, "book_split", VibeSyncRubyAccent),
+            ToolItem(context.getString(R.string.tool_id_card), context.getString(R.string.tool_id_card_subtitle), Icons.Default.Badge, "id_card", Color(0xFFC62828)),
+            ToolItem(context.getString(R.string.tool_id_photo), context.getString(R.string.tool_id_photo_subtitle), Icons.Default.Portrait, "id_photo", Color(0xFF8E0000)),
+            ToolItem(context.getString(R.string.tool_translation_scan), context.getString(R.string.tool_translation_scan_subtitle), Icons.Default.Translate, "translation_scan", VibeSyncRubyAccent),
+            ToolItem(context.getString(R.string.manual_crop_title), context.getString(R.string.manual_crop_subtitle), Icons.Default.Crop, "manual_crop", VibeSyncCrimsonPrimary),
+            ToolItem(context.getString(R.string.signature_manager_title), context.getString(R.string.signature_manager_subtitle), Icons.Default.Draw, "signature_manager", VibeSyncRubyAccent),
+            ToolItem(context.getString(R.string.vault_title), context.getString(R.string.vault_subtitle), Icons.Default.Lock, "vault", Color(0xFF5F0000))
         )
     }
 
@@ -223,8 +230,8 @@ fun DashboardScreen(
                         IconButton(onClick = { launchPickerSafely { folderPickerLauncher.launch(null) } }, modifier = Modifier.testTag("dashboard_action_folder")) {
                             Icon(Icons.Default.FolderOpen, contentDescription = stringResource(R.string.choose_pdf_folder), tint = VibeSyncCrimsonPrimary)
                         }
-                        IconButton(onClick = { viewModel.triggerScanRequest() }, modifier = Modifier.testTag("dashboard_action_refresh")) {
-                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.scan_device_pdfs), tint = VibeSyncCrimsonPrimary)
+                        IconButton(onClick = { viewModel.refreshCurrentSource() }, modifier = Modifier.testTag("dashboard_action_refresh")) {
+                            Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.rescan), tint = VibeSyncCrimsonPrimary)
                         }
                         IconButton(onClick = { launchPickerSafely { viewerPickerLauncher.launch(arrayOf("application/pdf")) } }, modifier = Modifier.testTag("dashboard_action_import")) {
                             Icon(Icons.Default.FileOpen, contentDescription = stringResource(R.string.open_document), tint = VibeSyncCrimsonPrimary)
@@ -384,7 +391,12 @@ fun DashboardScreen(
                                     Icon(tool.icon, contentDescription = null, tint = tool.color, modifier = Modifier.size(24.dp))
                                 }
                                 Spacer(modifier = Modifier.height(10.dp))
-                                Text(tool.title, fontWeight = FontWeight.SemiBold, fontSize = 14.sp)
+                                Text(
+                                    tool.title,
+                                    modifier = if (tool.route == "convert") Modifier.testTag("dashboard_photo_picker_import_entry") else Modifier,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 14.sp
+                                )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     tool.subtitle,
@@ -422,7 +434,7 @@ fun DashboardScreen(
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
                             Text(
-                                stringResource(if (uiState.isFolderScanResult) R.string.pdfs_in_selected_folder else R.string.pdf_recent_heading),
+                                stringResource(if (uiState.isFolderScanResult) R.string.pdfs_in_selected_folder else R.string.pdf_folder_picker_title),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.Bold
@@ -464,11 +476,11 @@ fun DashboardScreen(
                             Column(Modifier.fillMaxWidth().padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                                 Icon(Icons.Default.FindInPage, contentDescription = null, tint = VibeSyncCrimsonPrimary, modifier = Modifier.size(36.dp))
                                 Spacer(Modifier.height(8.dp))
-                                Text(stringResource(R.string.automatic_pdf_discovery), fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text(stringResource(R.string.scan_storage_invitation), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(stringResource(R.string.pdf_folder_picker_title), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text(stringResource(R.string.pdf_folder_picker_hint), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.height(12.dp))
-                                Button(onClick = { viewModel.triggerScanRequest() }, colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)) {
-                                    Text(stringResource(R.string.scan_device_storage))
+                                Button(onClick = { viewModel.triggerFolderSelection() }, colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)) {
+                                    Text(stringResource(R.string.choose_pdf_folder))
                                 }
                             }
                         }
@@ -736,9 +748,9 @@ fun DashboardScreen(
     }
 
     // Transparent Permission Request Explanatory Rationale Dialog
-    if (uiState.showPermissionRationale) {
+    if (uiState.showFolderPickerRationale) {
         AlertDialog(
-            onDismissRequest = { viewModel.dismissPermissionRationale() },
+            onDismissRequest = { viewModel.dismissFolderSelectionRationale() },
             icon = {
                 Icon(
                     imageVector = Icons.Default.FolderSpecial,
@@ -748,12 +760,12 @@ fun DashboardScreen(
                 )
             },
             title = {
-                Text(stringResource(R.string.allow_device_pdf_access), fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.pdf_folder_picker_title), fontWeight = FontWeight.Bold)
             },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        stringResource(R.string.device_access_rationale),
+                        stringResource(R.string.pdf_folder_picker_message),
                         fontSize = 13.sp,
                         lineHeight = 18.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -770,18 +782,18 @@ fun DashboardScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.dismissPermissionRationale()
-                        onRequestStoragePermission()
+                        viewModel.dismissFolderSelectionRationale()
+                        launchPickerSafely { folderPickerLauncher.launch(null) }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
                 ) {
-                    Text(stringResource(R.string.grant_access))
+                    Text(stringResource(R.string.choose_pdf_folder))
                 }
             },
             dismissButton = {
                 OutlinedButton(
                     onClick = {
-                        viewModel.dismissPermissionRationale()
+                        viewModel.dismissFolderSelectionRationale()
                         launchPickerSafely { viewerPickerLauncher.launch(arrayOf("application/pdf")) }
                     }
                 ) {

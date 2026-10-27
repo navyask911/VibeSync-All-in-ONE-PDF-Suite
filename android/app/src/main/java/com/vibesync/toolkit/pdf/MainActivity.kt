@@ -1,6 +1,5 @@
 package com.vibesync.toolkit.pdf
 
-import android.Manifest
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -14,7 +13,6 @@ import android.provider.DocumentsContract
 import android.provider.MediaStore
 import android.util.Base64
 import android.util.Log
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.graphics.Bitmap
 import android.graphics.Matrix
@@ -24,11 +22,17 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.Bundle
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.Toast
 import java.io.File
 import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.FragmentActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.activity.compose.setContent
+import androidx.compose.ui.platform.ComposeView
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -42,12 +46,13 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -74,8 +79,20 @@ import com.vibesync.toolkit.pdf.presentation.dashboard.DashboardScreen
 import com.vibesync.toolkit.pdf.presentation.dashboard.DashboardViewModel
 import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
 import com.vibesync.toolkit.pdf.presentation.editor.PdfEditorScreen
+import com.vibesync.toolkit.pdf.presentation.editor.SignatureManagerScreen
+import com.vibesync.toolkit.pdf.presentation.scanner.ManualCropScreen
+import com.vibesync.toolkit.pdf.presentation.vault.VaultGate
+import com.vibesync.toolkit.pdf.presentation.vault.VaultScreen
+import com.vibesync.toolkit.pdf.data.vault.VaultStorage
 import com.vibesync.toolkit.pdf.presentation.monetization.AdMobManager
 import com.vibesync.toolkit.pdf.presentation.scanner.DocumentScannerManager
+import com.vibesync.toolkit.pdf.presentation.scanner.BatchScanViewModel
+import com.vibesync.toolkit.pdf.presentation.scanner.BatchScanScreen
+import com.vibesync.toolkit.pdf.presentation.scanner.BookSplitEntryScreen
+import com.vibesync.toolkit.pdf.presentation.scanner.BookSplitScreen
+import com.vibesync.toolkit.pdf.presentation.tools.IdCardComposerScreen
+import com.vibesync.toolkit.pdf.presentation.tools.IdPhotoMakerScreen
+import com.vibesync.toolkit.pdf.presentation.settings.ResolutionProfilePreferencePanel
 import com.vibesync.toolkit.pdf.presentation.scanner.ScanHistoryScreen
 import com.vibesync.toolkit.pdf.presentation.scanner.ScannerHistoryRepository
 import com.vibesync.toolkit.pdf.presentation.scanner.ScannerHistoryViewModel
@@ -85,6 +102,7 @@ import com.vibesync.toolkit.pdf.presentation.tools.ExtractImagesScreen
 import com.vibesync.toolkit.pdf.presentation.tools.MergeScreen
 import com.vibesync.toolkit.pdf.presentation.tools.PdfQuickActionScreen
 import com.vibesync.toolkit.pdf.presentation.tools.SplitScreen
+import com.vibesync.toolkit.pdf.presentation.translation.TranslationScanScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
 import kotlinx.coroutines.Dispatchers
@@ -146,6 +164,7 @@ class MainActivity : AppCompatActivity() {
     private val viewerViewModel: PdfViewerViewModel by viewModels()
     private val editorViewModel: EditorViewModel by viewModels()
     private val scannerHistoryViewModel: ScannerHistoryViewModel by viewModels()
+    private val batchScanViewModel: BatchScanViewModel by viewModels()
     private val scannerHistoryRepository by lazy { ScannerHistoryRepository(File(filesDir, "scans")) }
     private val toolkitEngine by lazy { PdfBoxToolkitEngine(applicationContext) }
 
@@ -154,15 +173,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var saveScanLauncher: ActivityResultLauncher<String>
     private var pendingScanExportFile: File? = null
 
-    // Permission launcher for Android 14+ photo and media access
-    private val permissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val granted = permissions.entries.all { it.value }
-        if (!granted) {
-            Toast.makeText(this, getString(R.string.storage_permissions_denied), Toast.LENGTH_SHORT).show()
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -190,6 +200,9 @@ class MainActivity : AppCompatActivity() {
             ActivityResultContracts.StartIntentSenderForResult()
         ) { result ->
             val scanResult = scannerManager.parseResult(result.resultCode, result.data)
+            if (batchScanViewModel.handleCaptureResult(result.resultCode, scanResult?.pageImageUris.orEmpty())) {
+                return@registerForActivityResult
+            }
             scanResult?.let { completedScan ->
                 completedScan.pdfUri?.let { scannedPdfUri ->
                 Toast.makeText(this, getString(R.string.document_scanned_page_count, completedScan.pageCount), Toast.LENGTH_LONG).show()
@@ -405,9 +418,6 @@ class MainActivity : AppCompatActivity() {
                                         Toast.makeText(this@MainActivity, getString(R.string.error_scanner, error.message ?: ""), Toast.LENGTH_SHORT).show()
                                     }
                                 },
-                                onRequestStoragePermission = {
-                                    requestStoragePermissionFlow()
-                                },
                                 onSelectLanguage = { languageTag ->
                                     val locales = if (languageTag.isBlank()) {
                                         LocaleListCompat.getEmptyLocaleList()
@@ -421,6 +431,7 @@ class MainActivity : AppCompatActivity() {
                                 onRenameDocument = { uri, name -> renamePdfDocument(uri, name) },
                                 onDeleteDocument = { uri -> deletePdfDocument(uri) },
                                 onNavigateToPdfTool = { route, uri ->
+                                    if (route == "watermark") getSharedPreferences("pdf_watermark_options", MODE_PRIVATE).edit().putBoolean("watermark_custom_enabled", true).apply()
                                     navController.navigate("$route/${encodeUriRoute(uri)}")
                                 }
                             )
@@ -447,7 +458,140 @@ class MainActivity : AppCompatActivity() {
                                 onShareImages = { file -> shareScanImages(file) },
                                 onSaveToDownloads = { file -> saveScanToDownloads(file) },
                                 onNavigateToEditor = { uri -> navController.navigate("editor/${encodeUriRoute(uri)}") },
-                                onNavigateToPdfTool = { route, uri -> navController.navigate("$route/${encodeUriRoute(uri)}") }
+                                onNavigateToPdfTool = { route, uri ->
+                                    if (route == "watermark") getSharedPreferences("pdf_watermark_options", MODE_PRIVATE).edit().putBoolean("watermark_custom_enabled", true).apply()
+                                    navController.navigate("$route/${encodeUriRoute(uri)}")
+                                },
+                                onSplitBook = { imageUri -> navController.navigate("book_split/${encodeUriRoute(imageUri)}") }
+                            )
+                        }
+
+                        composable("batch_scan") {
+                            BatchScanScreen(
+                                viewModel = batchScanViewModel,
+                                onNavigateBack = { navController.popBackStack() },
+                                onStartCapture = {
+                                    scannerManager.startBatchScan(scannerLauncher) { error ->
+                                        Toast.makeText(this@MainActivity, getString(R.string.error_scanner, error.message ?: ""), Toast.LENGTH_LONG).show()
+                                    }
+                                },
+                                onOpenPdf = { file ->
+                                    scannerHistoryViewModel.refresh()
+                                    dashboardViewModel.refreshRecentDocuments()
+                                    navController.navigate("viewer/${encodeUriRoute(Uri.fromFile(file))}")
+                                }
+                            )
+                        }
+
+                        composable("book_split") {
+                            BookSplitEntryScreen(
+                                onNavigateBack = { navController.popBackStack() },
+                                onChooseImage = { uri -> navController.navigate("book_split/${encodeUriRoute(uri)}") }
+                            )
+                        }
+
+                        composable(
+                            route = "book_split/{encodedUri}",
+                            arguments = listOf(navArgument("encodedUri") { type = NavType.StringType })
+                        ) { entry ->
+                            val imageUri = decodeUriRoute(entry.arguments?.getString("encodedUri") ?: "")
+                            BookSplitScreen(
+                                imageUri = imageUri,
+                                onNavigateBack = { navController.popBackStack() },
+                                onSuccess = { file ->
+                                    scannerHistoryViewModel.refresh()
+                                    navController.navigate("viewer/${encodeUriRoute(Uri.fromFile(file))}")
+                                }
+                            )
+                        }
+
+                        composable("id_card") {
+                            IdCardComposerScreen(onNavigateBack = { navController.popBackStack() })
+                        }
+
+                        composable("id_photo") {
+                            IdPhotoMakerScreen(onNavigateBack = { navController.popBackStack() })
+                        }
+
+                        composable("translation_scan") {
+                            TranslationScanScreen(onNavigateBack = { navController.popBackStack() })
+                        }
+
+                        composable("manual_crop") {
+                            val cropScope = rememberCoroutineScope()
+                            ManualCropScreen(
+                                onNavigateBack = {
+                                    if (!navController.popBackStack("scan_history", false)) {
+                                        navController.navigate("scan_history") {
+                                            popUpTo("dashboard") { inclusive = false }
+                                            launchSingleTop = true
+                                        }
+                                    }
+                                },
+                                onCommit = { croppedBitmap ->
+                                    cropScope.launch {
+                                        try {
+                                            val saved = withContext(Dispatchers.IO) {
+                                                val scansDirectory = File(filesDir, "scans")
+                                                if (!scansDirectory.exists() && !scansDirectory.mkdirs()) {
+                                                    throw java.io.IOException("Unable to create cropped image storage.")
+                                                }
+                                                val temporaryPng = File.createTempFile("manual_crop_", ".png", cacheDir)
+                                                try {
+                                                    temporaryPng.outputStream().use { stream ->
+                                                        if (!croppedBitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)) {
+                                                            throw java.io.IOException("Unable to encode the cropped image.")
+                                                        }
+                                                    }
+                                                    val output = File(scansDirectory, "Manual_Crop_${System.currentTimeMillis()}.pdf")
+                                                    PdfBoxToolkitEngine(applicationContext)
+                                                        .convertImagesToPdf(listOf(Uri.fromFile(temporaryPng)), output)
+                                                        .getOrThrow()
+                                                    output
+                                                } finally {
+                                                    temporaryPng.delete()
+                                                }
+                                            }
+                                            scannerHistoryViewModel.refresh()
+                                            Toast.makeText(this@MainActivity, getString(R.string.manual_crop_saved, saved.name), Toast.LENGTH_LONG).show()
+                                        } catch (error: Exception) {
+                                            Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.manual_crop_error), Toast.LENGTH_LONG).show()
+                                        } finally {
+                                            if (!croppedBitmap.isRecycled) croppedBitmap.recycle()
+                                            navController.popBackStack()
+                                        }
+                                    }
+                                }
+                            )
+                        }
+
+                        composable("signature_manager") {
+                            SignatureManagerScreen(
+                                onNavigateBack = { navController.popBackStack() },
+                                onSelectSignature = { bitmap, _, _, _, _, _ ->
+                                    Toast.makeText(
+                                        this@MainActivity,
+                                        getString(R.string.signature_manager_open_editor_hint),
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                    if (!bitmap.isRecycled) bitmap.recycle()
+                                }
+                            )
+                        }
+
+                        composable("vault") {
+                            val vaultStorage = remember { VaultStorage(applicationContext) }
+                            VaultScreen(
+                                storage = vaultStorage,
+                                onNavigateBack = { navController.popBackStack() },
+                                onAuthenticate = { result ->
+                                    val host = this@MainActivity as? FragmentActivity
+                                    if (host == null) {
+                                        result(false)
+                                    } else {
+                                        VaultGate().authenticate(host, result)
+                                    }
+                                }
                             )
                         }
 
@@ -987,10 +1131,37 @@ class MainActivity : AppCompatActivity() {
             setSingleLine(true)
         }
 
+        val dialogContent = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(input, LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            ))
+            if (mimeType == "application/pdf") {
+                val profileSelector = ComposeView(this@MainActivity).apply {
+                    setViewTreeLifecycleOwner(this@MainActivity)
+                    setViewTreeViewModelStoreOwner(this@MainActivity)
+                    setViewTreeSavedStateRegistryOwner(this@MainActivity)
+                    setContent {
+                        VibeSyncPdfTheme {
+                            ResolutionProfilePreferencePanel(
+                                modifier = androidx.compose.ui.Modifier.fillMaxSize(),
+                                testTag = "resolution_profile_export_selector"
+                            )
+                        }
+                    }
+                }
+                addView(profileSelector, LinearLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                    (156 * resources.displayMetrics.density).toInt()
+                ))
+            }
+        }
+
         android.app.AlertDialog.Builder(this)
             .setTitle(getString(R.string.output_name_dialog_title))
             .setMessage(getString(R.string.output_name_dialog_message))
-            .setView(input)
+            .setView(dialogContent)
             .setNegativeButton(getString(R.string.cancel), null)
             .setPositiveButton(getString(R.string.continue_label)) { _, _ ->
                 val requested = sanitizeOutputBaseName(input.text?.toString().orEmpty(), defaultName)
@@ -1122,22 +1293,6 @@ class MainActivity : AppCompatActivity() {
         return incomingUri
     }
 
-    private fun checkAndRequestPermissions() {
-        // This legacy path is reached only on Android 10 and earlier, where the
-        // device-wide PDF discovery feature still uses READ_EXTERNAL_STORAGE.
-        // Image selection must use the system Photo Picker and never requests
-        // broad photo/video library access.
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return
-
-        if (ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            permissionLauncher.launch(arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE))
-        }
-    }
-
     override fun onStart() {
         super.onStart()
         registerConnectivityCallback()
@@ -1152,7 +1307,7 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         reviewEligibilityTracker.recordSessionIfDue()
         reviewEligibilityRevision += 1
-        dashboardViewModel.checkPermissionAndScan()
+        dashboardViewModel.refreshCurrentSource()
         refreshInternetStatus()
         maybeCheckForUpdate()
     }
@@ -1405,22 +1560,6 @@ class MainActivity : AppCompatActivity() {
         } catch (error: Exception) {
             Log.w(TAG, "Google Play in-app review is unavailable.", error)
             reviewFlowLaunching = false
-        }
-    }
-
-    private fun requestStoragePermissionFlow() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            try {
-                val intent = Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                    data = Uri.parse("package:$packageName")
-                }
-                startActivity(intent)
-            } catch (e: Exception) {
-                val intent = Intent(android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION)
-                startActivity(intent)
-            }
-        } else {
-            checkAndRequestPermissions()
         }
     }
 

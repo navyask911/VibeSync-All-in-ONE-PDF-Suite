@@ -2,6 +2,7 @@ package com.vibesync.toolkit.pdf.presentation.editor
 
 import android.app.Application
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.util.Log
 import android.net.Uri
 import androidx.compose.ui.graphics.Color
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.io.File
+import java.util.UUID
 
 data class EditorUiState(
     val currentPageIndex: Int = 0,
@@ -41,9 +43,15 @@ data class EditorUiState(
 
 class EditorViewModel(application: Application) : AndroidViewModel(application) {
 
+    companion object {
+        /** Marker consumed by the ViewModel for an eraser gesture sent by the canvas. */
+        const val ERASER_GESTURE_ID = "__vibesync_whole_stroke_eraser_gesture__"
+    }
+
     private val rendererEngine = PdfRendererEngine(application)
     private val toolkitEngine = PdfBoxToolkitEngine(application)
     private val securityVault by lazy { SecurityVault(getApplication<Application>()) }
+    private val temporarySignatureBitmaps = mutableSetOf<Bitmap>()
 
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
@@ -83,6 +91,10 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun addStroke(stroke: VectorStroke) {
+        if (stroke.id == ERASER_GESTURE_ID) {
+            eraseStrokesAlongPath(stroke.points, stroke.strokeWidth)
+            return
+        }
         undoStack.add(currentPageAnnotations())
         redoStack.clear()
         val updated = _uiState.value.currentStrokes + stroke
@@ -92,6 +104,61 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             canRedo = redoStack.isNotEmpty()
         )
         persistCurrentPageAnnotations()
+    }
+
+    /**
+     * Deletes the nearest complete stroke when a tap falls within the given pixel radius.
+     */
+    fun eraseStrokeAt(x: Float, y: Float, tolerancePx: Float): Boolean {
+        if (tolerancePx < 0f) return false
+        val point = Point2D(x, y)
+        val closest = _uiState.value.currentStrokes
+            .map { stroke -> stroke to pointToPathDistance(point, stroke.points) }
+            .minByOrNull { it.second }
+            ?: return false
+        if (closest.second > tolerancePx) return false
+        return removeStrokesById(listOf(closest.first.id)) == 1
+    }
+
+    /**
+     * Deletes each complete stroke crossed by a drag. Every deletion receives its own
+     * snapshot so undo restores the last deleted stroke at its original list/z-order index.
+     */
+    fun eraseStrokesAlongPath(pathPoints: List<Point2D>, tolerancePx: Float): Int {
+        if (pathPoints.isEmpty() || tolerancePx < 0f) return 0
+        if (pathPoints.size == 1) {
+            return if (eraseStrokeAt(pathPoints[0].x, pathPoints[0].y, tolerancePx)) 1 else 0
+        }
+
+        val hitIds = _uiState.value.currentStrokes
+            .filter { stroke -> pathsDistance(stroke.points, pathPoints) <= tolerancePx }
+            .map { it.id }
+        return removeStrokesById(hitIds)
+    }
+
+    private fun removeStrokesById(strokeIds: List<String>): Int {
+        var strokes = _uiState.value.currentStrokes
+        var removedCount = 0
+        strokeIds.distinct().forEach { strokeId ->
+            val index = strokes.indexOfFirst { it.id == strokeId }
+            if (index >= 0) {
+                // Keep a snapshot immediately before each deletion to make each whole stroke
+                // independently undoable and preserve its original position in the list.
+                undoStack.add(currentPageAnnotations(strokes))
+                redoStack.clear()
+                strokes = strokes.toMutableList().apply { removeAt(index) }
+                removedCount += 1
+            }
+        }
+        if (removedCount == 0) return 0
+
+        _uiState.value = _uiState.value.copy(
+            currentStrokes = strokes,
+            canUndo = undoStack.isNotEmpty(),
+            canRedo = redoStack.isNotEmpty()
+        )
+        persistCurrentPageAnnotations()
+        return removedCount
     }
 
     fun addTextAnnotation(text: String, x: Float, y: Float) {
@@ -113,23 +180,71 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         persistCurrentPageAnnotations()
     }
 
-    fun addSignature(bitmap: Bitmap, x: Float, y: Float) {
-        // Automatically save to Encrypted Vault
-        securityVault.saveDefaultSignature(bitmap)
+    fun addSignature(
+        bitmap: Bitmap,
+        x: Float,
+        y: Float,
+        width: Float = 160f,
+        height: Float = 80f,
+        rotationDegrees: Float = 0f,
+        saveToVault: Boolean = true
+    ) {
+        // Keep captured signatures discoverable by their stable encrypted identifiers.
+        if (saveToVault) {
+            securityVault.saveDefaultSignature(bitmap)
+            securityVault.saveSignature(
+                "signature_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(8)}",
+                bitmap
+            )
+        }
+        val normalizedRotation = ((rotationDegrees % 360f) + 360f) % 360f
+        val placedBitmap = if (normalizedRotation == 0f) {
+            bitmap
+        } else {
+            Bitmap.createBitmap(
+                bitmap, 0, 0, bitmap.width, bitmap.height,
+                Matrix().apply { postRotate(normalizedRotation) }, true
+            ).also { if (!bitmap.isRecycled) bitmap.recycle() }
+        }
+        temporarySignatureBitmaps.add(placedBitmap)
 
         undoStack.add(currentPageAnnotations())
         redoStack.clear()
-
         val sig = SignatureAnnotation(
             x = x,
             y = y,
-            width = 160f,
-            height = 80f,
-            bitmap = bitmap
+            width = width.coerceAtLeast(1f),
+            height = height.coerceAtLeast(1f),
+            bitmap = placedBitmap
         )
         val updated = _uiState.value.currentSignatures + sig
-        _uiState.value = _uiState.value.copy(currentSignatures = updated)
+        _uiState.value = _uiState.value.copy(
+            currentSignatures = updated,
+            canUndo = undoStack.isNotEmpty(),
+            canRedo = redoStack.isNotEmpty()
+        )
         persistCurrentPageAnnotations()
+    }
+
+    fun listSavedSignatures(): List<SecurityVault.SavedSignature> = securityVault.listSignatures()
+
+    fun renameSavedSignature(oldId: String, newId: String): Boolean =
+        securityVault.renameSignature(oldId, newId)
+
+    fun deleteSavedSignature(id: String): Boolean = securityVault.deleteSignature(id)
+
+    /** Releases decoded/placed signature bitmaps once PDF flattening has finished. */
+    fun releaseSignatureBitmapsAfterFlatten() {
+        temporarySignatureBitmaps.forEach { bitmap ->
+            if (!bitmap.isRecycled) bitmap.recycle()
+        }
+        temporarySignatureBitmaps.clear()
+        pageAnnotationsMap.keys.toList().forEach { pageIndex ->
+            pageAnnotationsMap[pageIndex]?.let { annotations ->
+                pageAnnotationsMap[pageIndex] = annotations.copy(signatures = emptyList())
+            }
+        }
+        _uiState.value = _uiState.value.copy(currentSignatures = emptyList())
     }
 
     fun undo() {
@@ -175,11 +290,13 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         )
     }
 
-    private fun currentPageAnnotations(): PageAnnotations {
+    private fun currentPageAnnotations(
+        strokes: List<VectorStroke> = _uiState.value.currentStrokes
+    ): PageAnnotations {
         val current = _uiState.value
         return PageAnnotations(
             pageIndex = current.currentPageIndex,
-            strokes = current.currentStrokes,
+            strokes = strokes,
             textAnnotations = current.currentTextAnnotations,
             signatures = current.currentSignatures
         )
@@ -222,6 +339,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
             result.fold(
                 onSuccess = { file ->
+                    releaseSignatureBitmapsAfterFlatten()
                     _uiState.value = _uiState.value.copy(isSaving = false, exportSuccessFile = file)
                     onComplete(file)
                 },
@@ -250,4 +368,96 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             }
         }
     }
+}
+
+
+private fun pointToPathDistance(point: Point2D, path: List<Point2D>): Float {
+    if (path.isEmpty()) return Float.POSITIVE_INFINITY
+    if (path.size == 1) return pointDistance(point, path[0])
+
+    var minimum = Float.POSITIVE_INFINITY
+    for (index in 1 until path.size) {
+        minimum = minOf(minimum, pointToSegmentDistance(point, path[index - 1], path[index]))
+    }
+    return minimum
+}
+
+private fun pathsDistance(first: List<Point2D>, second: List<Point2D>): Float {
+    if (first.isEmpty() || second.isEmpty()) return Float.POSITIVE_INFINITY
+    if (first.size == 1) return pointToPathDistance(first[0], second)
+    if (second.size == 1) return pointToPathDistance(second[0], first)
+
+    var minimum = Float.POSITIVE_INFINITY
+    for (firstIndex in 1 until first.size) {
+        for (secondIndex in 1 until second.size) {
+            minimum = minOf(
+                minimum,
+                segmentToSegmentDistance(
+                    first[firstIndex - 1], first[firstIndex],
+                    second[secondIndex - 1], second[secondIndex]
+                )
+            )
+            if (minimum == 0f) return 0f
+        }
+    }
+    return minimum
+}
+
+private fun pointDistance(first: Point2D, second: Point2D): Float {
+    val dx = first.x - second.x
+    val dy = first.y - second.y
+    return kotlin.math.sqrt(dx * dx + dy * dy)
+}
+
+private fun pointToSegmentDistance(point: Point2D, start: Point2D, end: Point2D): Float {
+    val dx = end.x - start.x
+    val dy = end.y - start.y
+    val lengthSquared = dx * dx + dy * dy
+    if (lengthSquared <= 0f) return pointDistance(point, start)
+
+    val projection = (
+        ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared
+    ).coerceIn(0f, 1f)
+    val nearest = Point2D(start.x + projection * dx, start.y + projection * dy)
+    return pointDistance(point, nearest)
+}
+
+private fun segmentToSegmentDistance(
+    firstStart: Point2D,
+    firstEnd: Point2D,
+    secondStart: Point2D,
+    secondEnd: Point2D
+): Float {
+    if (segmentsIntersect(firstStart, firstEnd, secondStart, secondEnd)) return 0f
+    return minOf(
+        pointToSegmentDistance(firstStart, secondStart, secondEnd),
+        pointToSegmentDistance(firstEnd, secondStart, secondEnd),
+        pointToSegmentDistance(secondStart, firstStart, firstEnd),
+        pointToSegmentDistance(secondEnd, firstStart, firstEnd)
+    )
+}
+
+private fun segmentsIntersect(a: Point2D, b: Point2D, c: Point2D, d: Point2D): Boolean {
+    fun orientation(p: Point2D, q: Point2D, r: Point2D): Float =
+        (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x)
+
+    fun liesOnSegment(point: Point2D, start: Point2D, end: Point2D): Boolean =
+        point.x >= minOf(start.x, end.x) - 0.0001f &&
+            point.x <= maxOf(start.x, end.x) + 0.0001f &&
+            point.y >= minOf(start.y, end.y) - 0.0001f &&
+            point.y <= maxOf(start.y, end.y) + 0.0001f
+
+    val first = orientation(a, b, c)
+    val second = orientation(a, b, d)
+    val third = orientation(c, d, a)
+    val fourth = orientation(c, d, b)
+
+    if (((first > 0f && second < 0f) || (first < 0f && second > 0f)) &&
+        ((third > 0f && fourth < 0f) || (third < 0f && fourth > 0f))
+    ) return true
+
+    return (kotlin.math.abs(first) <= 0.0001f && liesOnSegment(c, a, b)) ||
+        (kotlin.math.abs(second) <= 0.0001f && liesOnSegment(d, a, b)) ||
+        (kotlin.math.abs(third) <= 0.0001f && liesOnSegment(a, c, d)) ||
+        (kotlin.math.abs(fourth) <= 0.0001f && liesOnSegment(b, c, d))
 }

@@ -95,8 +95,145 @@ jobs:
                   target_args = sorted(re.findall(r"%(?:[0-9]+\$)?[a-zA-Z]", items[name]))
                   if source_args != target_args:
                       sys.exit(f"{locale}: placeholders differ for {name}: {source_args} != {target_args}")
-          print(f"Localization resource audit passed: {len(baseline)} keys across {len(buckets)} locales.")
+          print(f"Localization resource audit passed: {len(baseline)} keys across {len(buckets)} established locales.")
+
+          # Partial locales rely on base-resource fallbacks for existing keys. Require all new
+          # profile keys, unique IDs and matching placeholders in every shipped strings bucket.
+          required_profile_keys = [
+              "resolution_profile_title",
+              "resolution_profile_smallest",
+              "resolution_profile_smallest_description",
+              "resolution_profile_standard",
+              "resolution_profile_standard_description",
+              "resolution_profile_largest",
+              "resolution_profile_largest_description",
+              "resolution_profile_hd_auto",
+              "resolution_profile_hd_auto_description",
+              "resolution_profile_memory_fallback",
+          ]
+          required_filter_keys = [
+              "scan_filter_title",
+              "scan_filter_magic_color",
+              "scan_filter_bw",
+              "scan_filter_lighten",
+              "scan_filter_no_shadow",
+              "scan_filter_screen",
+              "scan_filter_clean_marks",
+          ]
+          required_step4_keys = [
+              "compression_progress_pages",
+              "compression_before_size",
+              "compression_after_size",
+              "compression_size_change",
+              "compression_page_count",
+              "compression_password_incorrect",
+              "compression_password_label",
+              "compression_password_message",
+              "compression_password_title",
+              "compression_try_again",
+              "compression_use_output",
+              "export_failed",
+              "export_jpg_current",
+              "export_jpg_separate",
+              "export_jpg_zip",
+              "export_menu_title",
+              "export_password_message",
+              "export_password_title",
+              "export_pdf",
+              "export_progress_pages",
+              "export_saved_jpg",
+              "export_saved_pdf",
+              "export_saved_txt",
+              "export_saved_zip",
+              "export_txt",
+              "print_action",
+              "print_failed",
+              "print_job_name",
+              "tool_translation_scan",
+              "tool_translation_scan_subtitle",
+              "translation_complete",
+              "translation_export_pdf",
+              "translation_export_saved",
+              "translation_export_txt",
+              "translation_failed",
+              "translation_import",
+              "translation_language_auto",
+              "translation_model_download_consent",
+              "translation_model_download_declined",
+              "translation_model_download_title",
+              "translation_ocr_complete",
+              "translation_original",
+              "translation_result",
+              "translation_scan_description",
+              "translation_scan_title",
+              "translation_source_language",
+              "translation_target_language",
+              "translation_translate_action",
+          ]
+          required_d2_keys = [
+              "pdf_folder_picker_title",
+              "pdf_folder_picker_message",
+              "pdf_folder_picker_hint",
+          ]
+          required_scan_keys = required_profile_keys + required_filter_keys + required_step4_keys + required_d2_keys
+          all_string_files = sorted(root.glob("values*/strings.xml"))
+          if root / "values/strings.xml" not in all_string_files:
+              sys.exit("Base strings.xml was not found by the all-locale audit.")
+          if len(all_string_files) != 40:
+              sys.exit(f"Expected 40 strings.xml files, found {len(all_string_files)}: {[str(p) for p in all_string_files]}")
+
+          base_nodes = ET.parse(root / "values/strings.xml").getroot().findall("string")
+          base_items = {node.attrib["name"]: "".join(node.itertext()) for node in base_nodes}
+          for path in all_string_files:
+              locale = path.parent.name
+              nodes = ET.parse(path).getroot().findall("string")
+              items = {}
+              for node in nodes:
+                  name = node.attrib["name"]
+                  if name in items:
+                      sys.exit(f"{locale}: duplicate string ID: {name}")
+                  items[name] = "".join(node.itertext())
+              for name in required_scan_keys:
+                  if name not in items:
+                      sys.exit(f"{locale}: missing required scan string: {name}")
+                  if name not in base_items:
+                      sys.exit(f"default: required profile string missing: {name}")
+                  source_args = sorted(re.findall(r"%(?:[0-9]+\$)?[a-zA-Z]", base_items[name]))
+                  target_args = sorted(re.findall(r"%(?:[0-9]+\$)?[a-zA-Z]", items[name]))
+                  if source_args != target_args:
+                      sys.exit(f"{locale}: placeholders differ for {name}: {source_args} != {target_args}")
+          print(f"All-locale resource audit passed: {len(required_profile_keys)} profile keys, {len(required_filter_keys)} filter keys, and {len(required_d2_keys)} SAF-only discovery keys across {len(all_string_files)} strings.xml files.")
           PY
+
+      - name: Verify PDF discovery uses SAF only
+        run: |
+          forbidden_manifest="$(grep -nE 'android[.]permission[.](MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|READ_MEDIA_IMAGES|READ_MEDIA_VIDEO|READ_MEDIA_VISUAL_USER_SELECTED)' android/app/src/main/AndroidManifest.xml || true)"
+          if [ -n "$forbidden_manifest" ]; then
+            echo "Broad storage/media permissions are forbidden; PDF and image input must use SAF/system pickers:"
+            echo "$forbidden_manifest"
+            exit 1
+          fi
+          forbidden_code="$(git grep -nE 'DevicePdfScanner|isExternalStorageManager|MANAGE_EXTERNAL_STORAGE|READ_EXTERNAL_STORAGE|ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION|ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION' -- android/app/src/main/java android/app/src/main/AndroidManifest.xml || true)"
+          if [ -n "$forbidden_code" ]; then
+            echo "Legacy device-wide storage discovery or settings flow remains in source:"
+            echo "$forbidden_code"
+            exit 1
+          fi
+
+      - name: Verify OCR and print adapters stay on-device
+        run: |
+          forbidden_ocr="$(grep -RniE 'okhttp|retrofit|firebase|google-cloud|cloud-vision|https?://|java\.net\.URL|URL\(' android/app/src/main/java/com/vibesync/toolkit/pdf/data/ocr || true)"
+          if [ -n "$forbidden_ocr" ]; then
+            echo "Forbidden network/cloud integration found in the OCR and translation path:"
+            echo "$forbidden_ocr"
+            exit 1
+          fi
+          non_platform_print_imports="$(grep -RniE '^import ' android/app/src/main/java/com/vibesync/toolkit/pdf/data/print | grep -vF 'import android.print.' || true)"
+          if [ -n "$non_platform_print_imports" ]; then
+            echo "Print adapter must use only Android platform print imports:"
+            echo "$non_platform_print_imports"
+            exit 1
+          fi
 
       - name: Set up JDK 17
         uses: actions/setup-java@v6
@@ -160,4 +297,68 @@ jobs:
           script: |
             gradle wrapper --gradle-version 8.13 --distribution-type bin
             chmod +x gradlew
-            ./gradlew connectedDebugAndroidTest --no-daemon --stacktrace
+            bash -o pipefail -c './gradlew connectedDebugAndroidTest --no-daemon --stacktrace 2>&1 | tee "$GITHUB_WORKSPACE/android/connected-debug-android-test.log"'
+
+      - name: Verify connected test completion against JUnit reports
+        if: always()
+        working-directory: android
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import re
+          import sys
+          import xml.etree.ElementTree as ET
+
+          log_path = pathlib.Path("connected-debug-android-test.log")
+          if not log_path.is_file():
+              sys.exit("Instrumented test console log is missing; completion cannot be verified.")
+
+          log = log_path.read_text(encoding="utf-8", errors="replace")
+          starts = re.findall(r"Starting (\d+) tests on", log)
+          finishes = re.findall(r"Finished (\d+) tests on", log)
+          if not starts:
+              sys.exit("No 'Starting N tests' line was captured from connectedDebugAndroidTest.")
+          if not finishes:
+              sys.exit("No 'Finished N tests' line was captured from connectedDebugAndroidTest.")
+          if len(set(starts)) != 1 or len(set(finishes)) != 1:
+              sys.exit(f"Inconsistent start/finish counts in test log: starts={starts}, finishes={finishes}.")
+
+          started = int(starts[-1])
+          finished = int(finishes[-1])
+          if started < 50:
+              sys.exit(f"Step 4 requires at least 50 connected Android tests; only {started} started.")
+          report_dir = pathlib.Path("app/build/outputs/androidTest-results/connected/debug")
+          report_files = sorted(report_dir.rglob("*.xml")) if report_dir.exists() else []
+          if not report_files:
+              sys.exit(f"No connected Android JUnit XML reports found under {report_dir}.")
+
+          test_cases = []
+          for path in report_files:
+              try:
+                  root = ET.parse(path).getroot()
+              except ET.ParseError as exc:
+                  sys.exit(f"Could not parse instrumented test report {path}: {exc}")
+              test_cases.extend(root.findall(".//testcase") if root.tag != "testcase" else [root])
+
+          if not test_cases:
+              sys.exit("Connected Android JUnit XML reports contain no test cases.")
+
+          skipped = sum(1 for case in test_cases if case.find("skipped") is not None)
+          failed = sum(
+              len(case.findall("failure")) + len(case.findall("error"))
+              for case in test_cases
+          )
+          actual = len(test_cases)
+          print(f"Tests {actual}/{started} completed. ({skipped} skipped) ({failed} failed)")
+
+          if started != finished:
+              sys.exit(f"Connected test start/finish mismatch: started={started}, finished={finished}.")
+          if actual != started:
+              sys.exit(f"JUnit report count ({actual}) does not match the instrumented start count ({started}).")
+          if skipped != 0:
+              sys.exit(f"Instrumented test report contains {skipped} skipped test(s).")
+          if failed != 0:
+              sys.exit(f"Instrumented test report contains {failed} failed/error test(s).")
+          print(f"Verified {actual} connected Android test cases against JUnit XML; 0 skipped, 0 failed.")
+          PY
