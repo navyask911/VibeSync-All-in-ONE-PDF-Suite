@@ -1,9 +1,11 @@
 package com.vibesync.toolkit.pdf.data.pdf
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import java.io.InputStream
 
 /** Shared bitmap helpers for PDF rasterization, thumbnails, and JPEG export. */
 public object PdfBitmapUtils {
@@ -31,6 +33,66 @@ public object PdfBitmapUtils {
             throw error
         }
     }
+    private const val DEFAULT_MAX_BITMAP_DIMENSION = 2048
+
+    /**
+     * Decodes a file without allocating its full-size bitmap when its longest side exceeds
+     * [maxDimension]. Bounds are read first; sampling uses Android's power-of-two convention.
+     */
+    @JvmStatic
+    public fun decodeFileDownsampled(
+        path: String,
+        maxDimension: Int = DEFAULT_MAX_BITMAP_DIMENSION
+    ): Bitmap? {
+        require(maxDimension > 0) { "Maximum bitmap dimension must be positive." }
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = calculateInSampleSize(bounds, maxDimension)
+        }
+        return BitmapFactory.decodeFile(path, options)
+    }
+
+    /**
+     * Decodes a reopenable stream with a bounds pass and then a sampled pass. The provider is
+     * invoked twice because many content streams cannot be rewound after bounds decoding.
+     */
+    @JvmStatic
+    public fun decodeStreamDownsampled(
+        openInputStream: () -> InputStream?,
+        maxDimension: Int = DEFAULT_MAX_BITMAP_DIMENSION
+    ): Bitmap? {
+        require(maxDimension > 0) { "Maximum bitmap dimension must be positive." }
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        val boundsStream = openInputStream() ?: return null
+        boundsStream.use { BitmapFactory.decodeStream(it, null, bounds) }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = calculateInSampleSize(bounds, maxDimension)
+        }
+        val imageStream = openInputStream() ?: return null
+        return imageStream.use { BitmapFactory.decodeStream(it, null, options) }
+    }
+
+    /** Returns the smallest power-of-two sample that brings the longest side within [maxDimension]. */
+    @JvmStatic
+    public fun calculateInSampleSize(
+        bounds: BitmapFactory.Options,
+        maxDimension: Int = DEFAULT_MAX_BITMAP_DIMENSION
+    ): Int {
+        require(maxDimension > 0) { "Maximum bitmap dimension must be positive." }
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return 1
+        var sampleSize = 1
+        while (
+            maxOf(bounds.outWidth / sampleSize, bounds.outHeight / sampleSize) > maxDimension &&
+            sampleSize < Int.MAX_VALUE / 2
+        ) {
+            sampleSize *= 2
+        }
+        return sampleSize
+    }
+
 }
 
 /*

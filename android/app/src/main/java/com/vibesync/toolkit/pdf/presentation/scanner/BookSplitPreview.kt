@@ -1,7 +1,7 @@
 package com.vibesync.toolkit.pdf.presentation.scanner
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import android.net.Uri
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.PickVisualMediaRequest
@@ -162,8 +162,8 @@ fun BookSplitScreen(
     val source by produceState<Bitmap?>(initialValue = null, key1 = imageUri) {
         value = withContext(Dispatchers.IO) {
             runCatching {
-                if (imageUri.scheme == "file") BitmapFactory.decodeFile(imageUri.path)
-                else context.contentResolver.openInputStream(imageUri)?.use { BitmapFactory.decodeStream(it) }
+                if (imageUri.scheme == "file") imageUri.path?.let { PdfBitmapUtils.decodeFileDownsampled(it) }
+                else PdfBitmapUtils.decodeStreamDownsampled(openInputStream = { context.contentResolver.openInputStream(imageUri) })
             }.getOrNull()
         }
     }

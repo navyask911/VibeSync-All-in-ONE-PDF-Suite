@@ -232,7 +232,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
             for (imageUri in imageUris) {
                 val sourceFile = UriUtils.copyUriToCacheFile(context, imageUri, "image_src_")
                 val bitmap = try {
-                    BitmapFactory.decodeFile(sourceFile.absolutePath)
+                    PdfBitmapUtils.decodeFileDownsampled(sourceFile.absolutePath)
                 } finally {
                     sourceFile.delete()
                 }
@@ -318,7 +318,10 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 BitmapFactory.decodeFile(file.absolutePath, bounds)
                 require(bounds.outWidth > 0 && bounds.outHeight > 0) { context.getString(R.string.batch_page_decode_failed) }
-                val pageBytes = bounds.outWidth.toLong() * bounds.outHeight.toLong() * 4L
+                val sampleSize = PdfBitmapUtils.calculateInSampleSize(bounds)
+                val decodedWidth = (bounds.outWidth / sampleSize).coerceAtLeast(1)
+                val decodedHeight = (bounds.outHeight / sampleSize).coerceAtLeast(1)
+                val pageBytes = decodedWidth.toLong() * decodedHeight.toLong() * 4L
                 if (pageBytes > memoryLimit || estimatedBytes > memoryLimit - pageBytes) {
                     throw IOException(context.getString(R.string.batch_memory_limit))
                 }
@@ -334,7 +337,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
 
             pageFiles.forEachIndexed { index, file ->
                 currentCoroutineContext().ensureActive()
-                var bitmap: Bitmap? = BitmapFactory.decodeFile(file.absolutePath)
+                var bitmap: Bitmap? = PdfBitmapUtils.decodeFileDownsampled(file.absolutePath)
                     ?: throw IOException(context.getString(R.string.batch_page_decode_failed))
                 try {
                     val source = requireNotNull(bitmap)

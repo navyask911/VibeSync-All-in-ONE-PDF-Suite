@@ -2,7 +2,7 @@ name: Build & Sign Android Release (AAB & APK)
 
 on:
   push:
-    branches: [ main, master, "fix/**", "hotfix/**" ]
+    branches: [ main, master, "fix/**", "hotfix/**", "playstore/**" ]
   workflow_dispatch:
 
 jobs:

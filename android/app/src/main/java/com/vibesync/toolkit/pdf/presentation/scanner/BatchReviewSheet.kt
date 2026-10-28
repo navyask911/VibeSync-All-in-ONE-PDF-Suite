@@ -1,6 +1,6 @@
 package com.vibesync.toolkit.pdf.presentation.scanner
 
-import android.graphics.BitmapFactory
+import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
@@ -120,8 +120,7 @@ private fun BatchPageThumbnail(
 ) {
     val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = page.id) {
         value = withContext(Dispatchers.IO) {
-            val options = BitmapFactory.Options().apply { inSampleSize = 4 }
-            BitmapFactory.decodeFile(page.file.absolutePath, options)
+            PdfBitmapUtils.decodeFileDownsampled(page.file.absolutePath)
         }
     }
     Card(

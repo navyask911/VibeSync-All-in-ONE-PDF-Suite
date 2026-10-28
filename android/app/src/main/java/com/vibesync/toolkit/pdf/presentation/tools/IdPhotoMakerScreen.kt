@@ -2,7 +2,7 @@ package com.vibesync.toolkit.pdf.presentation.tools
 
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -82,7 +82,7 @@ fun IdPhotoMakerScreen(
     val source by produceState<Bitmap?>(initialValue = previewBitmap, key1 = pickedUri, key2 = previewBitmap) {
         if (previewBitmap != null) value = previewBitmap
         else value = withContext(Dispatchers.IO) {
-            pickedUri?.let { uri -> runCatching { context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } }.getOrNull() }
+            pickedUri?.let { uri -> runCatching { PdfBitmapUtils.decodeStreamDownsampled(openInputStream = { context.contentResolver.openInputStream(uri) }) }.getOrNull() }
         }
     }
     val cropAspect = selected.widthPx.toFloat() / selected.heightPx.toFloat()
@@ -90,7 +90,7 @@ fun IdPhotoMakerScreen(
     val savedPreview by produceState<Bitmap?>(initialValue = null, key1 = savedUri) {
         value = withContext(Dispatchers.IO) {
             savedUri?.let { uri ->
-                runCatching { context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } }.getOrNull()
+                runCatching { PdfBitmapUtils.decodeStreamDownsampled(openInputStream = { context.contentResolver.openInputStream(uri) }) }.getOrNull()
             }
         }
     }

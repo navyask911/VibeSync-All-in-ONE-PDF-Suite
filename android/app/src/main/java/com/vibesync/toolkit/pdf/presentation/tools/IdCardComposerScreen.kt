@@ -1,7 +1,7 @@
 package com.vibesync.toolkit.pdf.presentation.tools
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -95,13 +95,13 @@ fun IdCardComposerScreen(
     val frontBitmap by produceState<Bitmap?>(initialValue = previewFront, key1 = frontUri, key2 = previewFront) {
         if (previewFront != null) value = previewFront
         else value = withContext(Dispatchers.IO) {
-            frontUri?.let { uri -> runCatching { context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } }.getOrNull() }
+            frontUri?.let { uri -> runCatching { PdfBitmapUtils.decodeStreamDownsampled(openInputStream = { context.contentResolver.openInputStream(uri) }) }.getOrNull() }
         }
     }
     val backBitmap by produceState<Bitmap?>(initialValue = previewBack, key1 = backUri, key2 = previewBack) {
         if (previewBack != null) value = previewBack
         else value = withContext(Dispatchers.IO) {
-            backUri?.let { uri -> runCatching { context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } }.getOrNull() }
+            backUri?.let { uri -> runCatching { PdfBitmapUtils.decodeStreamDownsampled(openInputStream = { context.contentResolver.openInputStream(uri) }) }.getOrNull() }
         }
     }
 

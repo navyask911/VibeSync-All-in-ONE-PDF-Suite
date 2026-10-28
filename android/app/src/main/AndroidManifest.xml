@@ -55,6 +55,12 @@
             </intent-filter>
         </activity>
 
+        <!-- ML Kit activity override to avoid locking scanning UI to portrait. -->
+        <activity
+            android:name="com.google.mlkit.vision.documentscanner.internal.GmsDocumentScanningDelegateActivity"
+            android:screenOrientation="unspecified"
+            tools:replace="android:screenOrientation" />
+
         <!-- Persists AppCompat per-app locale choices on Android versions below 13. -->
         <service
             android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
