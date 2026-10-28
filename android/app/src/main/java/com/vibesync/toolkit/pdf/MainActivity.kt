@@ -35,7 +35,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -44,6 +48,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.unit.dp
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -94,6 +99,7 @@ import com.vibesync.toolkit.pdf.presentation.scanner.BookSplitScreen
 import com.vibesync.toolkit.pdf.presentation.tools.IdCardComposerScreen
 import com.vibesync.toolkit.pdf.presentation.tools.IdPhotoMakerScreen
 import com.vibesync.toolkit.pdf.presentation.scanner.ScanHistoryScreen
+import com.vibesync.toolkit.pdf.presentation.settings.ResolutionProfilePreferencePanel
 import com.vibesync.toolkit.pdf.presentation.scanner.ScannerHistoryRepository
 import com.vibesync.toolkit.pdf.presentation.scanner.ScannerHistoryViewModel
 import com.vibesync.toolkit.pdf.presentation.tools.ConvertImagesScreen
@@ -853,12 +859,20 @@ class MainActivity : AppCompatActivity() {
                             onDismissRequest = { showRenameDialog = false },
                             title = { Text("Name your output file") },
                             text = {
-                                OutlinedTextField(
-                                    value = newName,
-                                    onValueChange = { newName = it },
-                                    label = { Text("File name") },
-                                    singleLine = true
-                                )
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    OutlinedTextField(
+                                        value = newName,
+                                        onValueChange = { newName = it },
+                                        label = { Text("File name") },
+                                        singleLine = true
+                                    )
+                                    if (pendingShareMimeType == "application/pdf") {
+                                        ResolutionProfilePreferencePanel(
+                                            modifier = Modifier.fillMaxWidth().height(156.dp),
+                                            testTag = "resolution_profile_export_selector"
+                                        )
+                                    }
+                                }
                             },
                             confirmButton = {
                                 TextButton(onClick = {
