@@ -82,19 +82,17 @@ class PdfOperationsHotfixTest {
                 for (y in 0 until generatedBitmap.height) {
                     for (x in 0 until generatedBitmap.width) {
                         val pixel = generatedBitmap.getPixel(x, y)
+                        val r = Color.red(pixel)
+                        val g = Color.green(pixel)
+                        val b = Color.blue(pixel)
+                        val a = Color.alpha(pixel)
 
-                        // Print the exact value so we can see it in CI if it fails
-                        if (Color.red(pixel) < 240 || Color.green(pixel) < 240 || Color.blue(pixel) < 240) {
-                            println("DEBUG_JPEG_FAIL: Pixel at ($x,$y) is ARGB(${Color.alpha(pixel)},${Color.red(pixel)},${Color.green(pixel)},${Color.blue(pixel)})")
-
-                            assertTrue(
-                                "JPEG pixel ($x,$y) should have a white background (pixel=$pixel).",
-                                Color.red(pixel) >= 240 &&
-                                    Color.green(pixel) >= 240 &&
-                                    Color.blue(pixel) >= 240
-                            )
-                        }
-                        assertEquals(255, Color.alpha(pixel))
+                        // Force the exact failing pixel values into the assertion message itself
+                        assertTrue(
+                            "JPEG pixel ($x,$y) failed white check: ARGB($a,$r,$g,$b). Expected >= 240.",
+                            r >= 240 && g >= 240 && b >= 240
+                        )
+                        assertEquals(255, a)
                     }
                 }
             } finally {
