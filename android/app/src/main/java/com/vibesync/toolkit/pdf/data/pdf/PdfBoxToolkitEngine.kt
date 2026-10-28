@@ -18,10 +18,13 @@ import com.vibesync.toolkit.pdf.data.model.FormFieldItem
 import com.vibesync.toolkit.pdf.data.model.FormFieldType
 import com.vibesync.toolkit.pdf.data.model.PageAnnotations
 import com.tom_roush.pdfbox.cos.COSName
+import com.tom_roush.pdfbox.cos.COSDictionary
 import com.tom_roush.pdfbox.io.MemoryUsageSetting
 import com.tom_roush.pdfbox.multipdf.PDFMergerUtility
+import com.tom_roush.pdfbox.multipdf.PDFCloneUtility
 import com.tom_roush.pdfbox.multipdf.Splitter
 import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.pdmodel.PDResources
 import com.vibesync.toolkit.pdf.R
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
@@ -116,10 +119,9 @@ class PdfBoxToolkitEngine(private val context: Context) {
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
         val tempFiles = mutableListOf<File>()
-        // Imported pages can retain COSStream references owned by source documents.
-        // Keep sources open until the destination has completed save().
-        val sourceDocuments = mutableListOf<PDDocument>()
+        val openDocuments = mutableListOf<PDDocument>()
         val mergedDocument = PDDocument()
+        val resourceCloner = PDFCloneUtility(mergedDocument)
         try {
             if (sourceUris.isEmpty()) {
                 outputFile.delete()
@@ -130,12 +132,15 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 val tempFile = UriUtils.copyUriToCacheFile(context, uri, "merge_src_")
                 tempFiles.add(tempFile)
                 val sourceDocument = PDDocument.load(tempFile)
-                sourceDocuments.add(sourceDocument)
+                openDocuments.add(sourceDocument)
 
                 for (pageIndex in 0 until sourceDocument.numberOfPages) {
                     val sourcePage = sourceDocument.getPage(pageIndex)
                     val importedPage = mergedDocument.importPage(sourcePage)
-                    sourcePage.resources?.let { importedPage.resources = it }
+                    sourcePage.resources?.let { sourceResources ->
+                        val clonedResources = resourceCloner.cloneForNewDocument(sourceResources.cosObject) as COSDictionary
+                        importedPage.resources = PDResources(clonedResources)
+                    }
                     importedPage.rotation = normalizePageRotation(sourcePage.rotation)
                 }
             }
@@ -152,7 +157,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
             Result.failure(e)
         } finally {
             runCatching { mergedDocument.close() }
-            sourceDocuments.asReversed().forEach { source -> runCatching { source.close() } }
+            openDocuments.asReversed().forEach { source -> runCatching { source.close() } }
             tempFiles.forEach { it.delete() }
         }
     }

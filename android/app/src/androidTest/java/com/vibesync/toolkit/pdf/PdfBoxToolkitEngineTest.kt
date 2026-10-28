@@ -15,6 +15,7 @@ import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
+import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
 import com.tom_roush.pdfbox.pdmodel.encryption.AccessPermission
 import com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy
 import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
@@ -99,28 +100,13 @@ class PdfBoxToolkitEngineTest {
     @Test
     fun testMergeMultiplePdfsWithRotations() = runTest {
         val file1 = File(tempFolder, "doc_rot_90.pdf")
-        PDDocument().use { doc ->
-            val page = PDPage(PDRectangle.LETTER)
-            page.rotation = 90
-            doc.addPage(page)
-            doc.save(file1)
-        }
+        createRotatedImagePdf(file1, PDRectangle.LETTER, 90, Color.RED)
 
         val file2 = File(tempFolder, "doc_rot_180.pdf")
-        PDDocument().use { doc ->
-            val page = PDPage(PDRectangle.A4)
-            page.rotation = 180
-            doc.addPage(page)
-            doc.save(file2)
-        }
+        createRotatedImagePdf(file2, PDRectangle.A4, 180, Color.GREEN)
 
         val file3 = File(tempFolder, "doc_rot_270.pdf")
-        PDDocument().use { doc ->
-            val page = PDPage(PDRectangle.A3)
-            page.rotation = 270
-            doc.addPage(page)
-            doc.save(file3)
-        }
+        createRotatedImagePdf(file3, PDRectangle.A3, 270, Color.BLUE)
 
         val outputFile = File(tempFolder, "merged_rotation_output.pdf")
         val uris = listOf(Uri.fromFile(file1), Uri.fromFile(file2), Uri.fromFile(file3))
@@ -133,6 +119,36 @@ class PdfBoxToolkitEngineTest {
             assertEquals("Page 1 must preserve 90° rotation", 90, mergedDoc.getPage(0).rotation)
             assertEquals("Page 2 must preserve 180° rotation", 180, mergedDoc.getPage(1).rotation)
             assertEquals("Page 3 must preserve 270° rotation", 270, mergedDoc.getPage(2).rotation)
+            for (index in 0 until mergedDoc.numberOfPages) {
+                val resources = mergedDoc.getPage(index).resources
+                val images = resources?.xObjectNames
+                    ?.mapNotNull { name -> resources.getXObject(name) as? PDImageXObject }
+                    .orEmpty()
+                assertTrue(
+                    "Merged page ${index + 1} must retain its embedded source image and watermark",
+                    images.size >= 2
+                )
+            }
+        }
+    }
+
+    private fun createRotatedImagePdf(file: File, pageSize: PDRectangle, rotation: Int, color: Int) {
+        val bitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(color)
+        }
+        try {
+            PDDocument().use { document ->
+                val page = PDPage(pageSize)
+                page.rotation = rotation
+                document.addPage(page)
+                val image = LosslessFactory.createFromImage(document, bitmap)
+                PDPageContentStream(document, page).use { content ->
+                    content.drawImage(image, 36f, 36f, 120f, 120f)
+                }
+                document.save(file)
+            }
+        } finally {
+            if (!bitmap.isRecycled) bitmap.recycle()
         }
     }
 

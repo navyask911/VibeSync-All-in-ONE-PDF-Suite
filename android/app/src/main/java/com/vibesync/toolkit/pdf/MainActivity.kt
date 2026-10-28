@@ -22,8 +22,6 @@ import android.graphics.pdf.PdfRenderer
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.Bundle
-import android.widget.EditText
-import android.widget.LinearLayout
 import android.widget.Toast
 import java.io.File
 import androidx.appcompat.app.AppCompatActivity
@@ -31,10 +29,6 @@ import androidx.fragment.app.FragmentActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.ui.platform.ComposeView
-import androidx.lifecycle.setViewTreeLifecycleOwner
-import androidx.lifecycle.setViewTreeViewModelStoreOwner
-import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -50,6 +44,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -98,7 +93,6 @@ import com.vibesync.toolkit.pdf.presentation.scanner.BookSplitEntryScreen
 import com.vibesync.toolkit.pdf.presentation.scanner.BookSplitScreen
 import com.vibesync.toolkit.pdf.presentation.tools.IdCardComposerScreen
 import com.vibesync.toolkit.pdf.presentation.tools.IdPhotoMakerScreen
-import com.vibesync.toolkit.pdf.presentation.settings.ResolutionProfilePreferencePanel
 import com.vibesync.toolkit.pdf.presentation.scanner.ScanHistoryScreen
 import com.vibesync.toolkit.pdf.presentation.scanner.ScannerHistoryRepository
 import com.vibesync.toolkit.pdf.presentation.scanner.ScannerHistoryViewModel
@@ -131,6 +125,12 @@ class MainActivity : AppCompatActivity() {
     private var offlinePromptVisible by mutableStateOf(false)
     private var internetAvailable by mutableStateOf(false)
     private var activeRoute by mutableStateOf("dashboard")
+    private var pendingShareFiles by mutableStateOf<List<File>>(emptyList())
+    private var showRenameDialog by mutableStateOf(false)
+    private var pendingShareMimeType by mutableStateOf("application/pdf")
+    private var pendingShareExtension by mutableStateOf(".pdf")
+    private var pendingShareDefaultBaseName by mutableStateOf("document")
+    private var pendingShareForceMultiple by mutableStateOf(false)
     private var reviewEligibilityRevision by mutableStateOf(0)
     private var updateCheckInProgress = false
     private var updateFlowStarted = false
@@ -847,6 +847,49 @@ class MainActivity : AppCompatActivity() {
                             dismissButton = { TextButton(onClick = { dismissOfflinePrompt() }) { Text(getString(R.string.not_now)) } }
                         )
                     }
+                    if (showRenameDialog) {
+                        var newName by remember { mutableStateOf(pendingShareDefaultBaseName) }
+                        AlertDialog(
+                            onDismissRequest = { showRenameDialog = false },
+                            title = { Text("Name your output file") },
+                            text = {
+                                OutlinedTextField(
+                                    value = newName,
+                                    onValueChange = { newName = it },
+                                    label = { Text("File name") },
+                                    singleLine = true
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    showRenameDialog = false
+                                    val requested = sanitizeOutputBaseName(newName, pendingShareDefaultBaseName)
+                                    val filesToRename = pendingShareFiles
+                                    val extension = pendingShareExtension
+                                    val mimeType = pendingShareMimeType
+                                    val forceMultiple = pendingShareForceMultiple
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        val renamedFiles = renameOutputFiles(filesToRename, requested, extension)
+                                        withContext(Dispatchers.Main) {
+                                            if (isFinishing || isDestroyed) return@withContext
+                                            if (renamedFiles.isEmpty()) {
+                                                Toast.makeText(
+                                                    this@MainActivity,
+                                                    getString(R.string.error_rename_output_files),
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                                return@withContext
+                                            }
+                                            shareRenamedFiles(renamedFiles, mimeType, forceMultiple)
+                                        }
+                                    }
+                                }) { Text("Continue") }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showRenameDialog = false }) { Text("Cancel") }
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -1137,74 +1180,20 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        val extension = when (mimeType) { "image/png" -> ".png"; "image/jpeg" -> ".jpg"; else -> ".pdf" }
-        val defaultName = defaultBaseName.removeSuffix(".pdf").removeSuffix(".png")
-        val input = EditText(this).apply {
-            setText(defaultName)
-            selectAll()
-            hint = getString(R.string.file_name)
-            setSingleLine(true)
+        pendingShareFiles = validFiles
+        pendingShareMimeType = mimeType
+        pendingShareExtension = when (mimeType) {
+            "image/png" -> ".png"
+            "image/jpeg" -> ".jpg"
+            else -> ".pdf"
         }
-
-        var profileSelector: ComposeView? = null
-        val dialogContent = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(input, LinearLayout.LayoutParams(
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-            ))
-            if (mimeType == "application/pdf") {
-                profileSelector = ComposeView(this@MainActivity).apply {
-                    setViewTreeLifecycleOwner(this@MainActivity)
-                    setViewTreeViewModelStoreOwner(this@MainActivity)
-                    setViewTreeSavedStateRegistryOwner(this@MainActivity)
-                    setContent {
-                        VibeSyncPdfTheme {
-                            ResolutionProfilePreferencePanel(
-                                modifier = androidx.compose.ui.Modifier.fillMaxSize(),
-                                testTag = "resolution_profile_export_selector"
-                            )
-                        }
-                    }
-                }
-                addView(requireNotNull(profileSelector), LinearLayout.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                    (156 * resources.displayMetrics.density).toInt()
-                ))
-            }
-        }
-
-        val dialog = android.app.AlertDialog.Builder(this)
-            .setTitle(getString(R.string.output_name_dialog_title))
-            .setMessage(getString(R.string.output_name_dialog_message))
-            .setView(dialogContent)
-            .setNegativeButton(getString(R.string.cancel), null)
-            .setPositiveButton(getString(R.string.continue_label)) { _, _ ->
-                if (isFinishing || isDestroyed) return@setPositiveButton
-                val requested = sanitizeOutputBaseName(input.text?.toString().orEmpty(), defaultName)
-                lifecycleScope.launch(Dispatchers.IO) {
-                    val renamedFiles = renameOutputFiles(validFiles, requested, extension)
-                    launch(Dispatchers.Main) {
-                        if (isFinishing || isDestroyed) return@launch
-                        if (renamedFiles.isEmpty()) {
-                            Toast.makeText(this@MainActivity, getString(R.string.error_rename_output_files), Toast.LENGTH_LONG).show()
-                            return@launch
-                        }
-                        shareRenamedFiles(renamedFiles, mimeType, forceMultiple)
-                    }
-                }
-            }
-            .create()
-        dialog.setOnDismissListener {
-            profileSelector?.disposeComposition()
-            profileSelector = null
-        }
-        if (isFinishing || isDestroyed || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
-            profileSelector?.disposeComposition()
-            profileSelector = null
-            return
-        }
-        dialog.show()
+        pendingShareDefaultBaseName = defaultBaseName
+            .removeSuffix(".pdf")
+            .removeSuffix(".png")
+            .removeSuffix(".jpg")
+            .removeSuffix(".jpeg")
+        pendingShareForceMultiple = forceMultiple
+        showRenameDialog = true
     }
 
     private fun shareRenamedFiles(
@@ -1265,6 +1254,8 @@ class MainActivity : AppCompatActivity() {
             .trim()
             .removeSuffix(".pdf")
             .removeSuffix(".png")
+            .removeSuffix(".jpg")
+            .removeSuffix(".jpeg")
         return cleaned.ifBlank { fallback }.take(80)
     }
 
