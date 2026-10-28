@@ -64,7 +64,7 @@ object IdPhotoExporter {
             uri = resolver.insert(Images.Media.EXTERNAL_CONTENT_URI, values)
                 ?: throw IOException(context.getString(R.string.id_photo_save_failed))
             resolver.openOutputStream(uri, "w")?.use { output ->
-                output.write(jpegBytesWithDpi(bitmap, quality = 88))
+                output.write(jpegBytesWithDpi(bitmap))
             } ?: throw IOException(context.getString(R.string.id_photo_save_failed))
             val published = ContentValues().apply { put(Images.Media.IS_PENDING, 0) }
             resolver.update(uri, published, null, null)
@@ -75,15 +75,17 @@ object IdPhotoExporter {
         }
     }
 
-    internal fun jpegBytesWithDpi(bitmap: Bitmap, quality: Int = 88): ByteArray {
-        // JPEG cannot represent alpha; flatten transparent pixels onto white before encoding.
-        val opaqueBitmap = PdfBitmapUtils.ensureWhiteBackgroundForJpeg(bitmap)
+    internal fun jpegBytesWithDpi(sourceBitmap: Bitmap): ByteArray {
+        val outputStream = ByteArrayOutputStream()
+
+        // Ensure transparent areas are forced onto a solid white canvas before JPEG encoding
+        val opaqueBitmap = com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils.ensureWhiteBackgroundForJpeg(sourceBitmap)
+
         try {
-            val encoded = ByteArrayOutputStream()
-            if (!opaqueBitmap.compress(Bitmap.CompressFormat.JPEG, quality, encoded)) {
+            if (!opaqueBitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)) {
                 throw IOException("Could not encode the JPEG image.")
             }
-            val jpeg = encoded.toByteArray()
+            val jpeg = outputStream.toByteArray()
             require(jpeg.size >= 2 && jpeg[0] == 0xff.toByte() && jpeg[1] == 0xd8.toByte())
             val jfif = byteArrayOf(
                 0xff.toByte(), 0xe0.toByte(), 0x00, 0x10,
@@ -96,7 +98,9 @@ object IdPhotoExporter {
                 jpeg.copyInto(out, 2 + jfif.size, 2)
             }
         } finally {
-            if (opaqueBitmap !== bitmap && !opaqueBitmap.isRecycled) opaqueBitmap.recycle()
+            if (opaqueBitmap !== sourceBitmap && !opaqueBitmap.isRecycled) {
+                opaqueBitmap.recycle()
+            }
         }
     }
 }

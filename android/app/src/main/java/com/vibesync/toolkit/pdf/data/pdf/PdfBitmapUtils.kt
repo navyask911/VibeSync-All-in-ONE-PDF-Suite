@@ -43,11 +43,34 @@ public object PdfBitmapUtils {
         if (source.config == Bitmap.Config.RGB_565) return source // already opaque
 
         val opaqueBitmap = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(opaqueBitmap)
-        canvas.drawColor(Color.WHITE) // Force solid white backing!
-        canvas.drawBitmap(source, 0f, 0f, null)
-        opaqueBitmap.setHasAlpha(false)
-        return opaqueBitmap
+        try {
+            val canvas = Canvas(opaqueBitmap)
+            canvas.drawColor(Color.WHITE) // Force solid white backing!
+            canvas.drawBitmap(source, 0f, 0f, null)
+
+            // Explicitly composite each row as a fallback for encoders that retain RGB=0
+            // under fully transparent pixels. Row buffers bound temporary memory use.
+            val sourceRow = IntArray(source.width)
+            val opaqueRow = IntArray(source.width)
+            for (y in 0 until source.height) {
+                source.getPixels(sourceRow, 0, source.width, 0, y, source.width, 1)
+                for (x in sourceRow.indices) {
+                    val pixel = sourceRow[x]
+                    val alpha = Color.alpha(pixel)
+                    val inverseAlpha = 255 - alpha
+                    val red = (Color.red(pixel) * alpha + 255 * inverseAlpha + 127) / 255
+                    val green = (Color.green(pixel) * alpha + 255 * inverseAlpha + 127) / 255
+                    val blue = (Color.blue(pixel) * alpha + 255 * inverseAlpha + 127) / 255
+                    opaqueRow[x] = Color.rgb(red, green, blue)
+                }
+                opaqueBitmap.setPixels(opaqueRow, 0, source.width, 0, y, source.width, 1)
+            }
+            opaqueBitmap.setHasAlpha(false)
+            return opaqueBitmap
+        } catch (error: Throwable) {
+            if (!opaqueBitmap.isRecycled) opaqueBitmap.recycle()
+            throw error
+        }
     }
 
     private const val DEFAULT_MAX_BITMAP_DIMENSION = 2048
