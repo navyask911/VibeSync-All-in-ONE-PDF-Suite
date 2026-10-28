@@ -12,10 +12,12 @@ import android.print.PrintDocumentInfo
 class PdfPrintDocumentAdapter(
     private val context: android.content.Context,
     private val sourceUri: android.net.Uri,
-    private val displayName: String
+    private val displayName: String,
+    preparedSource: java.io.File? = null
 ) : PrintDocumentAdapter() {
     private val lock = Any()
-    private var stagedSource: java.io.File? = null
+    private val preparedSource: java.io.File? = preparedSource
+    private var stagedSource: java.io.File? = preparedSource
     private var sourceDescriptor: android.os.ParcelFileDescriptor? = null
     private var renderer: android.graphics.pdf.PdfRenderer? = null
     private var printAttributes: PrintAttributes? = null
@@ -25,9 +27,16 @@ class PdfPrintDocumentAdapter(
         synchronized(lock) {
             activeAdapter?.takeIf { it !== this }?.cleanup()
             activeAdapter = this
-            cleanup()
-            stagedSource = stageSource()
-            // Prepare the page count as soon as source staging succeeds; onLayout reports errors.
+            val readySource = preparedSource?.takeIf {
+                it.isFile && it.canRead() && it.length() > 0L
+            }
+            cleanup(preserveStagedSource = readySource != null)
+            stagedSource = readySource ?: stageSource()
+            if (!stagedSource!!.isFile || stagedSource!!.length() <= 0L) {
+                throw java.io.IOException("The print source is empty or unreadable.")
+            }
+            // The launcher validates prepared sources before invoking PrintManager.print().
+            // Layout still revalidates renderer/page-count state via onLayout.
             runCatching { ensureRenderer() }
         }
     }
@@ -216,6 +225,9 @@ class PdfPrintDocumentAdapter(
                     ?: throw java.io.IOException("Unable to open the selected PDF.")
             }
             input.use { source -> java.io.FileOutputStream(file).use { sink -> source.copyTo(sink) } }
+            if (!file.isFile || !file.canRead() || file.length() <= 0L) {
+                throw java.io.IOException("The selected PDF is empty or unreadable.")
+            }
             return file
         } catch (error: Exception) {
             file.delete()
@@ -223,13 +235,15 @@ class PdfPrintDocumentAdapter(
         }
     }
 
-    private fun cleanup() {
+    private fun cleanup(preserveStagedSource: Boolean = false) {
         runCatching { renderer?.close() }
         renderer = null
         runCatching { sourceDescriptor?.close() }
         sourceDescriptor = null
-        runCatching { stagedSource?.delete() }
-        stagedSource = null
+        if (!preserveStagedSource) {
+            runCatching { stagedSource?.delete() }
+            stagedSource = null
+        }
         pageCount = 0
         printAttributes = null
     }

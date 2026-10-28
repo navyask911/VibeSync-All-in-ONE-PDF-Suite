@@ -7,6 +7,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -26,12 +29,15 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.window.Dialog
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
@@ -75,7 +81,14 @@ fun PdfEditorScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Text(stringResource(R.string.editor_annotate_sign), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        text = stringResource(R.string.editor_annotate_sign),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
@@ -161,29 +174,34 @@ fun PdfEditorScreen(
 
                     // Color Palette Selector
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState())
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         val palette = listOf(
-                            Color(0xFFD32F2F), // Crimson Primary
-                            Color(0xFF8E0000), // Deep Ruby
-                            Color(0xFFC62828), // Crimson Dark
-                            Color(0xFFEF5350), // Coral Crimson
-                            Color(0xFF120808), // Dark Onyx
-                            Color(0xFFFFFFFF)  // Clean White
+                            Color(0xFF8F00FF), // Violet
+                            Color(0xFF4B0082), // Indigo
+                            Color(0xFF0000FF), // Blue
+                            Color(0xFF008000), // Green
+                            Color(0xFFFFFF00), // Yellow
+                            Color(0xFFFFA500), // Orange
+                            Color(0xFFFF0000), // Red
+                            Color(0xFF000000)  // Black
                         )
 
                         palette.forEach { color ->
                             Box(
                                 modifier = Modifier
-                                    .padding(horizontal = 6.dp)
+                                    .padding(horizontal = 3.dp)
                                     .size(28.dp)
                                     .clip(CircleShape)
                                     .background(color)
                                     .border(
-                                        width = if (uiState.selectedColor == color) 3.dp else 0.dp,
-                                        color = if (uiState.selectedColor == color) Color.White else Color.Transparent,
+                                        width = if (uiState.selectedColor == color) 3.dp else 1.dp,
+                                        color = if (uiState.selectedColor == color) VibeSyncCrimsonPrimary else Color.Gray,
                                         shape = CircleShape
                                     )
                                     .clickable { viewModel.selectColor(color) }
@@ -201,7 +219,11 @@ fun PdfEditorScreen(
                 .background(Color(0xFFCBD5E1)),
             contentAlignment = Alignment.Center
         ) {
-            val pageBitmapState = produceState<Bitmap?>(initialValue = null, key1 = uiState.currentPageIndex) {
+            val pageBitmapState = produceState<Bitmap?>(
+                initialValue = null,
+                key1 = uiState.currentPageIndex,
+                key2 = uiState.documentLoadedRevision
+            ) {
                 value = viewModel.getPageBitmap(uiState.currentPageIndex)
             }
 
@@ -241,15 +263,36 @@ fun PdfEditorScreen(
                 // Render placed signatures
                 for (sig in uiState.currentSignatures) {
                     sig.bitmap?.let { sigBmp ->
+                        val dragOffset = remember(sig.id) { mutableStateOf(Offset.Zero) }
                         Image(
                             bitmap = sigBmp.asImageBitmap(),
                             contentDescription = stringResource(R.string.editor_placed_signature),
                             modifier = Modifier
-                                .offset { IntOffset(sig.x.roundToInt(), sig.y.roundToInt()) }
+                                .zIndex(1f)
+                                .offset {
+                                    IntOffset(
+                                        (sig.x + dragOffset.value.x).roundToInt(),
+                                        (sig.y + dragOffset.value.y).roundToInt()
+                                    )
+                                }
                                 .size(
                                     width = with(density) { sig.width.toDp() },
                                     height = with(density) { sig.height.toDp() }
                                 )
+                                .pointerInput(sig.id) {
+                                    detectDragGestures(
+                                        onDragEnd = {
+                                            val delta = dragOffset.value
+                                            viewModel.moveSignature(sig.id, delta.x, delta.y)
+                                            dragOffset.value = Offset.Zero
+                                        },
+                                        onDragCancel = { dragOffset.value = Offset.Zero },
+                                        onDrag = { change, dragAmount ->
+                                            change.consume()
+                                            dragOffset.value += dragAmount
+                                        }
+                                    )
+                                }
                         )
                     }
                 }
@@ -289,7 +332,16 @@ fun PdfEditorScreen(
             onDismissRequest = { showSignatureDialog = false },
             onSignatureCaptured = { bitmap ->
                 showSignatureDialog = false
-                viewModel.addSignature(bitmap, x = 120f, y = 300f)
+                val signatureWidthPx = 160f
+                val signatureHeightPx = 80f
+                val pageHeightPx = screenWidthPx * 842f / 595f
+                viewModel.addSignature(
+                    bitmap,
+                    x = ((screenWidthPx - signatureWidthPx) / 2f).coerceAtLeast(0f),
+                    y = ((pageHeightPx - signatureHeightPx) / 2f).coerceAtLeast(0f),
+                    width = signatureWidthPx,
+                    height = signatureHeightPx
+                )
             }
         )
     }

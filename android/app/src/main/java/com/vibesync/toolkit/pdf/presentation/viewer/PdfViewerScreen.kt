@@ -29,6 +29,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.testTag
@@ -39,11 +40,16 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
 import com.vibesync.toolkit.pdf.core.util.BitmapCache
+import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.presentation.common.launchSystemPdfPrint
 import com.vibesync.toolkit.pdf.R
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.sqrt
+import java.io.File
+import java.io.IOException
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,6 +73,7 @@ fun PdfViewerScreen(
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
+    var isPreparingPrint by remember(documentUri) { mutableStateOf(false) }
 
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
@@ -118,24 +125,27 @@ fun PdfViewerScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            uiState.fileName,
+                            text = uiState.fileName,
                             maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold,
-                            modifier = if (isManagedScan) {
+                            modifier = (if (isManagedScan) {
                                 Modifier.clickable {
                                     renamedScanName = uiState.fileName.removeSuffix(".pdf").removeSuffix(".PDF")
                                     showRenameScanDialog = true
                                 }.testTag("viewer_rename_title")
-                            } else Modifier
+                            } else Modifier).fillMaxWidth()
                         )
                         if (uiState.pageCount > 0) {
                             Text(
                                 stringResource(R.string.page_position, uiState.currentPageIndex + 1, uiState.pageCount),
                                 style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                     }
@@ -183,23 +193,46 @@ fun PdfViewerScreen(
                     }
                     IconButton(
                         onClick = {
-                            runCatching {
-                                onLaunchPrint(
-                                    context,
-                                    documentUri,
-                                    context.getString(R.string.print_job_name, uiState.fileName)
-                                )
-                            }.onFailure {
-                                android.widget.Toast.makeText(
-                                    context,
-                                    it.localizedMessage ?: context.getString(R.string.print_failed),
-                                    android.widget.Toast.LENGTH_LONG
-                                ).show()
+                            if (isPreparingPrint) return@IconButton
+                            isPreparingPrint = true
+                            coroutineScope.launch {
+                                var preparedFile: File? = null
+                                try {
+                                    preparedFile = withContext(Dispatchers.IO) {
+                                        UriUtils.copyUriToCacheFile(context, documentUri, "print_ready").also { file ->
+                                            if (!file.isFile || !file.canRead() || file.length() <= 0L) {
+                                                file.delete()
+                                                throw IOException("The selected PDF is not ready for printing.")
+                                            }
+                                        }
+                                    }
+                                    onLaunchPrint(
+                                        context,
+                                        Uri.fromFile(requireNotNull(preparedFile)),
+                                        context.getString(R.string.print_job_name, uiState.fileName)
+                                    )
+                                    // The print adapter takes ownership and deletes this staged file on finish.
+                                    preparedFile = null
+                                } catch (error: Exception) {
+                                    preparedFile?.delete()
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        error.localizedMessage ?: context.getString(R.string.print_failed),
+                                        android.widget.Toast.LENGTH_LONG
+                                    ).show()
+                                } finally {
+                                    isPreparingPrint = false
+                                }
                             }
                         },
+                        enabled = !isPreparingPrint,
                         modifier = Modifier.testTag("viewer_print")
                     ) {
-                        Icon(Icons.Default.Print, contentDescription = stringResource(R.string.print_action))
+                        if (isPreparingPrint) {
+                            CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Print, contentDescription = stringResource(R.string.print_action))
+                        }
                     }
                     ExportMenu(
                         sourceUri = documentUri,

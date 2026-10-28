@@ -28,6 +28,7 @@ import java.util.UUID
 data class EditorUiState(
     val currentPageIndex: Int = 0,
     val totalPages: Int = 1,
+    val documentLoadedRevision: Int = 0,
     val toolMode: ToolMode = ToolMode.PEN,
     val selectedColor: Color = Color(0xFF1A237E),
     val strokeWidth: Float = 6f,
@@ -68,7 +69,10 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         activeDocumentUri = uri
         viewModelScope.launch {
             rendererEngine.openDocument(uri).onSuccess { count ->
-                _uiState.value = _uiState.value.copy(totalPages = count)
+                _uiState.value = _uiState.value.copy(
+                    totalPages = count,
+                    documentLoadedRevision = _uiState.value.documentLoadedRevision + 1
+                )
                 loadPageAnnotations(0)
             }
         }
@@ -219,6 +223,28 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         )
         val updated = _uiState.value.currentSignatures + sig
         _uiState.value = _uiState.value.copy(
+            currentSignatures = updated,
+            canUndo = undoStack.isNotEmpty(),
+            canRedo = redoStack.isNotEmpty()
+        )
+        persistCurrentPageAnnotations()
+    }
+
+    fun moveSignature(signatureId: String, deltaX: Float, deltaY: Float) {
+        if (!deltaX.isFinite() || !deltaY.isFinite() || (deltaX == 0f && deltaY == 0f)) return
+        val current = _uiState.value
+        val targetIndex = current.currentSignatures.indexOfFirst { it.id == signatureId }
+        if (targetIndex < 0) return
+
+        undoStack.add(currentPageAnnotations())
+        redoStack.clear()
+        val updated = current.currentSignatures.toMutableList()
+        val signature = updated[targetIndex]
+        updated[targetIndex] = signature.copy(
+            x = (signature.x + deltaX).coerceAtLeast(0f),
+            y = (signature.y + deltaY).coerceAtLeast(0f)
+        )
+        _uiState.value = current.copy(
             currentSignatures = updated,
             canUndo = undoStack.isNotEmpty(),
             canRedo = redoStack.isNotEmpty()
