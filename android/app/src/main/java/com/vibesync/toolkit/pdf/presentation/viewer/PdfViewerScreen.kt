@@ -1,6 +1,8 @@
 package com.vibesync.toolkit.pdf.presentation.viewer
 
+import android.app.Activity
 import android.content.Context
+import android.print.PrintAttributes
 import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -207,22 +209,29 @@ fun PdfViewerScreen(
                         onClick = {
                             if (isPreparingPrint) return@IconButton
                             isPreparingPrint = true
-                            coroutineScope.launch {
+                            val activity = context as? Activity
+                            if (activity == null) {
+                                isPreparingPrint = false
+                                return@IconButton
+                            }
+                            val jobName = context.getString(R.string.print_job_name, uiState.fileName)
+                            val attributes = PrintAttributes.Builder()
+                                .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+                                .setResolution(PrintAttributes.Resolution("pdf_print", "PDF print", 300, 300))
+                                .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
+                                .build()
+                            val sourceFile = if (documentUri.scheme == "file") documentUri.path?.let(::File) else null
+                            if (sourceFile != null && sourceFile.isFile && sourceFile.canRead() && sourceFile.length() > 0L) {
                                 var preparedFile: File? = null
                                 try {
-                                    preparedFile = withContext(Dispatchers.IO) {
-                                        UriUtils.copyUriToCacheFile(context, documentUri, "print_ready").also { file ->
-                                            if (!file.isFile || !file.canRead() || file.length() <= 0L) {
-                                                file.delete()
-                                                throw IOException("The selected PDF is not ready for printing.")
-                                            }
+                                    preparedFile = UriUtils.copyUriToCacheFile(context, documentUri, "print_ready").also { file ->
+                                        if (!file.isFile || !file.canRead() || file.length() <= 0L) {
+                                            file.delete()
+                                            throw IOException("The selected PDF is not ready for printing.")
                                         }
                                     }
-                                    onLaunchPrint(
-                                        context,
-                                        Uri.fromFile(requireNotNull(preparedFile)),
-                                        context.getString(R.string.print_job_name, uiState.fileName)
-                                    )
+                                    viewModel.setPreparedPrintFile(preparedFile)
+                                    viewModel.printDocument(activity, jobName, attributes)
                                     preparedFile = null
                                 } catch (error: Exception) {
                                     preparedFile?.delete()
@@ -233,6 +242,32 @@ fun PdfViewerScreen(
                                     ).show()
                                 } finally {
                                     isPreparingPrint = false
+                                }
+                            } else {
+                                coroutineScope.launch {
+                                    var preparedFile: File? = null
+                                    try {
+                                        preparedFile = withContext(Dispatchers.IO) {
+                                            UriUtils.copyUriToCacheFile(context, documentUri, "print_ready").also { file ->
+                                                if (!file.isFile || !file.canRead() || file.length() <= 0L) {
+                                                    file.delete()
+                                                    throw IOException("The selected PDF is not ready for printing.")
+                                                }
+                                            }
+                                        }
+                                        viewModel.setPreparedPrintFile(requireNotNull(preparedFile))
+                                        viewModel.printDocument(activity, jobName, attributes)
+                                        preparedFile = null
+                                    } catch (error: Exception) {
+                                        preparedFile?.delete()
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            error.localizedMessage ?: context.getString(R.string.print_failed),
+                                            android.widget.Toast.LENGTH_LONG
+                                        ).show()
+                                    } finally {
+                                        isPreparingPrint = false
+                                    }
                                 }
                             }
                         },

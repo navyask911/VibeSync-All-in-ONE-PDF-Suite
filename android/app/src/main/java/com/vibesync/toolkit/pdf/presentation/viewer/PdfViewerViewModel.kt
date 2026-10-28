@@ -1,7 +1,9 @@
 package com.vibesync.toolkit.pdf.presentation.viewer
 
+import android.app.Activity
 import android.app.Application
 import android.net.Uri
+import android.print.PrintAttributes
 import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
@@ -10,6 +12,9 @@ import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.PageMetadata
+import com.vibesync.toolkit.pdf.data.print.AndroidPrintTrigger
+import com.vibesync.toolkit.pdf.data.print.PdfPrintDocumentAdapter
+import com.vibesync.toolkit.pdf.data.print.PrintTrigger
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.data.pdf.PdfRendererEngine
 import kotlinx.coroutines.CancellationException
@@ -40,7 +45,10 @@ data class ViewerUiState(
     val pagesMetadata: List<PageMetadata> = emptyList()
 )
 
-class PdfViewerViewModel(application: Application) : AndroidViewModel(application) {
+class PdfViewerViewModel(
+    application: Application,
+    private val printTrigger: PrintTrigger = AndroidPrintTrigger()
+) : AndroidViewModel(application) {
 
     private val rendererEngine = PdfRendererEngine(application)
     private val toolkitEngine = PdfBoxToolkitEngine(application)
@@ -52,6 +60,19 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
     private var closeJob: Job? = null
     private var loadSequence: Long = 0L
     private var unlockedDocumentFile: File? = null
+    private var preparedPrintFile: File? = null
+
+    fun setPreparedPrintFile(file: File?) {
+        preparedPrintFile = file
+    }
+
+    fun printDocument(activity: Activity, fileName: String, attributes: PrintAttributes) {
+        val file = preparedPrintFile ?: return
+        if (!file.exists() || !file.isFile || !file.canRead() || file.length() == 0L) return
+        val adapter = PdfPrintDocumentAdapter(activity, Uri.fromFile(file), fileName, file)
+        printTrigger.triggerPrint(activity, fileName, adapter, attributes)
+        preparedPrintFile = null
+    }
 
     fun updateFileName(fileName: String) {
         if (fileName.isBlank()) return
