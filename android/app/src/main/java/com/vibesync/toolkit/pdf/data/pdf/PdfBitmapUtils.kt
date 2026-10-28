@@ -33,6 +33,23 @@ public object PdfBitmapUtils {
             throw error
         }
     }
+    /**
+     * Returns an opaque bitmap for JPEG encoding, compositing transparency over solid white.
+     * RGB_565 cannot carry alpha, so it is already safe to encode without copying.
+     */
+    @JvmStatic
+    public fun ensureWhiteBackgroundForJpeg(source: Bitmap): Bitmap {
+        check(!source.isRecycled) { "Cannot flatten a recycled bitmap." }
+        if (source.config == Bitmap.Config.RGB_565) return source // already opaque
+
+        val opaqueBitmap = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(opaqueBitmap)
+        canvas.drawColor(Color.WHITE) // Force solid white backing!
+        canvas.drawBitmap(source, 0f, 0f, null)
+        opaqueBitmap.setHasAlpha(false)
+        return opaqueBitmap
+    }
+
     private const val DEFAULT_MAX_BITMAP_DIMENSION = 2048
 
     /**

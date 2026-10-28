@@ -196,11 +196,19 @@ fun BookSplitScreen(
                             try {
                                 split.pages.forEachIndexed { index, page ->
                                     val file = File(work, "half_${index + 1}.jpg")
-                                    FileOutputStream(file).use { output ->
-                                        if (!page.compress(Bitmap.CompressFormat.JPEG, 95, output)) throw java.io.IOException("Could not encode split page.")
+                                    try {
+                                        val flattenedBitmap = PdfBitmapUtils.ensureWhiteBackgroundForJpeg(page)
+                                        try {
+                                            FileOutputStream(file).use { output ->
+                                                if (!flattenedBitmap.compress(Bitmap.CompressFormat.JPEG, 95, output)) throw java.io.IOException("Could not encode split page.")
+                                            }
+                                        } finally {
+                                            if (flattenedBitmap !== page && !flattenedBitmap.isRecycled) flattenedBitmap.recycle()
+                                        }
+                                        inputFiles.add(file)
+                                    } finally {
+                                        if (!page.isRecycled) page.recycle()
                                     }
-                                    inputFiles.add(file)
-                                    page.recycle()
                                 }
                                 val scans = File(context.filesDir, "scans").apply { mkdirs() }
                                 val output = File(scans, "BookSplit_${System.currentTimeMillis()}.pdf")

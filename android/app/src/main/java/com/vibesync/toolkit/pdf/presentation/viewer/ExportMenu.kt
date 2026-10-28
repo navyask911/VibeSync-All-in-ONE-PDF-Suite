@@ -1,5 +1,6 @@
 package com.vibesync.toolkit.pdf.presentation.viewer
 
+import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
@@ -406,11 +407,16 @@ private fun exportPageJpg(context: Context, sourceUri: Uri, targetUri: Uri, page
     try {
         val bitmap = renderPage(source, pageIndex, password)
         try {
-            context.contentResolver.openOutputStream(targetUri, "wt")?.use { out ->
-                if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)) throw IOException("Could not encode the page as JPG.")
-            } ?: throw IOException("The selected destination could not be opened.")
+            val flattenedBitmap = PdfBitmapUtils.ensureWhiteBackgroundForJpeg(bitmap)
+            try {
+                context.contentResolver.openOutputStream(targetUri, "wt")?.use { out ->
+                    if (!flattenedBitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)) throw IOException("Could not encode the page as JPG.")
+                } ?: throw IOException("The selected destination could not be opened.")
+            } finally {
+                if (flattenedBitmap !== bitmap && !flattenedBitmap.isRecycled) flattenedBitmap.recycle()
+            }
         } finally {
-            bitmap.recycle()
+            if (!bitmap.isRecycled) bitmap.recycle()
         }
     } finally {
         source.delete()
@@ -450,11 +456,16 @@ internal suspend fun buildJpgPagesZip(
                 exportCoroutineContext.ensureActive()
                 val bitmap = renderPage(source, index, null)
                 try {
-                    zip.putNextEntry(ZipEntry(String.format(Locale.ROOT, "page_%03d.jpg", index + 1)))
-                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 92, zip)) throw IOException("Could not encode a page as JPG.")
-                    zip.closeEntry()
+                    val flattenedBitmap = PdfBitmapUtils.ensureWhiteBackgroundForJpeg(bitmap)
+                    try {
+                        zip.putNextEntry(ZipEntry(String.format(Locale.ROOT, "page_%03d.jpg", index + 1)))
+                        if (!flattenedBitmap.compress(Bitmap.CompressFormat.JPEG, 92, zip)) throw IOException("Could not encode a page as JPG.")
+                        zip.closeEntry()
+                    } finally {
+                        if (flattenedBitmap !== bitmap && !flattenedBitmap.isRecycled) flattenedBitmap.recycle()
+                    }
                 } finally {
-                    bitmap.recycle()
+                    if (!bitmap.isRecycled) bitmap.recycle()
                 }
                 onProgress(index + 1, count)
             }

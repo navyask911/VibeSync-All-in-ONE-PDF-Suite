@@ -1,5 +1,6 @@
 package com.vibesync.toolkit.pdf
 
+import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -903,8 +904,13 @@ class MainActivity : AppCompatActivity() {
                                     }
                                     page.render(bitmap, Rect(0, 0, width, height), matrix, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
                                     val output = UriUtils.createExportCacheFile(this@MainActivity, "document_page_${pageIndex + 1}", ".jpg")
-                                    java.io.FileOutputStream(output).use { stream ->
-                                        if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)) throw java.io.IOException("Could not encode page JPEG.")
+                                    val flattenedBitmap = PdfBitmapUtils.ensureWhiteBackgroundForJpeg(bitmap)
+                                    try {
+                                        java.io.FileOutputStream(output).use { stream ->
+                                            if (!flattenedBitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)) throw java.io.IOException("Could not encode page JPEG.")
+                                        }
+                                    } finally {
+                                        if (flattenedBitmap !== bitmap && !flattenedBitmap.isRecycled) flattenedBitmap.recycle()
                                     }
                                     generated += output
                                 } finally {

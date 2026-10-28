@@ -1,5 +1,6 @@
 package com.vibesync.toolkit.pdf.presentation.scanner
 
+import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
@@ -219,10 +220,15 @@ class ScannerHistoryRepository(private val scansDirectory: File) {
                                     ".jpg",
                                     outputDirectory
                                 )
-                                FileOutputStream(output).use { stream ->
-                                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)) {
-                                        throw IOException("Could not export page " + (pageIndex + 1) + " as JPEG.")
+                                val flattenedBitmap = PdfBitmapUtils.ensureWhiteBackgroundForJpeg(bitmap)
+                                try {
+                                    FileOutputStream(output).use { stream ->
+                                        if (!flattenedBitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)) {
+                                            throw IOException("Could not export page " + (pageIndex + 1) + " as JPEG.")
+                                        }
                                     }
+                                } finally {
+                                    if (flattenedBitmap !== bitmap && !flattenedBitmap.isRecycled) flattenedBitmap.recycle()
                                 }
                                 generatedFiles.add(output)
                             } finally {

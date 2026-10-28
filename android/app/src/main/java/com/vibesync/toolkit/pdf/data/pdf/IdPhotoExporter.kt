@@ -77,7 +77,7 @@ object IdPhotoExporter {
 
     internal fun jpegBytesWithDpi(bitmap: Bitmap, quality: Int = 88): ByteArray {
         // JPEG cannot represent alpha; flatten transparent pixels onto white before encoding.
-        val opaqueBitmap = flattenBitmapOnWhiteBackground(bitmap)
+        val opaqueBitmap = PdfBitmapUtils.ensureWhiteBackgroundForJpeg(bitmap)
         try {
             val encoded = ByteArrayOutputStream()
             if (!opaqueBitmap.compress(Bitmap.CompressFormat.JPEG, quality, encoded)) {
@@ -96,7 +96,7 @@ object IdPhotoExporter {
                 jpeg.copyInto(out, 2 + jfif.size, 2)
             }
         } finally {
-            if (!opaqueBitmap.isRecycled) opaqueBitmap.recycle()
+            if (opaqueBitmap !== bitmap && !opaqueBitmap.isRecycled) opaqueBitmap.recycle()
         }
     }
 }

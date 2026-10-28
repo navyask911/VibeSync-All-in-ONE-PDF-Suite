@@ -219,11 +219,16 @@ class PdfCompressor(private val context: Context) {
     }
 
     private fun encodeJpeg(bitmap: Bitmap, quality: Int): ByteArray {
-        val output = ByteArrayOutputStream()
-        if (!bitmap.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), output)) {
-            throw IOException("Unable to encode a PDF page as JPEG.")
+        val flattenedBitmap = PdfBitmapUtils.ensureWhiteBackgroundForJpeg(bitmap)
+        try {
+            val output = ByteArrayOutputStream()
+            if (!flattenedBitmap.compress(Bitmap.CompressFormat.JPEG, quality.coerceIn(1, 100), output)) {
+                throw IOException("Unable to encode a PDF page as JPEG.")
+            }
+            return output.toByteArray()
+        } finally {
+            if (flattenedBitmap !== bitmap && !flattenedBitmap.isRecycled) flattenedBitmap.recycle()
         }
-        return output.toByteArray()
     }
 
     /** Preflight keeps each decoded page within one quarter of the available memory. */
