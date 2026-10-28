@@ -1,4 +1,4 @@
-package com.vibesync.toolkit.pdf.data.print
+package com.vibesync.toolkit.pdf.presentation.common
 
 import android.app.Activity
 import android.content.Context

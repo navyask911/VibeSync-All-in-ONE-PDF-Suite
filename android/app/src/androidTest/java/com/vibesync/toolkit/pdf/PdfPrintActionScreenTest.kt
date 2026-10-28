@@ -1,7 +1,6 @@
 package com.vibesync.toolkit.pdf
 
 import android.app.Activity
-import android.app.Application
 import android.content.Context
 import android.net.Uri
 import android.print.PrintAttributes
@@ -15,7 +14,7 @@ import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
-import com.vibesync.toolkit.pdf.data.print.PrintTrigger
+import com.vibesync.toolkit.pdf.presentation.common.PrintTrigger
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
 import org.junit.Assert.assertEquals
@@ -32,8 +31,7 @@ class PdfPrintActionScreenTest {
     @Test
     fun printActionDispatchesA4Color300DpiAttributes() {
         val context = ApplicationProvider.getApplicationContext<Context>()
-        val application = ApplicationProvider.getApplicationContext<Application>()
-        PDFBoxResourceLoader.init(context)
+                PDFBoxResourceLoader.init(context)
         val work = File(context.cacheDir, "print-viewer-ui-" + System.nanoTime()).apply { mkdirs() }
         val source = File(work, "viewer-print.pdf")
         createPdf(source)
@@ -51,7 +49,10 @@ class PdfPrintActionScreenTest {
         }
 
         try {
-            val viewModel = PdfViewerViewModel(application, printTrigger = fakeTrigger)
+            val viewModel = PdfViewerViewModel(
+                application = ApplicationProvider.getApplicationContext(),
+                printTrigger = fakeTrigger
+            )
             composeRule.setContent {
                 VibeSyncPdfTheme {
                     PdfViewerScreen(

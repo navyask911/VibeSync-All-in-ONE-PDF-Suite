@@ -12,9 +12,9 @@ import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.PageMetadata
-import com.vibesync.toolkit.pdf.data.print.AndroidPrintTrigger
+import com.vibesync.toolkit.pdf.presentation.common.AndroidPrintTrigger
 import com.vibesync.toolkit.pdf.data.print.PdfPrintDocumentAdapter
-import com.vibesync.toolkit.pdf.data.print.PrintTrigger
+import com.vibesync.toolkit.pdf.presentation.common.PrintTrigger
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.data.pdf.PdfRendererEngine
 import kotlinx.coroutines.CancellationException

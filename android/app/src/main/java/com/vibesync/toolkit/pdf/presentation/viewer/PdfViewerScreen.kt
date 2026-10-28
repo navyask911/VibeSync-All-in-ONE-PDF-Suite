@@ -1,6 +1,7 @@
 package com.vibesync.toolkit.pdf.presentation.viewer
 
 import android.app.Activity
+import android.content.ContextWrapper
 import android.content.Context
 import android.print.PrintAttributes
 import android.net.Uri
@@ -209,7 +210,9 @@ fun PdfViewerScreen(
                         onClick = {
                             if (isPreparingPrint) return@IconButton
                             isPreparingPrint = true
-                            val activity = context as? Activity
+                            val activity = generateSequence(context) { (it as? ContextWrapper)?.baseContext }
+                                .filterIsInstance<Activity>()
+                                .firstOrNull()
                             if (activity == null) {
                                 isPreparingPrint = false
                                 return@IconButton
