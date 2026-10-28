@@ -48,7 +48,7 @@ class PdfPrintActionScreenTest {
         val source = File(work, "viewer-print.pdf")
         createPdf(source)
 
-        val printDispatched = CountDownLatch(1)
+        val printFinished = CountDownLatch(1)
         val dispatchCount = AtomicInteger(0)
         val dispatchedJobName = AtomicReference<String?>()
         val dispatchedAdapter = AtomicReference<PdfPrintDocumentAdapter?>()
@@ -68,7 +68,6 @@ class PdfPrintActionScreenTest {
                                 dispatchedJobName.set(submittedName)
                                 dispatchedAdapter.set(adapter as? PdfPrintDocumentAdapter)
                                 dispatchedAttributes.set(attributes)
-                                printDispatched.countDown()
                                 null
                             }
                         }
@@ -77,8 +76,11 @@ class PdfPrintActionScreenTest {
             }
 
             composeRule.onNodeWithTag("viewer_print").performClick()
-            val dispatchCompleted = printDispatched.await(30, TimeUnit.SECONDS)
-            assertTrue("Print dispatch callback did not complete within 30 seconds.", dispatchCompleted)
+            // The print dispatcher is invoked after source staging and captures the actual adapter.
+            // Compose actions finish synchronously; use the latch for the adapter's terminal callback below.
+            composeRule.runOnIdle {
+                assertEquals("Print dispatch must happen exactly once.", 1, dispatchCount.get())
+            }
 
             val attributes = requireNotNull(dispatchedAttributes.get())
             val adapter = requireNotNull(dispatchedAdapter.get())
@@ -120,6 +122,9 @@ class PdfPrintActionScreenTest {
                     assertEquals(1, renderer.pageCount)
                 }
             }
+            adapter.onFinish()
+            printFinished.countDown()
+            assertTrue("Print adapter lifecycle did not complete within 30 seconds.", printFinished.await(30, TimeUnit.SECONDS))
         } finally {
             dispatchedAdapter.get()?.onFinish()
             work.deleteRecursively()
