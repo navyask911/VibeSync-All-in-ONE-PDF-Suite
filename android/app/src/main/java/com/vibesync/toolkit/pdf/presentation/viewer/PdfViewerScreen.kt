@@ -125,8 +125,9 @@ fun PdfViewerScreen(
         topBar = {
             TopAppBar(
                 title = {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
                             text = uiState.fileName,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -147,6 +148,7 @@ fun PdfViewerScreen(
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
+                        }
                         }
                     }
                 },
