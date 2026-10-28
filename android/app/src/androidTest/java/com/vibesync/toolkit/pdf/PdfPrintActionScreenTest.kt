@@ -30,6 +30,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
@@ -46,6 +48,7 @@ class PdfPrintActionScreenTest {
         val source = File(work, "viewer-print.pdf")
         createPdf(source)
 
+        val printDispatched = CountDownLatch(1)
         val dispatchCount = AtomicInteger(0)
         val dispatchedJobName = AtomicReference<String?>()
         val dispatchedAdapter = AtomicReference<PdfPrintDocumentAdapter?>()
@@ -65,6 +68,7 @@ class PdfPrintActionScreenTest {
                                 dispatchedJobName.set(submittedName)
                                 dispatchedAdapter.set(adapter as? PdfPrintDocumentAdapter)
                                 dispatchedAttributes.set(attributes)
+                                printDispatched.countDown()
                                 null
                             }
                         }
@@ -73,9 +77,8 @@ class PdfPrintActionScreenTest {
             }
 
             composeRule.onNodeWithTag("viewer_print").performClick()
-            composeRule.waitUntil(timeoutMillis = 30_000) {
-                dispatchedAdapter.get() != null && dispatchedAttributes.get() != null && !dispatchedJobName.get().isNullOrBlank()
-            }
+            val dispatchCompleted = printDispatched.await(30, TimeUnit.SECONDS)
+            assertTrue("Print dispatch callback did not complete within 30 seconds.", dispatchCompleted)
 
             val attributes = requireNotNull(dispatchedAttributes.get())
             val adapter = requireNotNull(dispatchedAdapter.get())
