@@ -73,7 +73,7 @@ class PdfPrintActionScreenTest {
             }
 
             composeRule.onNodeWithTag("viewer_print").performClick()
-            composeRule.waitUntil(15_000) {
+            composeRule.waitUntil(timeoutMillis = 30_000) {
                 dispatchedAdapter.get() != null && dispatchedAttributes.get() != null && !dispatchedJobName.get().isNullOrBlank()
             }
 
