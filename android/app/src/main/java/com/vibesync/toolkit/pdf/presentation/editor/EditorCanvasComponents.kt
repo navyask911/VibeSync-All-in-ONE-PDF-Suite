@@ -85,7 +85,8 @@ fun VectorCanvasOverlay(
                                 points = activePoints,
                                 colorArgb = strokeColor.toArgb(),
                                 strokeWidth = strokeWidth,
-                                isHighlighter = activeToolMode == ToolMode.HIGHLIGHTER
+                                isHighlighter = activeToolMode == ToolMode.HIGHLIGHTER,
+                                alpha = if (activeToolMode == ToolMode.HIGHLIGHTER) 0.35f else 1.0f
                             )
                         )
                     }
@@ -133,7 +134,7 @@ fun VectorCanvasOverlay(
         Canvas(modifier = inputModifier.fillMaxSize()) {
         existingStrokes.forEach { stroke ->
             val points = stroke.points
-            val width = if (stroke.isHighlighter) stroke.strokeWidth * 2.5f else stroke.strokeWidth
+            val width = stroke.strokeWidth
             val color = Color(stroke.colorArgb).copy(alpha = stroke.alpha)
             for (index in 1 until points.size) {
                 drawLine(
@@ -153,7 +154,7 @@ fun VectorCanvasOverlay(
             } else {
                 strokeColor
             }
-            val width = if (activeToolMode == ToolMode.HIGHLIGHTER) strokeWidth * 2.5f else strokeWidth
+            val width = strokeWidth
             for (index in 1 until active.size) {
                 drawLine(
                     color = color,

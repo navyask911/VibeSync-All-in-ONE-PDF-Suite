@@ -707,7 +707,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
                             annotations.strokes.filter { it.isHighlighter }.forEach { stroke ->
                                 if (stroke.points.size >= 2) {
                                     val gs = PDExtendedGraphicsState().apply {
-                                        strokingAlphaConstant = 0.35f
+                                        strokingAlphaConstant = stroke.alpha.coerceIn(0f, 1f)
                                     }
                                     cs.setGraphicsStateParameters(gs)
                                     val r = Color.red(stroke.colorArgb) / 255f
@@ -733,7 +733,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
                             annotations.strokes.filter { !it.isHighlighter }.forEach { stroke ->
                                 if (stroke.points.size >= 2) {
                                     val gs = PDExtendedGraphicsState().apply {
-                                        strokingAlphaConstant = 1.0f
+                                        strokingAlphaConstant = stroke.alpha.coerceIn(0f, 1f)
                                     }
                                     cs.setGraphicsStateParameters(gs)
                                     val r = Color.red(stroke.colorArgb) / 255f

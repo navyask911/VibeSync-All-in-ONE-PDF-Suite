@@ -10,6 +10,7 @@ import com.vibesync.toolkit.pdf.data.print.PdfPrintDocumentAdapter
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import java.io.File
 import java.io.IOException
+import java.io.RandomAccessFile
 
 /** Opens Android's system print UI with A4, color, 300 DPI and no duplex as the defaults. */
 @Volatile private var activeSystemPrintJob: PrintJob? = null
@@ -42,6 +43,11 @@ fun launchSystemPdfPrint(
     try {
         if (!printReadyFile.isFile || !printReadyFile.canRead() || printReadyFile.length() <= 0L) {
             throw IOException("The selected PDF is empty or unreadable; printing was not started.")
+        }
+        // Complete the disk write before calling PrintManager; non-empty cache entries alone are not enough.
+        RandomAccessFile(printReadyFile, "rw").use { it.fd.sync() }
+        if (!printReadyFile.isFile || !printReadyFile.canRead() || printReadyFile.length() <= 0L) {
+            throw IOException("The selected PDF changed while it was being prepared for printing.")
         }
         val printManager = if (printDispatcher == null) {
             context.getSystemService(Context.PRINT_SERVICE) as? PrintManager

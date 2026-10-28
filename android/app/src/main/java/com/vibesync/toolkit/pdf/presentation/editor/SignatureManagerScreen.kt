@@ -5,6 +5,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,6 +48,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -56,6 +59,7 @@ import androidx.compose.ui.unit.dp
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.security.SecurityVault
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
 @Composable
 fun SignatureManagerScreen(
@@ -76,6 +80,8 @@ fun SignatureManagerScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var offsetX by remember { mutableStateOf(24f) }
     var offsetY by remember { mutableStateOf(24f) }
+    var placementZoom by remember { mutableStateOf(1f) }
+    var placementPan by remember { mutableStateOf(Offset.Zero) }
     var sizeScale by remember { mutableStateOf(1f) }
     var rotationDegrees by remember { mutableStateOf(0f) }
 
@@ -95,6 +101,8 @@ fun SignatureManagerScreen(
         offsetY = 24f
         sizeScale = 1f
         rotationDegrees = 0f
+        placementZoom = 1f
+        placementPan = Offset.Zero
     }
 
     DisposableEffect(Unit) {
@@ -152,24 +160,96 @@ fun SignatureManagerScreen(
             if (preview != null && previewImageBitmap != null && !preview.isRecycled) {
                 Text(stringResource(R.string.signature_manager_drag_hint), style = MaterialTheme.typography.bodySmall)
                 Box(
-                    modifier = Modifier.fillMaxWidth().height(180.dp).background(MaterialTheme.colorScheme.surfaceVariant).testTag("signature_placement_canvas")
-                ) {
-                    Image(
-                        bitmap = previewImageBitmap,
-                        contentDescription = stringResource(R.string.signature_manager_select),
-                        modifier = Modifier
-                            .offset(x = offsetX.dp, y = offsetY.dp)
-                            .size(width = (160f * sizeScale).dp, height = (80f * sizeScale).dp)
-                            .graphicsLayer(rotationZ = rotationDegrees)
-                            .pointerInput(preview, density) {
-                                detectDragGestures { change, dragAmount ->
-                                    change.consume()
-                                    offsetX = (offsetX + dragAmount.x / density).coerceIn(0f, 220f)
-                                    offsetY = (offsetY + dragAmount.y / density).coerceIn(0f, 95f)
-                                }
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .testTag("signature_placement_canvas")
+                        .pointerInput(preview) {
+                            awaitEachGesture {
+                                awaitFirstDown(requireUnconsumed = false)
+                                var previousCentroid: Offset? = null
+                                var previousDistance = 0f
+                                var previousPointerCount = 0
+                                do {
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                    val pressed = event.changes.filter { it.pressed }
+                                    if (pressed.isEmpty()) break
+                                    val centroid = Offset(
+                                        pressed.map { it.position.x }.average().toFloat(),
+                                        pressed.map { it.position.y }.average().toFloat()
+                                    )
+                                    val distance = if (pressed.size > 1) {
+                                        sqrt(pressed.sumOf { change ->
+                                            val dx = (change.position.x - centroid.x).toDouble()
+                                            val dy = (change.position.y - centroid.y).toDouble()
+                                            dx * dx + dy * dy
+                                        } / pressed.size).toFloat()
+                                    } else 0f
+
+                                    val priorCentroid = previousCentroid
+                                    if (priorCentroid != null &&
+                                        previousPointerCount == pressed.size &&
+                                        (pressed.size > 1 || placementZoom > 1f)
+                                    ) {
+                                        val pan = centroid - priorCentroid
+                                        val zoomFactor = if (pressed.size > 1 && previousDistance > 0f) {
+                                            distance / previousDistance
+                                        } else 1f
+                                        val previousScale = placementZoom
+                                        val nextScale = (previousScale * zoomFactor).coerceIn(1f, 5f)
+                                        val scaleFactor = nextScale / previousScale
+                                        placementZoom = nextScale
+                                        if (nextScale > 1f) {
+                                            val focusX = centroid.x - size.width / 2f
+                                            val focusY = centroid.y - size.height / 2f
+                                            val maxOffsetX = size.width * (nextScale - 1f) / 2f
+                                            val maxOffsetY = size.height * (nextScale - 1f) / 2f
+                                            placementPan = Offset(
+                                                ((placementPan.x - focusX) * scaleFactor + focusX + pan.x)
+                                                    .coerceIn(-maxOffsetX, maxOffsetX),
+                                                ((placementPan.y - focusY) * scaleFactor + focusY + pan.y)
+                                                    .coerceIn(-maxOffsetY, maxOffsetY)
+                                            )
+                                        } else {
+                                            placementPan = Offset.Zero
+                                        }
+                                        event.changes.forEach { it.consume() }
+                                    }
+                                    previousCentroid = centroid
+                                    previousDistance = distance
+                                    previousPointerCount = pressed.size
+                                } while (event.changes.any { it.pressed })
                             }
-                            .testTag("signature_placement_preview")
-                    )
+                        }
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .graphicsLayer(
+                                scaleX = placementZoom,
+                                scaleY = placementZoom,
+                                translationX = placementPan.x,
+                                translationY = placementPan.y
+                            )
+                    ) {
+                        Image(
+                            bitmap = previewImageBitmap,
+                            contentDescription = stringResource(R.string.signature_manager_select),
+                            modifier = Modifier
+                                .offset(x = offsetX.dp, y = offsetY.dp)
+                                .size(width = (160f * sizeScale).dp, height = (80f * sizeScale).dp)
+                                .graphicsLayer(rotationZ = rotationDegrees)
+                                .pointerInput(preview, density) {
+                                    detectDragGestures { change, dragAmount ->
+                                        change.consume()
+                                        offsetX = (offsetX + dragAmount.x / density).coerceIn(0f, 220f)
+                                        offsetY = (offsetY + dragAmount.y / density).coerceIn(0f, 95f)
+                                    }
+                                }
+                                .testTag("signature_placement_preview")
+                        )
+                    }
                 }
                 Text(stringResource(R.string.signature_manager_size), style = MaterialTheme.typography.labelMedium)
                 Slider(

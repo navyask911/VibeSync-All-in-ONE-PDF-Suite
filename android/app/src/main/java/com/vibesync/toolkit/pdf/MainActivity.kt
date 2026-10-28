@@ -58,6 +58,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.core.os.LocaleListCompat
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -133,6 +134,10 @@ class MainActivity : AppCompatActivity() {
     private var activeRoute by mutableStateOf("dashboard")
     private var pendingShareFiles by mutableStateOf<List<File>>(emptyList())
     private var showRenameDialog by mutableStateOf(false)
+    private var showDocumentRenameDialog by mutableStateOf(false)
+    private var pendingDocumentRenameUri by mutableStateOf<Uri?>(null)
+    private var pendingDocumentRenameRoute by mutableStateOf("viewer")
+    private var pendingDocumentRenameName by mutableStateOf("")
     private var pendingShareMimeType by mutableStateOf("application/pdf")
     private var pendingShareExtension by mutableStateOf(".pdf")
     private var pendingShareDefaultBaseName by mutableStateOf("document")
@@ -626,6 +631,12 @@ class MainActivity : AppCompatActivity() {
                                 documentUri = decodedUri,
                                 viewModel = viewerViewModel,
                                 onNavigateBack = { navController.popBackStack() },
+                                onRenameClick = { currentName ->
+                                    pendingDocumentRenameUri = decodedUri
+                                    pendingDocumentRenameRoute = "viewer"
+                                    pendingDocumentRenameName = currentName
+                                    showDocumentRenameDialog = true
+                                },
                                 onNavigateToEditor = { uri ->
                                     val enc = encodeUriRoute(uri)
                                     navController.navigate("editor/$enc")
@@ -689,6 +700,12 @@ class MainActivity : AppCompatActivity() {
                                 documentUri = decodedUri,
                                 viewModel = editorViewModel,
                                 onNavigateBack = { navController.popBackStack() },
+                                onRenameClick = { currentName ->
+                                    pendingDocumentRenameUri = decodedUri
+                                    pendingDocumentRenameRoute = "editor"
+                                    pendingDocumentRenameName = currentName
+                                    showDocumentRenameDialog = true
+                                },
                                 onExportComplete = { savedFile ->
                                     recordSuccessfulPdfOperation()
                                     shareFiles(listOf(savedFile), "application/pdf", "VibeSync_Edit_Signed")
@@ -853,6 +870,60 @@ class MainActivity : AppCompatActivity() {
                             dismissButton = { TextButton(onClick = { dismissOfflinePrompt() }) { Text(getString(R.string.not_now)) } }
                         )
                     }
+                    if (showDocumentRenameDialog) {
+                        var newDocumentName by remember(pendingDocumentRenameUri, pendingDocumentRenameName) {
+                            mutableStateOf(pendingDocumentRenameName.removeSuffix(".pdf").removeSuffix(".PDF"))
+                        }
+                        AlertDialog(
+                            onDismissRequest = { showDocumentRenameDialog = false },
+                            title = { Text("Rename document") },
+                            text = {
+                                OutlinedTextField(
+                                    value = newDocumentName,
+                                    onValueChange = { newDocumentName = it },
+                                    label = { Text("File name") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth().testTag("document_rename_field")
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    enabled = newDocumentName.isNotBlank(),
+                                    onClick = {
+                                        val sourceUri = pendingDocumentRenameUri
+                                        val route = pendingDocumentRenameRoute
+                                        showDocumentRenameDialog = false
+                                        if (sourceUri != null) {
+                                            renamePdfDocument(sourceUri, newDocumentName.trim()) { renamedUri, displayName ->
+                                                if (renamedUri != sourceUri) {
+                                                    val encoded = encodeUriRoute(renamedUri)
+                                                    if (route == "editor") {
+                                                        navController.navigate("viewer/$encoded") {
+                                                            popUpTo("viewer/{encodedUri}") { inclusive = true }
+                                                            launchSingleTop = true
+                                                        }
+                                                        navController.navigate("editor/$encoded") { launchSingleTop = true }
+                                                    } else {
+                                                        navController.navigate("viewer/$encoded") {
+                                                            popUpTo("viewer/{encodedUri}") { inclusive = true }
+                                                            launchSingleTop = true
+                                                        }
+                                                    }
+                                                } else {
+                                                    viewerViewModel.updateFileName(displayName)
+                                                    editorViewModel.updateFileName(displayName)
+                                                }
+                                            }
+                                        }
+                                    }
+                                ) { Text("Save") }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showDocumentRenameDialog = false }) { Text("Cancel") }
+                            }
+                        )
+                    }
+
                     if (showRenameDialog) {
                         var newName by remember { mutableStateOf(pendingShareDefaultBaseName) }
                         AlertDialog(
@@ -991,7 +1062,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun renamePdfDocument(uri: Uri, requestedName: String) {
+    private fun renamePdfDocument(
+        uri: Uri,
+        requestedName: String,
+        onRenamed: (Uri, String) -> Unit = { _, _ -> }
+    ) {
         if (scannerHistoryViewModel.isManagedScanUri(uri)) {
             val file = scannerHistoryRepository.fileFromUri(uri)
             if (file == null) {
@@ -1000,10 +1075,11 @@ class MainActivity : AppCompatActivity() {
             }
             scannerHistoryViewModel.renameScan(file, requestedName) { result ->
                 runOnUiThread {
-                    result.onSuccess {
+                    result.onSuccess { renamedFile ->
                         Toast.makeText(this, getString(R.string.document_rename_success), Toast.LENGTH_SHORT).show()
                         dashboardViewModel.refreshCurrentSource()
                         dashboardViewModel.refreshRecentDocuments()
+                        onRenamed(Uri.fromFile(renamedFile), renamedFile.name)
                     }.onFailure { error ->
                         Toast.makeText(this, error.localizedMessage ?: getString(R.string.document_action_failed), Toast.LENGTH_LONG).show()
                     }
@@ -1051,6 +1127,7 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this@MainActivity, getString(R.string.document_rename_success), Toast.LENGTH_SHORT).show()
                     dashboardViewModel.updateRecentDocument(uri, renamedUri, newName)
                     dashboardViewModel.refreshCurrentSource()
+                    onRenamed(renamedUri, newName)
                 }.onFailure { error ->
                     Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.document_action_failed), Toast.LENGTH_LONG).show()
                 }

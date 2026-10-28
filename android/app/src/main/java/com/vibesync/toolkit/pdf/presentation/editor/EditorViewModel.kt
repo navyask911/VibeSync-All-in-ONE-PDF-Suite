@@ -22,16 +22,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.UUID
 
 data class EditorUiState(
+    val fileName: String = "document.pdf",
     val currentPageIndex: Int = 0,
     val totalPages: Int = 1,
     val documentLoadedRevision: Int = 0,
     val toolMode: ToolMode = ToolMode.PEN,
     val selectedColor: Color = Color(0xFF1A237E),
-    val strokeWidth: Float = 6f,
+    val strokeWidth: Float = 8f,
     val currentStrokes: List<VectorStroke> = emptyList(),
     val currentTextAnnotations: List<TextAnnotation> = emptyList(),
     val currentSignatures: List<SignatureAnnotation> = emptyList(),
@@ -53,6 +55,8 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private val toolkitEngine = PdfBoxToolkitEngine(application)
     private val securityVault by lazy { SecurityVault(getApplication<Application>()) }
     private val temporarySignatureBitmaps = mutableSetOf<Bitmap>()
+    private var penStrokeWidth = 8f
+    private var highlighterStrokeWidth = 24f
 
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
@@ -68,8 +72,17 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     fun initEditor(uri: Uri) {
         activeDocumentUri = uri
         viewModelScope.launch {
+            val app = getApplication<Application>()
+            val fileName = withContext(Dispatchers.IO) {
+                runCatching { UriUtils.getFileName(app, uri) }
+                    .getOrNull()
+                    ?.takeIf { it.isNotBlank() }
+            } ?: uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+                ?: app.getString(R.string.default_pdf_filename)
+
             rendererEngine.openDocument(uri).onSuccess { count ->
                 _uiState.value = _uiState.value.copy(
+                    fileName = fileName,
                     totalPages = count,
                     documentLoadedRevision = _uiState.value.documentLoadedRevision + 1
                 )
@@ -83,7 +96,13 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun selectTool(mode: ToolMode) {
-        _uiState.value = _uiState.value.copy(toolMode = mode)
+        val current = _uiState.value
+        val width = when (mode) {
+            ToolMode.PEN -> penStrokeWidth
+            ToolMode.HIGHLIGHTER -> highlighterStrokeWidth
+            else -> current.strokeWidth
+        }
+        _uiState.value = current.copy(toolMode = mode, strokeWidth = width)
     }
 
     fun selectColor(color: Color) {
@@ -91,7 +110,19 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun setStrokeWidth(width: Float) {
-        _uiState.value = _uiState.value.copy(strokeWidth = width)
+        if (!width.isFinite() || width <= 0f) return
+        val safeWidth = width.coerceIn(1f, 64f)
+        when (_uiState.value.toolMode) {
+            ToolMode.PEN -> penStrokeWidth = safeWidth
+            ToolMode.HIGHLIGHTER -> highlighterStrokeWidth = safeWidth
+            else -> Unit
+        }
+        _uiState.value = _uiState.value.copy(strokeWidth = safeWidth)
+    }
+
+    fun updateFileName(fileName: String) {
+        if (fileName.isBlank()) return
+        _uiState.value = _uiState.value.copy(fileName = fileName)
     }
 
     fun addStroke(stroke: VectorStroke) {

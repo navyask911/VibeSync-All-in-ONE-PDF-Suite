@@ -2,7 +2,11 @@ package com.vibesync.toolkit.pdf.presentation.viewer
 
 import android.content.Context
 import android.net.Uri
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -30,6 +34,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.testTag
@@ -51,7 +57,7 @@ import kotlin.math.sqrt
 import java.io.File
 import java.io.IOException
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun PdfViewerScreen(
     documentUri: Uri,
@@ -67,7 +73,8 @@ fun PdfViewerScreen(
     onDeleteScan: () -> Unit = {},
     onLaunchPrint: (Context, Uri, String) -> Unit = { printContext, uri, jobName ->
         launchSystemPdfPrint(printContext, uri, jobName)
-    }
+    },
+    onRenameClick: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
@@ -123,68 +130,71 @@ fun PdfViewerScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(modifier = Modifier.fillMaxWidth()) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
+            Column {
+                TopAppBar(
+                    title = {
+                        Text(
                             text = uiState.fileName,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .fillMaxWidth(0.85f)
+                                .basicMarquee(iterations = Int.MAX_VALUE)
+                                .clickable { onRenameClick(uiState.fileName) }
+                                .testTag("viewer_rename_title"),
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = (if (isManagedScan) {
-                                Modifier.clickable {
-                                    renamedScanName = uiState.fileName.removeSuffix(".pdf").removeSuffix(".PDF")
-                                    showRenameScanDialog = true
-                                }.testTag("viewer_rename_title")
-                            } else Modifier).fillMaxWidth()
+                            fontWeight = FontWeight.Bold
                         )
-                        if (uiState.pageCount > 0) {
-                            Text(
-                                stringResource(R.string.page_position, uiState.currentPageIndex + 1, uiState.pageCount),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
                         }
-                        }
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-                actions = {
+                    },
+                    actions = {}
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     IconButton(
                         onClick = {
                             scale = (scale / 1.25f).coerceAtLeast(1f)
-                            if (scale <= 1f) {
-                                offsetX = 0f
-                                offsetY = 0f
-                            }
+                            if (scale <= 1f) { offsetX = 0f; offsetY = 0f }
                         },
                         enabled = scale > 1f
-                    ) {
-                        Icon(Icons.Default.ZoomOut, contentDescription = stringResource(R.string.reset_zoom))
-                    }
-                    IconButton(onClick = {
-                        scale = (scale * 1.25f).coerceAtMost(4f)
-                    }) {
+                    ) { Icon(Icons.Default.ZoomOut, contentDescription = stringResource(R.string.reset_zoom)) }
+                    IconButton(onClick = { scale = (scale * 1.25f).coerceAtMost(5f) }) {
                         Icon(Icons.Default.ZoomIn, contentDescription = stringResource(R.string.reset_zoom))
                     }
                     if (scale > 1.05f) {
-                        IconButton(onClick = {
-                            scale = 1f
-                            offsetX = 0f
-                            offsetY = 0f
-                        }) {
+                        IconButton(onClick = { scale = 1f; offsetX = 0f; offsetY = 0f }) {
                             Icon(Icons.Default.ZoomOutMap, contentDescription = stringResource(R.string.reset_zoom))
                         }
                     }
-                    // Saved scans get dedicated export/manage actions; other documents keep standard sharing.
+                    IconButton(
+                        onClick = {
+                            val target = (uiState.currentPageIndex - 1).coerceAtLeast(0)
+                            viewModel.onPageScrolled(target)
+                            coroutineScope.launch { listState.scrollToItem(target) }
+                        },
+                        enabled = uiState.currentPageIndex > 0
+                    ) { Icon(Icons.Default.NavigateBefore, contentDescription = "Previous page") }
+                    Text(
+                        stringResource(R.string.page_position, uiState.currentPageIndex + 1, uiState.pageCount),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    IconButton(
+                        onClick = {
+                            val target = (uiState.currentPageIndex + 1).coerceAtMost(uiState.pageCount - 1)
+                            viewModel.onPageScrolled(target)
+                            coroutineScope.launch { listState.scrollToItem(target) }
+                        },
+                        enabled = uiState.pageCount > 0 && uiState.currentPageIndex < uiState.pageCount - 1
+                    ) { Icon(Icons.Default.NavigateNext, contentDescription = "Next page") }
                     if (!isManagedScan) {
                         IconButton(onClick = onShareDocument) {
                             Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share_pdf), tint = VibeSyncCrimsonPrimary)
@@ -213,7 +223,6 @@ fun PdfViewerScreen(
                                         Uri.fromFile(requireNotNull(preparedFile)),
                                         context.getString(R.string.print_job_name, uiState.fileName)
                                     )
-                                    // The print adapter takes ownership and deletes this staged file on finish.
                                     preparedFile = null
                                 } catch (error: Exception) {
                                     preparedFile?.delete()
@@ -230,17 +239,10 @@ fun PdfViewerScreen(
                         enabled = !isPreparingPrint,
                         modifier = Modifier.testTag("viewer_print")
                     ) {
-                        if (isPreparingPrint) {
-                            CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                        } else {
-                            Icon(Icons.Default.Print, contentDescription = stringResource(R.string.print_action))
-                        }
+                        if (isPreparingPrint) CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                        else Icon(Icons.Default.Print, contentDescription = stringResource(R.string.print_action))
                     }
-                    ExportMenu(
-                        sourceUri = documentUri,
-                        currentPageIndex = uiState.currentPageIndex,
-                        testTag = "viewer_export_menu"
-                    )
+                    ExportMenu(sourceUri = documentUri, currentPageIndex = uiState.currentPageIndex, testTag = "viewer_export_menu")
                     if (isManagedScan) {
                         Box {
                             IconButton(onClick = { scanMenuExpanded = true }) {
@@ -280,7 +282,7 @@ fun PdfViewerScreen(
                         }
                     }
                 }
-            )
+            }
         },
         bottomBar = {
             if (uiState.pageCount > 1) {
@@ -359,7 +361,7 @@ fun PdfViewerScreen(
                                 val shouldHandleGesture = scale > 1f || pressed.size > 1
                                 if (shouldHandleGesture) {
                                     val previousScale = scale
-                                    val nextScale = (previousScale * zoomFactor).coerceIn(1f, 4f)
+                                    val nextScale = (previousScale * zoomFactor).coerceIn(1f, 5f)
                                     val scaleFactor = nextScale / previousScale
                                     scale = nextScale
                                     if (nextScale > 1f) {
@@ -461,6 +463,28 @@ fun PdfViewerScreen(
                             documentKey = documentUri.toString()
                         )
                     }
+                }
+            }
+        }
+    }
+
+    if (isPreparingPrint) {
+        Dialog(
+            onDismissRequest = {},
+            properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Row(
+                    modifier = Modifier.padding(24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CircularProgressIndicator(color = VibeSyncCrimsonPrimary)
+                    Text("Preparing PDF for printing…", style = MaterialTheme.typography.bodyLarge)
                 }
             }
         }

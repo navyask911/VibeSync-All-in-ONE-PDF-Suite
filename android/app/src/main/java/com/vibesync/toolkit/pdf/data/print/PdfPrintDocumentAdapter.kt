@@ -224,7 +224,13 @@ class PdfPrintDocumentAdapter(
                 context.contentResolver.openInputStream(sourceUri)
                     ?: throw java.io.IOException("Unable to open the selected PDF.")
             }
-            input.use { source -> java.io.FileOutputStream(file).use { sink -> source.copyTo(sink) } }
+            input.use { source ->
+                java.io.FileOutputStream(file).use { sink ->
+                    source.copyTo(sink)
+                    sink.flush()
+                    sink.fd.sync()
+                }
+            }
             if (!file.isFile || !file.canRead() || file.length() <= 0L) {
                 throw java.io.IOException("The selected PDF is empty or unreadable.")
             }

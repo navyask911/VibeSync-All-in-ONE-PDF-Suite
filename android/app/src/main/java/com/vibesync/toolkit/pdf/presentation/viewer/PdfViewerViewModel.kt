@@ -53,6 +53,11 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
     private var loadSequence: Long = 0L
     private var unlockedDocumentFile: File? = null
 
+    fun updateFileName(fileName: String) {
+        if (fileName.isBlank()) return
+        _uiState.value = _uiState.value.copy(fileName = fileName)
+    }
+
     /**
      * Every request owns one sequence number. Only the newest request may publish UI state;
      * cancellation and a request's finally block must never overwrite a later document.

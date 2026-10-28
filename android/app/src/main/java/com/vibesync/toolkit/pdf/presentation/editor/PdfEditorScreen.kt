@@ -3,7 +3,11 @@ package com.vibesync.toolkit.pdf.presentation.editor
 import android.app.Activity
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.basicMarquee
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,6 +33,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -46,14 +51,16 @@ import com.vibesync.toolkit.pdf.data.model.ToolMode
 import com.vibesync.toolkit.pdf.presentation.monetization.AdMobManager
 import java.io.File
 import kotlin.math.roundToInt
+import kotlin.math.sqrt
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun PdfEditorScreen(
     documentUri: Uri,
     viewModel: EditorViewModel,
     onNavigateBack: () -> Unit,
-    onExportComplete: (File) -> Unit
+    onExportComplete: (File) -> Unit,
+    onRenameClick: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -65,6 +72,8 @@ fun PdfEditorScreen(
     var pendingTapOffset by remember { mutableStateOf(Offset.Zero) }
     var textInputState by remember { mutableStateOf("") }
     var screenWidthPx by remember { mutableFloatStateOf(1080f) }
+    var scale by remember(documentUri) { mutableFloatStateOf(1f) }
+    var offset by remember(documentUri) { mutableStateOf(Offset.Zero) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(documentUri) {
@@ -79,54 +88,101 @@ fun PdfEditorScreen(
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(modifier = Modifier.fillMaxWidth()) {
+            Column {
+                TopAppBar(
+                    title = {
                         Text(
-                            text = stringResource(R.string.editor_annotate_sign),
+                            text = uiState.fileName,
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                            modifier = Modifier
+                                .fillMaxWidth(0.85f)
+                                .basicMarquee(iterations = Int.MAX_VALUE)
+                                .clickable { onRenameClick(uiState.fileName) }
+                                .testTag("editor_rename_title"),
                             style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
+                            fontWeight = FontWeight.Bold
                         )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
+                        }
+                    },
+                    actions = {
+                        IconButton(
+                            onClick = {
+                                viewModel.saveFlattenedDocument(screenWidthPx) { savedFile ->
+                                    (context as? Activity)?.let { activity ->
+                                        AdMobManager.showInterstitial(activity) {
+                                            onExportComplete(savedFile)
+                                        }
+                                    } ?: onExportComplete(savedFile)
+                                }
+                            },
+                            enabled = !uiState.isSaving
+                        ) {
+                            if (uiState.isSaving) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = VibeSyncCrimsonPrimary,
+                                    strokeWidth = 2.dp
+                                )
+                            } else {
+                                Icon(Icons.Default.Check, contentDescription = stringResource(R.string.editor_flatten_save))
+                            }
+                        }
                     }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
-                    }
-                },
-                actions = {
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     IconButton(onClick = { viewModel.undo() }, enabled = uiState.canUndo) {
                         Icon(Icons.Default.Undo, contentDescription = stringResource(R.string.editor_undo))
                     }
                     IconButton(onClick = { viewModel.redo() }, enabled = uiState.canRedo) {
                         Icon(Icons.Default.Redo, contentDescription = stringResource(R.string.editor_redo))
                     }
-                    IconButton(onClick = { showSignatureManagerDialog = true }, modifier = Modifier.testTag("editor_saved_signatures")) {
-                        Icon(Icons.Default.Draw, contentDescription = stringResource(R.string.signature_manager_title))
-                    }
-                    Button(
-                        onClick = {
-                            viewModel.saveFlattenedDocument(screenWidthPx) { savedFile ->
-                                (context as? Activity)?.let { activity ->
-                                    AdMobManager.showInterstitial(activity) {
-                                        onExportComplete(savedFile)
-                                    }
-                                } ?: onExportComplete(savedFile)
-                            }
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
+                    IconButton(
+                        onClick = { viewModel.setPage((uiState.currentPageIndex - 1).coerceAtLeast(0)) },
+                        enabled = uiState.currentPageIndex > 0
                     ) {
-                        if (uiState.isSaving) {
-                            CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
-                        } else {
-                            Text(stringResource(R.string.editor_flatten_save))
+                        Icon(Icons.Default.NavigateBefore, contentDescription = "Previous page")
+                    }
+                    Text(
+                        stringResource(R.string.page_position, uiState.currentPageIndex + 1, uiState.totalPages),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    IconButton(
+                        onClick = { viewModel.setPage((uiState.currentPageIndex + 1).coerceAtMost(uiState.totalPages - 1)) },
+                        enabled = uiState.currentPageIndex < uiState.totalPages - 1
+                    ) {
+                        Icon(Icons.Default.NavigateNext, contentDescription = "Next page")
+                    }
+                    IconButton(
+                        onClick = { scale = (scale / 1.25f).coerceAtLeast(1f).also { if (it == 1f) offset = Offset.Zero } },
+                        enabled = scale > 1f
+                    ) {
+                        Icon(Icons.Default.ZoomOut, contentDescription = "Zoom out")
+                    }
+                    IconButton(onClick = { scale = (scale * 1.25f).coerceAtMost(5f) }) {
+                        Icon(Icons.Default.ZoomIn, contentDescription = "Zoom in")
+                    }
+                    if (scale > 1f) {
+                        IconButton(onClick = { scale = 1f; offset = Offset.Zero }) {
+                            Icon(Icons.Default.ZoomOutMap, contentDescription = "Reset zoom")
                         }
                     }
+                    IconButton(
+                        onClick = { showSignatureManagerDialog = true },
+                        modifier = Modifier.testTag("editor_saved_signatures")
+                    ) {
+                        Icon(Icons.Default.Draw, contentDescription = stringResource(R.string.signature_manager_title))
+                    }
                 }
-            )
+            }
         },
         bottomBar = {
             Surface(
@@ -209,6 +265,25 @@ fun PdfEditorScreen(
                                     .clickable { viewModel.selectColor(color) }
                             )
                         }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+                        if (uiState.toolMode == ToolMode.PEN || uiState.toolMode == ToolMode.HIGHLIGHTER) {
+                            val strokeSizes = if (uiState.toolMode == ToolMode.HIGHLIGHTER) {
+                                listOf(16f, 24f, 32f)
+                            } else {
+                                listOf(4f, 8f, 16f)
+                            }
+                            val strokeLabels = listOf("Thin", "Medium", "Thick")
+                            Text("Size", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            strokeSizes.forEachIndexed { index, width ->
+                                FilterChip(
+                                    selected = uiState.strokeWidth == width,
+                                    onClick = { viewModel.setStrokeWidth(width) },
+                                    label = { Text(strokeLabels[index], fontSize = 11.sp) },
+                                    modifier = Modifier.testTag("editor_stroke_size_${strokeLabels[index].lowercase()}")
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -218,7 +293,57 @@ fun PdfEditorScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(Color(0xFFCBD5E1)),
+                .background(Color(0xFFCBD5E1))
+                .pointerInput(documentUri) {
+                    awaitEachGesture {
+                        awaitFirstDown(requireUnconsumed = false)
+                        var previousCentroid: Offset? = null
+                        var previousDistance = 0f
+                        var previousPointerCount = 0
+                        do {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val pressed = event.changes.filter { it.pressed }
+                            if (pressed.isEmpty()) break
+                            val centroid = Offset(
+                                pressed.map { it.position.x }.average().toFloat(),
+                                pressed.map { it.position.y }.average().toFloat()
+                            )
+                            val distance = if (pressed.size > 1) {
+                                sqrt(pressed.sumOf { change ->
+                                    val dx = (change.position.x - centroid.x).toDouble()
+                                    val dy = (change.position.y - centroid.y).toDouble()
+                                    dx * dx + dy * dy
+                                } / pressed.size).toFloat()
+                            } else 0f
+
+                            val priorCentroid = previousCentroid
+                            if (priorCentroid != null && previousPointerCount == pressed.size &&
+                                (pressed.size > 1 || scale > 1f)
+                            ) {
+                                val pan = centroid - priorCentroid
+                                val zoomFactor = if (pressed.size > 1 && previousDistance > 0f) {
+                                    distance / previousDistance
+                                } else 1f
+                                val nextScale = (scale * zoomFactor).coerceIn(1f, 5f)
+                                scale = nextScale
+                                if (nextScale > 1f) {
+                                    val maxOffsetX = screenWidthPx * (nextScale - 1f) / 2f
+                                    val maxOffsetY = screenWidthPx * (842f / 595f) * (nextScale - 1f) / 2f
+                                    offset = Offset(
+                                        (offset.x + pan.x).coerceIn(-maxOffsetX, maxOffsetX),
+                                        (offset.y + pan.y).coerceIn(-maxOffsetY, maxOffsetY)
+                                    )
+                                } else {
+                                    offset = Offset.Zero
+                                }
+                                event.changes.forEach { it.consume() }
+                            }
+                            previousCentroid = centroid
+                            previousDistance = distance
+                            previousPointerCount = pressed.size
+                        } while (event.changes.any { it.pressed })
+                    }
+                },
             contentAlignment = Alignment.Center
         ) {
             val pageBitmapState = produceState<Bitmap?>(
@@ -237,6 +362,12 @@ fun PdfEditorScreen(
                     .testTag("editor_pdf_page") // Standard A4 Aspect Ratio
                     .shadow(8.dp, RoundedCornerShape(4.dp))
                     .background(Color.White)
+                    .graphicsLayer(
+                        scaleX = scale,
+                        scaleY = scale,
+                        translationX = offset.x,
+                        translationY = offset.y
+                    )
                     .onGloballyPositioned { coordinates ->
                         screenWidthPx = coordinates.size.width.toFloat()
                     }
