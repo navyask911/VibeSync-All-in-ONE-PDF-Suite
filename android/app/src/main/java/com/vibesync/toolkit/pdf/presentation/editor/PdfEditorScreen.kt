@@ -265,23 +265,57 @@ fun PdfEditorScreen(
                                     .clickable { viewModel.selectColor(color) }
                             )
                         }
+                    }
 
-                        Spacer(modifier = Modifier.width(8.dp))
-                        if (uiState.toolMode == ToolMode.PEN || uiState.toolMode == ToolMode.HIGHLIGHTER) {
-                            val strokeSizes = if (uiState.toolMode == ToolMode.HIGHLIGHTER) {
-                                listOf(16f, 24f, 32f)
-                            } else {
-                                listOf(4f, 8f, 16f)
-                            }
-                            val strokeLabels = listOf("Thin", "Medium", "Thick")
-                            Text("Size", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                            strokeSizes.forEachIndexed { index, width ->
-                                FilterChip(
-                                    selected = uiState.strokeWidth == width,
-                                    onClick = { viewModel.setStrokeWidth(width) },
-                                    label = { Text(strokeLabels[index], fontSize = 11.sp) },
-                                    modifier = Modifier.testTag("editor_stroke_size_${strokeLabels[index].lowercase()}")
-                                )
+                    if (uiState.toolMode == ToolMode.PEN || uiState.toolMode == ToolMode.HIGHLIGHTER) {
+                        val strokeSizes = if (uiState.toolMode == ToolMode.HIGHLIGHTER) {
+                            listOf(16f, 24f, 32f)
+                        } else {
+                            listOf(4f, 8f, 16f)
+                        }
+                        val strokeLabels = listOf("Thin", "Medium", "Thick")
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(48.dp)
+                                .testTag("editor_stroke_size_surface"),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                strokeSizes.forEachIndexed { index, width ->
+                                    val selected = uiState.strokeWidth == width
+                                    Column(
+                                        modifier = Modifier.weight(1f),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        IconButton(
+                                            onClick = { viewModel.setStrokeWidth(width) },
+                                            modifier = Modifier
+                                                .size(32.dp)
+                                                .testTag("editor_stroke_size_${strokeLabels[index].lowercase()}")
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Create,
+                                                contentDescription = "${strokeLabels[index]} stroke",
+                                                modifier = Modifier.size(listOf(14.dp, 20.dp, 26.dp)[index]),
+                                                tint = if (selected) VibeSyncCrimsonPrimary
+                                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Text(
+                                            strokeLabels[index],
+                                            fontSize = 10.sp,
+                                            color = if (selected) VibeSyncCrimsonPrimary
+                                                else MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -453,7 +487,9 @@ fun PdfEditorScreen(
                             pendingTapOffset = offset
                             showTextInputDialog = true
                         }
-                    }
+                    },
+                    zoomScale = scale,
+                    panOffset = offset
                 )
             }
         }

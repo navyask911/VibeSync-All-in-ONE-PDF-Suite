@@ -23,6 +23,15 @@ import java.io.File
 class PdfPrintViewModelTest {
 
     @Test
+    fun viewModelFactoryCanInstantiatePdfViewerViewModel() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val viewModel = androidx.lifecycle.ViewModelProvider.AndroidViewModelFactory
+            .getInstance(app)
+            .create(PdfViewerViewModel::class.java)
+        assertNotNull("ViewModelProvider reflection must succeed", viewModel)
+    }
+
+    @Test
     fun printActionDispatchesA4Color300DpiAttributes() {
         val application = ApplicationProvider.getApplicationContext<Application>()
         val captured = mutableListOf<Triple<String, PrintDocumentAdapter, PrintAttributes>>()

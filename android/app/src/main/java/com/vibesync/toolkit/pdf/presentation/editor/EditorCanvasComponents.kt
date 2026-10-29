@@ -50,7 +50,9 @@ fun VectorCanvasOverlay(
     existingStrokes: List<VectorStroke>,
     onStrokeAdded: (VectorStroke) -> Unit,
     onTap: (Offset) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    zoomScale: Float = 1f,
+    panOffset: Offset = Offset.Zero
 ) {
     var activePoints by remember { mutableStateOf<List<Point2D>>(emptyList()) }
     var eraserEnabled by remember { mutableStateOf(toolMode == ToolMode.ERASER) }
@@ -63,20 +65,31 @@ fun VectorCanvasOverlay(
         else -> toolMode
     }
     val eraserRadiusPx = with(LocalDensity.current) { 8.dp.toPx() }
+    val safeZoomScale = zoomScale.coerceAtLeast(0.001f)
+
+    fun toCanvasPoint(touchOffset: Offset): Point2D {
+        val bitmapX = (touchOffset.x - panOffset.x) / safeZoomScale
+        val bitmapY = (touchOffset.y - panOffset.y) / safeZoomScale
+        return Point2D(bitmapX, bitmapY)
+    }
 
     val inputModifier = when (activeToolMode) {
-        ToolMode.TEXT -> modifier.pointerInput(Unit) {
-            detectTapGestures { offset -> onTap(offset) }
+        ToolMode.TEXT -> modifier.pointerInput(zoomScale, panOffset) {
+            detectTapGestures { touchOffset ->
+                val point = toCanvasPoint(touchOffset)
+                onTap(Offset(point.x, point.y))
+            }
         }
-        ToolMode.PEN, ToolMode.HIGHLIGHTER -> modifier.pointerInput(activeToolMode, strokeColor, strokeWidth) {
+        ToolMode.PEN, ToolMode.HIGHLIGHTER -> modifier.pointerInput(
+            activeToolMode, strokeColor, strokeWidth, zoomScale, panOffset
+        ) {
             detectDragGestures(
-                onDragStart = { offset ->
-                    activePoints = listOf(Point2D(offset.x, offset.y))
+                onDragStart = { touchOffset ->
+                    activePoints = listOf(toCanvasPoint(touchOffset))
                 },
                 onDrag = { change, _ ->
                     change.consume()
-                    val position = change.position
-                    activePoints = activePoints + Point2D(position.x, position.y)
+                    activePoints = activePoints + toCanvasPoint(change.position)
                 },
                 onDragEnd = {
                     if (activePoints.size >= 2) {
@@ -97,10 +110,12 @@ fun VectorCanvasOverlay(
                 }
             )
         }
-        ToolMode.ERASER -> modifier.pointerInput(activeToolMode, eraserRadiusPx, onStrokeAdded) {
+        ToolMode.ERASER -> modifier.pointerInput(
+            activeToolMode, eraserRadiusPx, onStrokeAdded, zoomScale, panOffset
+        ) {
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
-                val pathPoints = mutableListOf(Point2D(down.position.x, down.position.y))
+                val pathPoints = mutableListOf(toCanvasPoint(down.position))
                 var lastPosition = down.position
                 down.consume()
 
@@ -109,7 +124,7 @@ fun VectorCanvasOverlay(
                     val change = event.changes.firstOrNull { it.id == down.id }
                     if (change != null) {
                         if (change.position != lastPosition) {
-                            pathPoints.add(Point2D(change.position.x, change.position.y))
+                            pathPoints.add(toCanvasPoint(change.position))
                             lastPosition = change.position
                         }
                         if (change.pressed) change.consume()

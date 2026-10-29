@@ -45,7 +45,7 @@ data class ViewerUiState(
     val pagesMetadata: List<PageMetadata> = emptyList()
 )
 
-class PdfViewerViewModel(
+class PdfViewerViewModel @JvmOverloads constructor(
     application: Application,
     private val printTrigger: PrintTrigger = AndroidPrintTrigger()
 ) : AndroidViewModel(application) {
