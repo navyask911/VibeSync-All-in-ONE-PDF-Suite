@@ -33,6 +33,7 @@ import com.tom_roush.pdfbox.pdmodel.encryption.AccessPermission
 import com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy
 import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
 import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
+import com.tom_roush.pdfbox.pdmodel.graphics.blend.BlendMode
 import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
 import com.tom_roush.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState
 import com.tom_roush.pdfbox.pdmodel.interactive.form.PDAcroForm
@@ -556,9 +557,10 @@ class PdfBoxToolkitEngine(private val context: Context) {
         val watermarkPreferences = context.getSharedPreferences("pdf_watermark_options", Context.MODE_PRIVATE)
         val useCustomOptions = watermarkPreferences.getBoolean("watermark_custom_enabled", false)
         val effectiveText = if (useCustomOptions) {
-            watermarkPreferences.getString("watermark_text", watermarkText)?.takeIf { it.isNotBlank() } ?: watermarkText
+            watermarkPreferences.getString("watermark_text", watermarkText)?.takeIf { it.isNotBlank() }
+                ?: DEFAULT_FOOTER_WATERMARK_TEXT
         } else {
-            watermarkText
+            DEFAULT_FOOTER_WATERMARK_TEXT
         }
         val effectiveOpacity = (if (useCustomOptions) {
             watermarkPreferences.getFloat("watermark_opacity", opacity)
@@ -585,8 +587,8 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 ) {
                     // Android text layout shapes scripts that PDFBox's built-in fonts cannot encode.
                     val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = Color.rgb(142, 0, 0)
-                        typeface = Typeface.create("sans-serif", Typeface.BOLD)
+                        color = Color.rgb(40, 40, 40)
+                        typeface = Typeface.create("sans-serif", Typeface.NORMAL)
                         textSize = 28f
                     }
                     val measuredTextWidth = ceil(paint.measureText(effectiveText)).toInt().coerceAtLeast(1)
@@ -628,15 +630,19 @@ class PdfBoxToolkitEngine(private val context: Context) {
                             for (page in document.pages) {
                                 val mediaBox = page.mediaBox
                                 val maxWidthPt = mediaBox.width * 0.85f
-                                val maxHeightPt = mediaBox.height * 0.72f
-                                val scale = minOf(
-                                    maxWidthPt / watermarkBitmap.width.toFloat().coerceAtLeast(1f),
-                                    maxHeightPt / watermarkBitmap.height.toFloat().coerceAtLeast(1f)
+                                val aspectRatio = watermarkBitmap.width.toFloat() /
+                                    watermarkBitmap.height.toFloat().coerceAtLeast(1f)
+                                val targetHeightPt = minOf(10f, maxWidthPt / aspectRatio)
+                                val targetWidthPt = targetHeightPt * aspectRatio
+                                val footer = FooterWatermarkLayout.topLeft(
+                                    pageWidth = mediaBox.width,
+                                    pageHeight = mediaBox.height,
+                                    watermarkWidth = targetWidthPt,
+                                    watermarkHeight = targetHeightPt,
+                                    margin = 16f
                                 )
-                                val targetWidthPt = watermarkBitmap.width * scale
-                                val targetHeightPt = watermarkBitmap.height * scale
-                                val x = mediaBox.lowerLeftX + (mediaBox.width - targetWidthPt) / 2f
-                                val y = mediaBox.lowerLeftY + (mediaBox.height - targetHeightPt) / 2f
+                                val x = mediaBox.lowerLeftX + footer.x
+                                val y = mediaBox.lowerLeftY + mediaBox.height - footer.topY - targetHeightPt
                                 val graphicsState = PDExtendedGraphicsState().apply {
                                     nonStrokingAlphaConstant = effectiveOpacity
                                     strokingAlphaConstant = effectiveOpacity
@@ -707,9 +713,12 @@ class PdfBoxToolkitEngine(private val context: Context) {
                             annotations.strokes.filter { it.isHighlighter }.forEach { stroke ->
                                 if (stroke.points.size >= 2) {
                                     val gs = PDExtendedGraphicsState().apply {
-                                        strokingAlphaConstant = stroke.alpha.coerceIn(0f, 1f)
+                                        strokingAlphaConstant = 0.35f
+                                        blendMode = BlendMode.MULTIPLY
                                     }
                                     cs.setGraphicsStateParameters(gs)
+                                    cs.setLineCapStyle(1)
+                                    cs.setLineJoinStyle(1)
                                     val r = Color.red(stroke.colorArgb) / 255f
                                     val g = Color.green(stroke.colorArgb) / 255f
                                     val b = Color.blue(stroke.colorArgb) / 255f
@@ -736,6 +745,8 @@ class PdfBoxToolkitEngine(private val context: Context) {
                                         strokingAlphaConstant = stroke.alpha.coerceIn(0f, 1f)
                                     }
                                     cs.setGraphicsStateParameters(gs)
+                                    cs.setLineCapStyle(1)
+                                    cs.setLineJoinStyle(1)
                                     val r = Color.red(stroke.colorArgb) / 255f
                                     val g = Color.green(stroke.colorArgb) / 255f
                                     val b = Color.blue(stroke.colorArgb) / 255f
@@ -915,7 +926,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
 
     private fun applyVibeSyncWatermark(
         document: PDDocument,
-        watermarkText: String = context.getString(R.string.pdf_watermark_text)
+        watermarkText: String = DEFAULT_FOOTER_WATERMARK_TEXT
     ) {
         val documentInfo = document.documentInformation
         if (documentInfo.getCustomMetadataValue(WATERMARK_METADATA_KEY) == WATERMARK_METADATA_VALUE) {
@@ -959,8 +970,15 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 val aspectRatio = bitmap.width.toFloat() / bitmap.height.toFloat().coerceAtLeast(1f)
                 val targetHeightPt = minOf(10f, maxWidthPt / aspectRatio)
                 val targetWidthPt = targetHeightPt * aspectRatio
-                val x = mediaBox.lowerLeftX + (mediaBox.width - targetWidthPt) / 2f
-                val y = mediaBox.lowerLeftY + 6f
+                val footer = FooterWatermarkLayout.topLeft(
+                    pageWidth = mediaBox.width,
+                    pageHeight = mediaBox.height,
+                    watermarkWidth = targetWidthPt,
+                    watermarkHeight = targetHeightPt,
+                    margin = 16f
+                )
+                val x = mediaBox.lowerLeftX + footer.x
+                val y = mediaBox.lowerLeftY + mediaBox.height - footer.topY - targetHeightPt
 
                 PDPageContentStream(
                     document,
@@ -986,14 +1004,16 @@ class PdfBoxToolkitEngine(private val context: Context) {
         try {
             val canvas = Canvas(mutableBitmap)
             val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(150, 142, 0, 0)
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-                textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.035f).coerceIn(10f, 22f)
+                color = Color.argb(150, 40, 40, 40)
+                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.012f).coerceIn(10f, 36f)
             }
 
-            val watermarkText = context.getString(R.string.pdf_watermark_text)
-            val x = mutableBitmap.width / 2f - paint.measureText(watermarkText) / 2f
-            val y = mutableBitmap.height - 10f
+            val watermarkText = DEFAULT_FOOTER_WATERMARK_TEXT
+            val margin = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.015f).coerceAtLeast(16f)
+            val x = (mutableBitmap.width - margin - paint.measureText(watermarkText))
+                .coerceAtLeast(mutableBitmap.width * 0.5f)
+            val y = mutableBitmap.height - margin
             canvas.drawText(watermarkText, x, y, paint)
 
             FileOutputStream(outputFile).use { output ->
@@ -1010,6 +1030,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
     }
 
     companion object {
+        const val DEFAULT_FOOTER_WATERMARK_TEXT = "VibeSync All in ONE PDF Suite"
         private const val TAG = "PdfBoxToolkitEngine"
         private const val WATERMARK_METADATA_KEY = "VibeSync-Watermarked"
         private const val WATERMARK_METADATA_VALUE = "true"

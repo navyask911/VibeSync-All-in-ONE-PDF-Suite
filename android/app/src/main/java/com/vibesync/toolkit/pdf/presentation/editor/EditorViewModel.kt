@@ -222,7 +222,8 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         width: Float = 160f,
         height: Float = 80f,
         rotationDegrees: Float = 0f,
-        saveToVault: Boolean = true
+        saveToVault: Boolean = true,
+        relativeStrokeWidth: Float = 0.025f
     ) {
         // Keep captured signatures discoverable by their stable encrypted identifiers.
         if (saveToVault) {
@@ -250,7 +251,8 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             y = y,
             width = width.coerceAtLeast(1f),
             height = height.coerceAtLeast(1f),
-            bitmap = placedBitmap
+            bitmap = placedBitmap,
+            relativeStrokeWidth = relativeStrokeWidth.coerceIn(0f, 1f)
         )
         val updated = _uiState.value.currentSignatures + sig
         _uiState.value = _uiState.value.copy(

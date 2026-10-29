@@ -6,9 +6,13 @@ import android.print.PrintAttributes
 import android.print.PrintDocumentAdapter
 import androidx.test.core.app.ApplicationProvider
 import com.vibesync.toolkit.pdf.data.print.PdfPrintDocumentAdapter
+import com.vibesync.toolkit.pdf.data.print.copyPdfBytes
+import com.vibesync.toolkit.pdf.data.pdf.FooterWatermarkLayout
+import com.vibesync.toolkit.pdf.presentation.editor.SignatureStrokeMetrics
 import com.vibesync.toolkit.pdf.presentation.common.PrintTrigger
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -29,6 +33,45 @@ class PdfPrintViewModelTest {
             .getInstance(app)
             .create(PdfViewerViewModel::class.java)
         assertNotNull("ViewModelProvider reflection must succeed", viewModel)
+    }
+
+    @Test
+    fun signatureStrokeWidthScalesProportionallyAndHasVisibleMinimum() {
+        val relative = SignatureStrokeMetrics.relativeStrokeWidth(12f, 400f)
+        assertEquals(0.03f, relative, 0.0001f)
+        assertEquals(6f, SignatureStrokeMetrics.scaledStrokeWidth(relative, 160f), 0.001f)
+        assertEquals(12f, SignatureStrokeMetrics.scaledStrokeWidth(0.075f, 160f), 0.001f)
+    }
+
+    @Test
+    fun printByteCopyPreservesNonEmptyPdfBytes() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val source = File.createTempFile("print-copy-test-", ".pdf", app.cacheDir)
+        val original = "%PDF-1.4\\n1 0 obj << /Type /Catalog >> endobj\\n%%EOF".toByteArray()
+        try {
+            source.writeBytes(original)
+            val destination = java.io.ByteArrayOutputStream()
+            copyPdfBytes(source, destination)
+            assertTrue(destination.size() > 0)
+            assertArrayEquals(original, destination.toByteArray())
+        } finally {
+            source.delete()
+        }
+    }
+
+    @Test
+    fun defaultFooterWatermarkCoordinatesAreBottomRight() {
+        val pageWidth = 595f
+        val pageHeight = 842f
+        val position = FooterWatermarkLayout.topLeft(
+            pageWidth = pageWidth,
+            pageHeight = pageHeight,
+            watermarkWidth = 120f,
+            watermarkHeight = 10f,
+            margin = 16f
+        )
+        assertTrue(position.x > pageWidth * 0.5f)
+        assertTrue(position.topY > pageHeight * 0.9f)
     }
 
     @Test

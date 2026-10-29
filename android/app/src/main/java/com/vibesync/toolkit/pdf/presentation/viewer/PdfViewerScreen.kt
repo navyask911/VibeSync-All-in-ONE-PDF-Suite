@@ -1,6 +1,7 @@
 package com.vibesync.toolkit.pdf.presentation.viewer
 
 import android.app.Activity
+import androidx.compose.animation.AnimatedVisibility
 import android.content.ContextWrapper
 import android.content.Context
 import android.print.PrintAttributes
@@ -84,6 +85,7 @@ fun PdfViewerScreen(
     val listState = rememberLazyListState()
     val coroutineScope = rememberCoroutineScope()
     var isPreparingPrint by remember(documentUri) { mutableStateOf(false) }
+    var areBarsVisible by remember { mutableStateOf(true) }
 
     var scale by remember { mutableFloatStateOf(1f) }
     var offsetX by remember { mutableFloatStateOf(0f) }
@@ -133,7 +135,7 @@ fun PdfViewerScreen(
 
     Scaffold(
         topBar = {
-            Column {
+            AnimatedVisibility(visible = areBarsVisible) {
                 TopAppBar(
                     title = {
                         Text(
@@ -153,15 +155,14 @@ fun PdfViewerScreen(
                             Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
                         }
                     },
-                    actions = {}
-                )
-                Row(
-                    modifier = Modifier.fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                    actions = {
+                        Row(
+                            modifier = Modifier.widthIn(max = 260.dp)
+                                .horizontalScroll(rememberScrollState())
+                                .padding(horizontal = 2.dp),
+                            horizontalArrangement = Arrangement.spacedBy(0.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                     IconButton(
                         onClick = {
                             scale = (scale / 1.25f).coerceAtLeast(1f)
@@ -185,11 +186,6 @@ fun PdfViewerScreen(
                         },
                         enabled = uiState.currentPageIndex > 0
                     ) { Icon(Icons.Default.NavigateBefore, contentDescription = "Previous page") }
-                    Text(
-                        stringResource(R.string.page_position, uiState.currentPageIndex + 1, uiState.pageCount),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                     IconButton(
                         onClick = {
                             val target = (uiState.currentPageIndex + 1).coerceAtMost(uiState.pageCount - 1)
@@ -323,41 +319,51 @@ fun PdfViewerScreen(
                             }
                         }
                     }
-                }
+                        }
+                    }
+                )
             }
         },
         bottomBar = {
-            if (uiState.pageCount > 1) {
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .shadow(8.dp),
-                    color = MaterialTheme.colorScheme.surface
-                ) {
-                    Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+            AnimatedVisibility(visible = areBarsVisible) {
+                if (uiState.pageCount > 1) {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(0.96f).shadow(6.dp, RoundedCornerShape(28.dp)),
+                            shape = RoundedCornerShape(28.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.88f),
+                            tonalElevation = 3.dp
                         ) {
-                            Text("1", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text(stringResource(R.string.page_position, uiState.currentPageIndex + 1, uiState.pageCount), fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
-                            Text("${uiState.pageCount}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    stringResource(R.string.page_position, uiState.currentPageIndex + 1, uiState.pageCount),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1
+                                )
+                                Slider(
+                                    modifier = Modifier.weight(1f),
+                                    value = uiState.currentPageIndex.toFloat(),
+                                    onValueChange = { targetPage ->
+                                        val pageInt = targetPage.toInt()
+                                        viewModel.onPageScrolled(pageInt)
+                                        coroutineScope.launch { listState.scrollToItem(pageInt) }
+                                    },
+                                    valueRange = 0f..(uiState.pageCount - 1).toFloat().coerceAtLeast(1f),
+                                    colors = SliderDefaults.colors(
+                                        thumbColor = VibeSyncCrimsonPrimary,
+                                        activeTrackColor = VibeSyncCrimsonPrimary
+                                    )
+                                )
+                            }
                         }
-                        Slider(
-                            value = uiState.currentPageIndex.toFloat(),
-                            onValueChange = { targetPage ->
-                                val pageInt = targetPage.toInt()
-                                viewModel.onPageScrolled(pageInt)
-                                coroutineScope.launch {
-                                    listState.scrollToItem(pageInt)
-                                }
-                            },
-                            valueRange = 0f..(uiState.pageCount - 1).toFloat().coerceAtLeast(1f),
-                            colors = SliderDefaults.colors(
-                                thumbColor = VibeSyncCrimsonPrimary,
-                                activeTrackColor = VibeSyncCrimsonPrimary
-                            )
-                        )
                     }
                 }
             }
@@ -432,6 +438,7 @@ fun PdfViewerScreen(
                 }
                 .pointerInput(documentUri) {
                     detectTapGestures(
+                        onTap = { areBarsVisible = !areBarsVisible },
                         onDoubleTap = {
                             if (scale > 1f) {
                                 scale = 1f
@@ -763,14 +770,14 @@ fun PdfPageItem(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(bottom = 2.dp),
-                    contentAlignment = Alignment.BottomCenter
+                        .padding(end = 12.dp, bottom = 8.dp),
+                    contentAlignment = Alignment.BottomEnd
                 ) {
                     Text(
-                        text = stringResource(R.string.pdf_brand_watermark),
+                        text = "VibeSync All in ONE PDF Suite",
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
                         color = Color(0xFF8E0000).copy(alpha = 0.55f),
-                        fontSize = 8.sp,
+                        fontSize = 7.sp,
                         fontWeight = FontWeight.SemiBold
                     )
                 }

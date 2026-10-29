@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -78,10 +79,10 @@ fun BookSplitPreview(
     modifier: Modifier = Modifier
 ) {
     var gutter by remember(source) { mutableStateOf(initialGutterPx.coerceIn(1, source.width.coerceAtLeast(2) - 1)) }
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(modifier = modifier.fillMaxWidth().fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.book_split_preview_title), style = MaterialTheme.typography.titleMedium)
         Box(
-            modifier = Modifier.fillMaxWidth().height(260.dp).testTag("book_split_preview"),
+            modifier = Modifier.fillMaxWidth().weight(1f).testTag("book_split_preview"),
             contentAlignment = Alignment.Center
         ) {
             Image(
@@ -179,12 +180,12 @@ fun BookSplitScreen(
             }
         )
     }) { padding ->
-        Column(Modifier.padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(padding).fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val bitmap = source
             when {
                 bitmap == null -> CircularProgressIndicator()
                 bitmap.width <= bitmap.height -> Text(stringResource(R.string.book_split_portrait_error), color = MaterialTheme.colorScheme.error)
-                else -> BookSplitPreview(source = bitmap, onCommit = { gutter ->
+                else -> BookSplitPreview(source = bitmap, modifier = Modifier.weight(1f), onCommit = { gutter ->
                     if (busy) return@BookSplitPreview
                     busy = true
                     error = null

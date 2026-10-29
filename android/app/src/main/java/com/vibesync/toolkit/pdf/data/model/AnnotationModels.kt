@@ -60,7 +60,8 @@ data class SignatureAnnotation(
     val y: Float,
     val width: Float,
     val height: Float,
-    @Transient val bitmap: Bitmap? = null
+    @Transient val bitmap: Bitmap? = null,
+    val relativeStrokeWidth: Float = 0.025f
 )
 
 data class PageAnnotations(

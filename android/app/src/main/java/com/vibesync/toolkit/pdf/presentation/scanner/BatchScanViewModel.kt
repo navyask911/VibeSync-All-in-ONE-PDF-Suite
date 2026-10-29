@@ -25,7 +25,7 @@ import java.io.IOException
 class BatchScanViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application.applicationContext
     private val prefs = app.getSharedPreferences(ResolutionProfilePrefs.PREFERENCES_FILE, 0)
-    private val workDirectory = File(app.cacheDir, "vibesync_batch_pages")
+    private val workDirectory = File(app.filesDir, "vibesync_batch_pages")
     private val scansDirectory = File(app.filesDir, "scans")
     private val engine = PdfBoxToolkitEngine(app)
     private val _state = MutableStateFlow(

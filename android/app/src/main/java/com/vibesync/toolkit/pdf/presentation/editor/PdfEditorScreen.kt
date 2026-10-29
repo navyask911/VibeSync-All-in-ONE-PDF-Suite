@@ -196,6 +196,13 @@ fun PdfEditorScreen(
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
                         ToolIconButton(
+                            icon = Icons.Default.TouchApp,
+                            label = "View",
+                            testTag = "View",
+                            isSelected = uiState.toolMode == ToolMode.VIEW,
+                            onClick = { viewModel.selectTool(ToolMode.VIEW) }
+                        )
+                        ToolIconButton(
                             icon = Icons.Default.Edit,
                             label = stringResource(R.string.editor_pen),
                             testTag = "Pen",
@@ -294,18 +301,23 @@ fun PdfEditorScreen(
                                         horizontalAlignment = Alignment.CenterHorizontally,
                                         verticalArrangement = Arrangement.Center
                                     ) {
-                                        IconButton(
-                                            onClick = { viewModel.setStrokeWidth(width) },
+                                        Box(
                                             modifier = Modifier
-                                                .size(32.dp)
-                                                .testTag("editor_stroke_size_${strokeLabels[index].lowercase()}")
+                                                .width(32.dp)
+                                                .height(28.dp)
+                                                .clickable { viewModel.setStrokeWidth(width) }
+                                                .testTag("editor_stroke_size_${strokeLabels[index].lowercase()}"),
+                                            contentAlignment = Alignment.Center
                                         ) {
-                                            Icon(
-                                                Icons.Default.Create,
-                                                contentDescription = "${strokeLabels[index]} stroke",
-                                                modifier = Modifier.size(listOf(14.dp, 20.dp, 26.dp)[index]),
-                                                tint = if (selected) VibeSyncCrimsonPrimary
-                                                    else MaterialTheme.colorScheme.onSurfaceVariant
+                                            Box(
+                                                modifier = Modifier
+                                                    .width(30.dp)
+                                                    .height(listOf(3.dp, 7.dp, 12.dp)[index])
+                                                    .background(
+                                                        if (selected) VibeSyncCrimsonPrimary
+                                                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        RoundedCornerShape(4.dp)
+                                                    )
                                             )
                                         }
                                         Text(
@@ -328,7 +340,7 @@ fun PdfEditorScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
                 .background(Color(0xFFCBD5E1))
-                .pointerInput(documentUri) {
+                .pointerInput(documentUri, uiState.toolMode) {
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false)
                         var previousCentroid: Offset? = null
@@ -351,11 +363,11 @@ fun PdfEditorScreen(
                             } else 0f
 
                             val priorCentroid = previousCentroid
-                            if (priorCentroid != null && previousPointerCount == pressed.size &&
-                                (pressed.size > 1 || scale > 1f)
-                            ) {
+                            val canManipulatePage = pressed.size >= 2 ||
+                                (uiState.toolMode == ToolMode.VIEW && pressed.size == 1 && scale > 1f)
+                            if (priorCentroid != null && previousPointerCount == pressed.size && canManipulatePage) {
                                 val pan = centroid - priorCentroid
-                                val zoomFactor = if (pressed.size > 1 && previousDistance > 0f) {
+                                val zoomFactor = if (pressed.size >= 2 && previousDistance > 0f) {
                                     distance / previousDistance
                                 } else 1f
                                 val nextScale = (scale * zoomFactor).coerceIn(1f, 5f)
@@ -499,17 +511,18 @@ fun PdfEditorScreen(
     if (showSignatureDialog) {
         SignaturePadDialog(
             onDismissRequest = { showSignatureDialog = false },
-            onSignatureCaptured = { bitmap ->
+            onSignatureCaptured = { bitmap, relativeStrokeWidth ->
                 showSignatureDialog = false
-                val signatureWidthPx = 160f
-                val signatureHeightPx = 80f
+                val signatureWidthPx = SignatureStrokeMetrics.DEFAULT_TARGET_WIDTH_PX
+                val signatureHeightPx = SignatureStrokeMetrics.DEFAULT_TARGET_HEIGHT_PX
                 val pageHeightPx = screenWidthPx * 842f / 595f
                 viewModel.addSignature(
                     bitmap,
                     x = ((screenWidthPx - signatureWidthPx) / 2f).coerceAtLeast(0f),
                     y = ((pageHeightPx - signatureHeightPx) / 2f).coerceAtLeast(0f),
                     width = signatureWidthPx,
-                    height = signatureHeightPx
+                    height = signatureHeightPx,
+                    relativeStrokeWidth = relativeStrokeWidth
                 )
             }
         )

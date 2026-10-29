@@ -2,6 +2,8 @@ package com.vibesync.toolkit.pdf.presentation.scanner
 
 import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -10,6 +12,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -22,6 +26,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.ui.window.Dialog
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -49,6 +54,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.ImageBitmap
 import com.vibesync.toolkit.pdf.R
@@ -118,6 +124,7 @@ private fun BatchPageThumbnail(
     onMove: (Int, Int) -> Unit,
     pageCount: Int
 ) {
+    var showFullPreview by remember(page.id) { androidx.compose.runtime.mutableStateOf(false) }
     val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = page.id) {
         value = withContext(Dispatchers.IO) {
             PdfBitmapUtils.decodeFileDownsampled(page.file.absolutePath)
@@ -151,7 +158,12 @@ private fun BatchPageThumbnail(
             ) {
                 val preview = bitmap
                 if (preview != null && !preview.isRecycled) {
-                    Image(preview.asImageBitmap(), contentDescription = stringResource(R.string.batch_page_number, index + 1), modifier = Modifier.fillMaxWidth().height(112.dp), contentScale = ContentScale.Crop)
+                    Image(
+                        preview.asImageBitmap(),
+                        contentDescription = stringResource(R.string.batch_page_number, index + 1),
+                        modifier = Modifier.fillMaxSize().clickable { showFullPreview = true },
+                        contentScale = ContentScale.Fit
+                    )
                 } else {
                     Surface(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth().height(112.dp)) {}
                 }
@@ -166,6 +178,39 @@ private fun BatchPageThumbnail(
                 }
                 IconButton(onClick = onDelete, modifier = Modifier.testTag("batch_delete_${page.id}")) {
                     Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.batch_delete_page))
+                }
+            }
+        }
+    }
+
+    if (showFullPreview && bitmap != null && !bitmap!!.isRecycled) {
+        Dialog(onDismissRequest = { showFullPreview = false }) {
+            Surface(
+                modifier = Modifier.fillMaxWidth().fillMaxHeight(0.94f),
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                Column(modifier = Modifier.fillMaxSize().padding(12.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            stringResource(R.string.batch_page_number, index + 1),
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        IconButton(onClick = { showFullPreview = false }) {
+                            Icon(Icons.Default.Close, contentDescription = stringResource(R.string.cancel))
+                        }
+                    }
+                    Image(
+                        bitmap!!.asImageBitmap(),
+                        contentDescription = stringResource(R.string.batch_page_number, index + 1),
+                        modifier = Modifier.fillMaxWidth().weight(1f).testTag("batch_page_preview_${page.id}"),
+                        contentScale = ContentScale.Fit
+                    )
                 }
             }
         }
@@ -212,7 +257,7 @@ fun BatchScanScreen(
         }
     ) { padding ->
         Column(
-            modifier = Modifier.padding(padding).padding(16.dp).fillMaxWidth(),
+            modifier = Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
