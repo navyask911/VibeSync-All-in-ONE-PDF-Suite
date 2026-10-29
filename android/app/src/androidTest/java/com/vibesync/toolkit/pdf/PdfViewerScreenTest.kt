@@ -88,7 +88,8 @@ class PdfViewerScreenTest {
 
         // Verify document title and page count appear in top bar
         composeTestRule.onNodeWithText("Large_Catalog_2026.pdf").assertIsDisplayed()
-        composeTestRule.onAllNodesWithText("Page 1 of 30").assertCountEquals(2)
+        // A single page-position label is intentional; the old top/bottom duplicate was removed.
+        composeTestRule.onAllNodesWithText("Page 1 of 30").assertCountEquals(1)
 
         // Rapid continuous vertical scroll gestures to verify OOM-safe LazyColumn recycling
         val listNode = composeTestRule.onNodeWithTag("pdf_page_list")
