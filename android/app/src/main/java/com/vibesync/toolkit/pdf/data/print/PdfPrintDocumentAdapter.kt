@@ -1,34 +1,26 @@
 package com.vibesync.toolkit.pdf.data.print
 
-import android.graphics.pdf.PdfRenderer
-import android.os.ParcelFileDescriptor
 import android.print.PageRange
 import android.print.PrintAttributes
 import android.print.PrintDocumentAdapter
 import android.print.PrintDocumentInfo
-import java.io.File
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.io.IOException
-import java.io.OutputStream
-import java.util.concurrent.CancellationException
 
 /**
  * Copies a complete PDF source without closing the caller-owned output stream.
  * This pure helper is also exercised by fast JVM regression tests.
  */
 internal fun copyPdfBytes(
-    source: File,
-    output: OutputStream,
+    source: java.io.File,
+    output: java.io.OutputStream,
     isCancelled: () -> Boolean = { false }
 ) {
     if (!source.exists() || !source.isFile || !source.canRead() || source.length() <= 0L) {
-        throw IOException("The source PDF is empty or unreadable.")
+        throw java.io.IOException("The source PDF is empty or unreadable.")
     }
-    FileInputStream(source).use { input ->
+    java.io.FileInputStream(source).use { input ->
         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
         while (true) {
-            if (isCancelled()) throw CancellationException("PDF printing was cancelled.")
+            if (isCancelled()) throw java.util.concurrent.CancellationException("PDF printing was cancelled.")
             val count = input.read(buffer)
             if (count < 0) break
             if (count > 0) output.write(buffer, 0, count)
@@ -41,14 +33,14 @@ class PdfPrintDocumentAdapter(
     private val context: android.content.Context,
     private val sourceUri: android.net.Uri,
     private val displayName: String,
-    preparedSource: File? = null
+    preparedSource: java.io.File? = null
 ) : PrintDocumentAdapter() {
     private val lock = Any()
-    private val preparedSource: File? = preparedSource
-    private var stagedSource: File? = preparedSource
+    private val preparedSource: java.io.File? = preparedSource
+    private var stagedSource: java.io.File? = preparedSource
     private var printAttributes: PrintAttributes? = null
     private var pageCount = 0
-    private var destinationWriter: FileOutputStream? = null
+    private var destinationWriter: java.io.FileOutputStream? = null
 
     override fun onStart() {
         synchronized(lock) {
@@ -74,7 +66,7 @@ class PdfPrintDocumentAdapter(
             val info = prepareLayout(newAttributes, cancellationSignal)
             callback.onLayoutFinished(info, true)
         } catch (error: Exception) {
-            if (cancellationSignal.isCanceled || error is CancellationException) callback.onLayoutCancelled()
+            if (cancellationSignal.isCanceled || error is java.util.concurrent.CancellationException) callback.onLayoutCancelled()
             else callback.onLayoutFailed(error.localizedMessage ?: "Unable to prepare this PDF for printing.")
         }
     }
@@ -83,17 +75,17 @@ class PdfPrintDocumentAdapter(
         newAttributes: PrintAttributes,
         cancellationSignal: android.os.CancellationSignal
     ): PrintDocumentInfo = synchronized(lock) {
-        if (cancellationSignal.isCanceled) throw CancellationException("Print layout was cancelled.")
+        if (cancellationSignal.isCanceled) throw java.util.concurrent.CancellationException("Print layout was cancelled.")
         val source = ensureStagedSource()
         validateSourceFile(source)
-        val count = ParcelFileDescriptor.open(source, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
-            PdfRenderer(descriptor).use { renderer ->
+        val count = android.os.ParcelFileDescriptor.open(source, android.os.ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+            android.graphics.pdf.PdfRenderer(descriptor).use { renderer ->
                 renderer.pageCount.also {
-                    if (it <= 0) throw IOException("The source PDF contains no pages.")
+                    if (it <= 0) throw java.io.IOException("The source PDF contains no pages.")
                 }
             }
         }
-        if (cancellationSignal.isCanceled) throw CancellationException("Print layout was cancelled.")
+        if (cancellationSignal.isCanceled) throw java.util.concurrent.CancellationException("Print layout was cancelled.")
         printAttributes = newAttributes
         pageCount = count
         PrintDocumentInfo.Builder(normalizePdfName(displayName))
@@ -104,7 +96,7 @@ class PdfPrintDocumentAdapter(
 
     override fun onWrite(
         pages: Array<out PageRange>,
-        destination: ParcelFileDescriptor,
+        destination: android.os.ParcelFileDescriptor,
         cancellationSignal: android.os.CancellationSignal,
         callback: WriteResultCallback
     ) {
@@ -112,7 +104,7 @@ class PdfPrintDocumentAdapter(
             val written = writeDocument(pages, destination, cancellationSignal)
             callback.onWriteFinished(written)
         } catch (error: Exception) {
-            if (cancellationSignal.isCanceled || error is CancellationException) callback.onWriteCancelled()
+            if (cancellationSignal.isCanceled || error is java.util.concurrent.CancellationException) callback.onWriteCancelled()
             else callback.onWriteFailed(error.localizedMessage ?: "Unable to print this PDF.")
         }
         // Android owns the destination descriptor. Do not close it before callback completion.
@@ -120,13 +112,13 @@ class PdfPrintDocumentAdapter(
 
     internal fun writeDocument(
         pages: Array<out PageRange>,
-        destination: ParcelFileDescriptor,
+        destination: android.os.ParcelFileDescriptor,
         cancellationSignal: android.os.CancellationSignal
     ): Array<PageRange> {
-        if (cancellationSignal.isCanceled) throw CancellationException("PDF printing was cancelled.")
+        if (cancellationSignal.isCanceled) throw java.util.concurrent.CancellationException("PDF printing was cancelled.")
         val source = synchronized(lock) { ensureStagedSource() }
         validateSourceFile(source)
-        val output = FileOutputStream(destination.fileDescriptor)
+        val output = java.io.FileOutputStream(destination.fileDescriptor)
         synchronized(lock) {
             runCatching { destinationWriter?.close() }
             destinationWriter = output
@@ -146,26 +138,26 @@ class PdfPrintDocumentAdapter(
         super.onFinish()
     }
 
-    private fun ensureStagedSource(): File =
+    private fun ensureStagedSource(): java.io.File =
         stagedSource ?: stageSource().also { stagedSource = it }
 
-    private fun validateSourceFile(file: File) {
+    private fun validateSourceFile(file: java.io.File) {
         if (!file.exists() || !file.isFile || !file.canRead() || file.length() <= 0L) {
-            throw IOException("The source PDF is empty or unreadable.")
+            throw java.io.IOException("The source PDF is empty or unreadable.")
         }
     }
 
-    private fun stageSource(): File {
-        val file = File.createTempFile("print_source_", ".pdf", context.cacheDir)
+    private fun stageSource(): java.io.File {
+        val file = java.io.File.createTempFile("print_source_", ".pdf", context.cacheDir)
         try {
             val input = if (sourceUri.scheme == "file") {
-                File(sourceUri.path ?: throw IOException("The source path is missing.")).inputStream()
+                java.io.File(sourceUri.path ?: throw java.io.IOException("The source path is missing.")).inputStream()
             } else {
                 context.contentResolver.openInputStream(sourceUri)
-                    ?: throw IOException("Unable to open the selected PDF.")
+                    ?: throw java.io.IOException("Unable to open the selected PDF.")
             }
             input.use { source ->
-                FileOutputStream(file).use { sink ->
+                java.io.FileOutputStream(file).use { sink ->
                     source.copyTo(sink)
                     sink.flush()
                     sink.fd.sync()
