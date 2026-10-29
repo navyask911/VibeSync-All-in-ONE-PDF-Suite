@@ -214,9 +214,11 @@ fun PdfViewerScreen(
                                 .filterIsInstance<Activity>()
                                 .firstOrNull()
                             if (activity == null) {
+                                println("PdfViewerScreen: Print click could not resolve Activity from LocalContext")
                                 isPreparingPrint = false
                                 return@IconButton
                             }
+                            println("PdfViewerScreen: Print click resolved Activity; preparing print dispatch")
                             val jobName = context.getString(R.string.print_job_name, uiState.fileName)
                             val attributes = PrintAttributes.Builder()
                                 .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
@@ -234,6 +236,7 @@ fun PdfViewerScreen(
                                         }
                                     }
                                     viewModel.setPreparedPrintFile(preparedFile)
+                                    println("PdfViewerScreen: dispatching Print through PdfViewerViewModel")
                                     viewModel.printDocument(activity, jobName, attributes)
                                     preparedFile = null
                                 } catch (error: Exception) {
@@ -259,6 +262,7 @@ fun PdfViewerScreen(
                                             }
                                         }
                                         viewModel.setPreparedPrintFile(requireNotNull(preparedFile))
+                                        println("PdfViewerScreen: dispatching Print through PdfViewerViewModel")
                                         viewModel.printDocument(activity, jobName, attributes)
                                         preparedFile = null
                                     } catch (error: Exception) {
@@ -278,7 +282,7 @@ fun PdfViewerScreen(
                         modifier = Modifier.testTag("viewer_print")
                     ) {
                         if (isPreparingPrint) CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                        else Icon(Icons.Default.Print, contentDescription = stringResource(R.string.print_action))
+                        else Icon(Icons.Default.Print, contentDescription = "Print")
                     }
                     ExportMenu(sourceUri = documentUri, currentPageIndex = uiState.currentPageIndex, testTag = "viewer_export_menu")
                     if (isManagedScan) {

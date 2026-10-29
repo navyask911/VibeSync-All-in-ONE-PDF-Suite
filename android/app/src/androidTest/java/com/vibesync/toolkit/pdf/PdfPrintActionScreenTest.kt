@@ -6,6 +6,7 @@ import android.net.Uri
 import android.print.PrintAttributes
 import android.print.PrintDocumentAdapter
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
@@ -44,6 +45,7 @@ class PdfPrintActionScreenTest {
                 adapter: PrintDocumentAdapter,
                 attributes: PrintAttributes
             ) {
+                println("PdfPrintActionScreenTest: fake PrintTrigger.triggerPrint invoked for job=$jobName")
                 captured.add(Triple(jobName, adapter, attributes))
             }
         }
@@ -65,7 +67,7 @@ class PdfPrintActionScreenTest {
                 }
             }
 
-            composeRule.onNodeWithTag("viewer_print").performClick()
+            composeRule.onNodeWithContentDescription("Print").performClick()
 
             composeRule.runOnIdle {
                 assertEquals(1, captured.size)
