@@ -1,6 +1,7 @@
 package com.vibesync.toolkit.pdf.presentation.viewer
 
 import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
+import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
@@ -42,6 +43,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.util.UriUtils
+import com.vibesync.toolkit.pdf.core.util.generateSmartFileName
 import com.vibesync.toolkit.pdf.data.pdf.createWhiteBackgroundBitmap
 import com.vibesync.toolkit.pdf.data.ocr.MlKitOcrEngine
 import kotlinx.coroutines.CancellationException
@@ -190,7 +192,7 @@ fun ExportMenu(
                     modifier = Modifier.testTag("export_pdf"),
                     onClick = {
                         expanded = false
-                        val name = "$baseName.pdf"
+                        val name = generateSmartFileName("VibeSync_Export", "pdf")
                         requestSaf("application/pdf", name) { pdfLauncher.launch(name) }
                     }
                 )
@@ -201,7 +203,7 @@ fun ExportMenu(
                         expanded = false
                         val page = currentPageIndex.coerceAtLeast(0)
                         queuedJpgPages = listOf(page)
-                        val name = "${baseName}_page_${page + 1}.jpg"
+                        val name = generateSmartFileName("VibeSync_Export_Page${page + 1}", "jpg")
                         requestSaf("image/jpeg", name) { jpgLauncher.launch(name) }
                     }
                 )
@@ -215,7 +217,7 @@ fun ExportMenu(
                                 val count = withContext(Dispatchers.IO) { pageCount(context, sourceUri, null) }
                                 queuedJpgPages = (0 until count).toList()
                                 val firstPage = queuedJpgPages.firstOrNull() ?: return@launch
-                                val name = "${baseName}_page_${firstPage + 1}.jpg"
+                                val name = generateSmartFileName("VibeSync_Export_Page${firstPage + 1}", "jpg")
                                 requestSaf("image/jpeg", name) { jpgLauncher.launch(name) }
                             } catch (error: Throwable) {
                                 showExportError(context, error)
@@ -390,15 +392,20 @@ private fun showExportError(context: Context, error: Throwable) {
     Toast.makeText(context, error.localizedMessage ?: context.getString(R.string.export_failed), Toast.LENGTH_LONG).show()
 }
 
-private fun copyPdfToSaf(context: Context, sourceUri: Uri, targetUri: Uri) {
-    val input = if (sourceUri.scheme == "file") {
-        File(sourceUri.path ?: throw IOException("The selected file path is missing.")).inputStream()
-    } else {
-        context.contentResolver.openInputStream(sourceUri) ?: throw IOException("Unable to open the selected PDF.")
-    }
-    input.use { source ->
-        context.contentResolver.openOutputStream(targetUri, "wt")?.use { target -> source.copyTo(target) }
-            ?: throw IOException("The selected destination could not be opened.")
+private suspend fun copyPdfToSaf(context: Context, sourceUri: Uri, targetUri: Uri) {
+    val watermarked = UriUtils.createExportCacheFile(context, "VibeSync_Export")
+    try {
+        PdfBoxToolkitEngine(context).watermarkPdf(
+            sourceUri = sourceUri,
+            watermarkText = PdfBoxToolkitEngine.DEFAULT_FOOTER_WATERMARK_TEXT,
+            outputFile = watermarked
+        ).getOrThrow()
+        watermarked.inputStream().use { source ->
+            context.contentResolver.openOutputStream(targetUri, "wt")?.use { target -> source.copyTo(target) }
+                ?: throw IOException("The selected destination could not be opened.")
+        }
+    } finally {
+        watermarked.delete()
     }
 }
 

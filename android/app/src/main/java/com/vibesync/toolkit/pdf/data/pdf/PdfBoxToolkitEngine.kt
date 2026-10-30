@@ -310,15 +310,29 @@ class PdfBoxToolkitEngine(private val context: Context) {
         outputFile: File,
         profile: ResolutionProfile,
         filterId: FilterId? = null,
+        pageRanges: List<IntRange>? = null,
         onProgress: (Float) -> Unit = {}
     ): Result<PdfBatchAssemblyResult> = withContext(Dispatchers.IO) {
         var document: PDDocument? = null
         var temporaryOutput: File? = null
         try {
             require(pageFiles.isNotEmpty()) { context.getString(R.string.batch_no_pages) }
+            val selectedPageFiles = if (pageRanges == null) {
+                pageFiles
+            } else {
+                require(pageRanges.isNotEmpty()) { "Select at least one page." }
+                val selectedIndexes = pageRanges.flatMap { range ->
+                    require(range.first >= 1 && range.last <= pageFiles.size && range.first <= range.last) {
+                        "The selected page range is outside the available pages."
+                    }
+                    range.map { it - 1 }
+                }.distinct()
+                require(selectedIndexes.isNotEmpty()) { "Select at least one page." }
+                selectedIndexes.map(pageFiles::get)
+            }
             val memoryLimit = Runtime.getRuntime().maxMemory() / 4L
             var estimatedBytes = 0L
-            pageFiles.forEach { file ->
+            selectedPageFiles.forEach { file ->
                 currentCoroutineContext().ensureActive()
                 require(file.isFile && file.length() > 0L) { context.getString(R.string.batch_page_missing) }
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -341,7 +355,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
             val filterEngine = if (filterId == null) null else FilterEngine()
             var fellBack = false
 
-            pageFiles.forEachIndexed { index, file ->
+            selectedPageFiles.forEachIndexed { index, file ->
                 currentCoroutineContext().ensureActive()
                 var bitmap: Bitmap? = PdfBitmapUtils.decodeFileDownsampled(file.absolutePath)
                     ?: throw IOException(context.getString(R.string.batch_page_decode_failed))
@@ -385,10 +399,11 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 } finally {
                     bitmap?.let { if (!it.isRecycled) it.recycle() }
                 }
-                onProgress((index + 1).toFloat() / pageFiles.size.toFloat())
+                onProgress((index + 1).toFloat() / selectedPageFiles.size.toFloat())
             }
 
             currentCoroutineContext().ensureActive()
+            applyVibeSyncWatermark(requireNotNull(document))
             requireNotNull(document).save(requireNotNull(temporaryOutput))
             document.close()
             document = null
@@ -398,7 +413,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 requireNotNull(temporaryOutput).copyTo(outputFile, overwrite = true)
                 requireNotNull(temporaryOutput).delete()
             }
-            Result.success(PdfBatchAssemblyResult(outputFile, pageFiles.size, fellBack))
+            Result.success(PdfBatchAssemblyResult(outputFile, selectedPageFiles.size, fellBack))
         } catch (cancelled: CancellationException) {
             temporaryOutput?.delete()
             outputFile.delete()
@@ -525,6 +540,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
             sourceFile = stagedFile
             PDDocument.load(stagedFile).use { document ->
                 require(document.numberOfPages > 0) { "The source PDF contains no pages." }
+                applyVibeSyncWatermark(document)
                 document.save(outputFile)
             }
             if (!outputFile.isFile || outputFile.length() <= 0L) {
@@ -556,22 +572,6 @@ class PdfBoxToolkitEngine(private val context: Context) {
         var sourceFileToDelete: File? = null
         val watermarkPreferences = context.getSharedPreferences("pdf_watermark_options", Context.MODE_PRIVATE)
         val useCustomOptions = watermarkPreferences.getBoolean("watermark_custom_enabled", false)
-        val effectiveText = if (useCustomOptions) {
-            watermarkPreferences.getString("watermark_text", watermarkText)?.takeIf { it.isNotBlank() }
-                ?: DEFAULT_FOOTER_WATERMARK_TEXT
-        } else {
-            DEFAULT_FOOTER_WATERMARK_TEXT
-        }
-        val effectiveOpacity = (if (useCustomOptions) {
-            watermarkPreferences.getFloat("watermark_opacity", opacity)
-        } else {
-            opacity
-        }).coerceIn(0f, 1f)
-        val effectiveAngle = (if (useCustomOptions) {
-            watermarkPreferences.getFloat("watermark_angle", angleDegrees)
-        } else {
-            angleDegrees
-        }).coerceIn(0f, 90f)
         if (useCustomOptions) {
             watermarkPreferences.edit().putBoolean("watermark_custom_enabled", false).apply()
         }
@@ -580,92 +580,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "watermark_src_")
             sourceFileToDelete = sourceFile
             PDDocument.load(sourceFile).use { document ->
-                val documentInfo = document.documentInformation
-                if (
-                    documentInfo.getCustomMetadataValue(WATERMARK_METADATA_KEY) != WATERMARK_METADATA_VALUE &&
-                    effectiveText.isNotBlank()
-                ) {
-                    // Android text layout shapes scripts that PDFBox's built-in fonts cannot encode.
-                    val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-                        color = Color.rgb(40, 40, 40)
-                        typeface = Typeface.create("sans-serif", Typeface.NORMAL)
-                        textSize = 28f
-                    }
-                    val measuredTextWidth = ceil(paint.measureText(effectiveText)).toInt().coerceAtLeast(1)
-                    val bitmap = Bitmap.createBitmap(
-                        measuredTextWidth + 16,
-                        (ceil(paint.fontMetrics.descent - paint.fontMetrics.ascent).toInt() + 8).coerceAtLeast(1),
-                        Bitmap.Config.ARGB_8888
-                    )
-                    try {
-                        val textLayout = StaticLayout.Builder
-                            .obtain(effectiveText, 0, effectiveText.length, paint, measuredTextWidth)
-                            .setAlignment(Layout.Alignment.ALIGN_CENTER)
-                            .setTextDirection(TextDirectionHeuristics.FIRSTSTRONG_LTR)
-                            .setIncludePad(true)
-                            .setMaxLines(1)
-                            .build()
-                        Canvas(bitmap).apply {
-                            save()
-                            translate(8f, ((bitmap.height - textLayout.height) / 2f).coerceAtLeast(0f))
-                            textLayout.draw(this)
-                            restore()
-                        }
-
-                        val watermarkBitmap = if (effectiveAngle == 0f) {
-                            bitmap
-                        } else {
-                            Bitmap.createBitmap(
-                                bitmap,
-                                0,
-                                0,
-                                bitmap.width,
-                                bitmap.height,
-                                android.graphics.Matrix().apply { postRotate(effectiveAngle) },
-                                true
-                            )
-                        }
-                        try {
-                            val watermarkImage = LosslessFactory.createFromImage(document, watermarkBitmap)
-                            for (page in document.pages) {
-                                val mediaBox = page.mediaBox
-                                val maxWidthPt = mediaBox.width * 0.85f
-                                val aspectRatio = watermarkBitmap.width.toFloat() /
-                                    watermarkBitmap.height.toFloat().coerceAtLeast(1f)
-                                val targetHeightPt = minOf(10f, maxWidthPt / aspectRatio)
-                                val targetWidthPt = targetHeightPt * aspectRatio
-                                val footer = FooterWatermarkLayout.topLeft(
-                                    pageWidth = mediaBox.width,
-                                    pageHeight = mediaBox.height,
-                                    watermarkWidth = targetWidthPt,
-                                    watermarkHeight = targetHeightPt,
-                                    margin = 16f
-                                )
-                                val x = mediaBox.lowerLeftX + footer.x
-                                val y = mediaBox.lowerLeftY + mediaBox.height - footer.topY - targetHeightPt
-                                val graphicsState = PDExtendedGraphicsState().apply {
-                                    nonStrokingAlphaConstant = effectiveOpacity
-                                    strokingAlphaConstant = effectiveOpacity
-                                }
-                                PDPageContentStream(
-                                    document,
-                                    page,
-                                    PDPageContentStream.AppendMode.APPEND,
-                                    true,
-                                    true
-                                ).use { stream ->
-                                    stream.setGraphicsStateParameters(graphicsState)
-                                    stream.drawImage(watermarkImage, x, y, targetWidthPt, targetHeightPt)
-                                }
-                            }
-                        } finally {
-                            if (watermarkBitmap !== bitmap && !watermarkBitmap.isRecycled) watermarkBitmap.recycle()
-                        }
-                    } finally {
-                        if (!bitmap.isRecycled) bitmap.recycle()
-                    }
-                    documentInfo.setCustomMetadataValue(WATERMARK_METADATA_KEY, WATERMARK_METADATA_VALUE)
-                }
+                applyVibeSyncWatermark(document)
                 document.save(outputFile)
             }
             Result.success(outputFile)
@@ -937,7 +852,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
         // Built-in Type1 fonts cannot encode Arabic, CJK, and many Indic glyphs. Shape the
         // localized footer with Android text layout and embed a transparent image in the PDF.
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = Color.argb(150, 142, 0, 0)
+            color = Color.rgb(142, 0, 0)
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
             textSize = 28f
         }
@@ -968,18 +883,23 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 val mediaBox = page.mediaBox
                 val maxWidthPt = mediaBox.width * 0.85f
                 val aspectRatio = bitmap.width.toFloat() / bitmap.height.toFloat().coerceAtLeast(1f)
-                val targetHeightPt = minOf(10f, maxWidthPt / aspectRatio)
+                val targetHeightPt = minOf(9f, maxWidthPt / aspectRatio)
                 val targetWidthPt = targetHeightPt * aspectRatio
                 val footer = FooterWatermarkLayout.topLeft(
                     pageWidth = mediaBox.width,
                     pageHeight = mediaBox.height,
                     watermarkWidth = targetWidthPt,
                     watermarkHeight = targetHeightPt,
-                    margin = 16f
+                    margin = 14f,
+                    bottomMargin = 10f
                 )
                 val x = mediaBox.lowerLeftX + footer.x
                 val y = mediaBox.lowerLeftY + mediaBox.height - footer.topY - targetHeightPt
 
+                val graphicsState = PDExtendedGraphicsState().apply {
+                    nonStrokingAlphaConstant = 0.45f
+                    strokingAlphaConstant = 0.45f
+                }
                 PDPageContentStream(
                     document,
                     page,
@@ -987,6 +907,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
                     true,
                     true
                 ).use { stream ->
+                    stream.setGraphicsStateParameters(graphicsState)
                     stream.drawImage(watermarkImage, x, y, targetWidthPt, targetHeightPt)
                 }
             }
@@ -1032,7 +953,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
     companion object {
         const val DEFAULT_FOOTER_WATERMARK_TEXT = "VibeSync All in ONE PDF Suite"
         private const val TAG = "PdfBoxToolkitEngine"
-        private const val WATERMARK_METADATA_KEY = "VibeSync-Watermarked"
+        private const val WATERMARK_METADATA_KEY = "VibeSync-Watermarked-V2"
         private const val WATERMARK_METADATA_VALUE = "true"
     }
 }

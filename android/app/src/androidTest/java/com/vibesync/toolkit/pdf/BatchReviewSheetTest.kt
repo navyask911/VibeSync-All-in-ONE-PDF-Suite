@@ -55,7 +55,7 @@ class BatchReviewSheetTest {
                 },
                 onDeletePage = { id -> pages.removeAll { it.id == id } },
                 onAddPages = {},
-                onCompile = {}
+                onCompile = { _ -> }
             )
         }
         composeRule.onNodeWithTag("batch_page_count").assertIsDisplayed()

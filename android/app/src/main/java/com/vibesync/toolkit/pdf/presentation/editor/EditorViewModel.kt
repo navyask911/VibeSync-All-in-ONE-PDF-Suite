@@ -1,5 +1,7 @@
 package com.vibesync.toolkit.pdf.presentation.editor
 
+import com.vibesync.toolkit.pdf.core.util.generateSmartFileName
+
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Matrix
@@ -388,7 +390,15 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         _uiState.value = _uiState.value.copy(isSaving = true)
 
         viewModelScope.launch {
-            val outputFile = UriUtils.createExportCacheFile(getApplication(), "signed_annotated")
+            val exportDirectory = File(getApplication<Application>().cacheDir, "pdf_cache").apply {
+                if (!exists() && !mkdirs()) throw IOException("Unable to prepare the edited PDF export folder.")
+            }
+            val smartName = generateSmartFileName("VibeSync_Edited", "pdf")
+            var outputFile = File(exportDirectory, smartName)
+            var suffix = 1
+            while (outputFile.exists()) {
+                outputFile = File(exportDirectory, smartName.removeSuffix(".pdf") + "_${suffix++}.pdf")
+            }
             val result = toolkitEngine.flattenAnnotations(
                 sourceUri = sourceUri,
                 pageAnnotationsMap = pageAnnotationsMap,

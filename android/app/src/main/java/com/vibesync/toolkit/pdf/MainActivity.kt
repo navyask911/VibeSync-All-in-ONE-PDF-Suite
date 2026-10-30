@@ -80,6 +80,7 @@ import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.core.util.EngagementPolicy
 import com.vibesync.toolkit.pdf.core.util.ReviewEligibilityTracker
 import com.vibesync.toolkit.pdf.core.util.UriUtils
+import com.vibesync.toolkit.pdf.core.util.generateSmartFileName
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.data.pdf.createWhiteBackgroundBitmap
 import com.vibesync.toolkit.pdf.presentation.dashboard.DashboardScreen
@@ -237,7 +238,7 @@ class MainActivity : AppCompatActivity() {
                         }
 
                         val timestamp = System.currentTimeMillis()
-                        val requestedBaseName = "Scan_$timestamp"
+                        val requestedBaseName = generateSmartFileName("VibeSync_Scan", "pdf").removeSuffix(".pdf")
                         var finalFile = File(scanDirectory, "$requestedBaseName.pdf")
                         var suffix = 1
                         while (finalFile.exists() || scanDirectory.listFiles { _, name ->
@@ -708,7 +709,7 @@ class MainActivity : AppCompatActivity() {
                                 },
                                 onExportComplete = { savedFile ->
                                     recordSuccessfulPdfOperation()
-                                    shareFiles(listOf(savedFile), "application/pdf", "VibeSync_Edit_Signed")
+                                    shareFiles(listOf(savedFile), "application/pdf", "VibeSync_Edited")
                                     navController.popBackStack()
                                 }
                             )
@@ -1266,6 +1267,48 @@ class MainActivity : AppCompatActivity() {
         forceMultiple: Boolean = false
     ) {
         val validFiles = files.filter { it.exists() && it.length() > 0L }
+        if (validFiles.isEmpty()) {
+            Toast.makeText(this, getString(R.string.error_no_output_files), Toast.LENGTH_LONG).show()
+            return
+        }
+        if (mimeType == "application/pdf") {
+            lifecycleScope.launch {
+                val preparedResult = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val prepared = mutableListOf<File>()
+                        try {
+                            validFiles.forEach { source ->
+                                val output = UriUtils.createExportCacheFile(this@MainActivity, "VibeSync_Shared")
+                                toolkitEngine.watermarkPdf(
+                                    sourceUri = Uri.fromFile(source),
+                                    watermarkText = getString(R.string.pdf_watermark_text),
+                                    outputFile = output
+                                ).getOrThrow()
+                                prepared.add(output)
+                            }
+                            prepared
+                        } catch (error: Exception) {
+                            prepared.forEach { it.delete() }
+                            throw error
+                        }
+                    }
+                }
+                preparedResult.onSuccess { shareFilesPrepared(it, mimeType, defaultBaseName, forceMultiple) }
+                    .onFailure { error ->
+                        Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.error_prepare_pdf_sharing), Toast.LENGTH_LONG).show()
+                    }
+            }
+            return
+        }
+        shareFilesPrepared(validFiles, mimeType, defaultBaseName, forceMultiple)
+    }
+
+    private fun shareFilesPrepared(
+        validFiles: List<File>,
+        mimeType: String,
+        defaultBaseName: String,
+        forceMultiple: Boolean
+    ) {
         if (validFiles.isEmpty()) {
             Toast.makeText(this, getString(R.string.error_no_output_files), Toast.LENGTH_LONG).show()
             return

@@ -57,6 +57,18 @@ import com.vibesync.toolkit.pdf.data.model.Point2D
 import com.vibesync.toolkit.pdf.data.model.ToolMode
 import com.vibesync.toolkit.pdf.data.model.VectorStroke
 
+/**
+ * Converts transformed page pointer coordinates into the original unscaled bitmap coordinates.
+ */
+internal object EditorCanvasCoordinates {
+    fun toBitmapPoint(touchOffset: Offset, zoomScale: Float, panOffset: Offset): Point2D {
+        val safeZoomScale = zoomScale.coerceAtLeast(0.001f)
+        val bitmapX = (touchOffset.x - panOffset.x) / safeZoomScale
+        val bitmapY = (touchOffset.y - panOffset.y) / safeZoomScale
+        return Point2D(bitmapX, bitmapY)
+    }
+}
+
 @Composable
 fun VectorCanvasOverlay(
     toolMode: ToolMode,
@@ -80,13 +92,9 @@ fun VectorCanvasOverlay(
         else -> toolMode
     }
     val eraserRadiusPx = with(LocalDensity.current) { 8.dp.toPx() }
-    val safeZoomScale = zoomScale.coerceAtLeast(0.001f)
 
-    fun toCanvasPoint(touchOffset: Offset): Point2D {
-        val bitmapX = (touchOffset.x - panOffset.x) / safeZoomScale
-        val bitmapY = (touchOffset.y - panOffset.y) / safeZoomScale
-        return Point2D(bitmapX, bitmapY)
-    }
+    fun toCanvasPoint(touchOffset: Offset): Point2D =
+        EditorCanvasCoordinates.toBitmapPoint(touchOffset, zoomScale, panOffset)
 
     val inputModifier = when (activeToolMode) {
         ToolMode.TEXT -> modifier.pointerInput(zoomScale, panOffset) {
@@ -107,6 +115,7 @@ fun VectorCanvasOverlay(
                     activePoints = activePoints + toCanvasPoint(change.position)
                 },
                 onDragEnd = {
+                    // Persist inverse-transformed points in original page bitmap coordinates.
                     if (activePoints.size >= 2) {
                         onStrokeAdded(
                             VectorStroke(

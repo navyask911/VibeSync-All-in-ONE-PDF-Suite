@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -36,6 +37,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -59,6 +62,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.ImageBitmap
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.data.pdf.filters.FilterId
+import com.vibesync.toolkit.pdf.data.pdf.PageRangeParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -69,11 +73,14 @@ fun BatchReviewSheet(
     onMovePage: (Int, Int) -> Unit,
     onDeletePage: (String) -> Unit,
     onAddPages: () -> Unit,
-    onCompile: () -> Unit,
+    onCompile: (String) -> Unit,
     isCompiling: Boolean = false,
     progress: Float = 0f,
     modifier: Modifier = Modifier
 ) {
+    var showPageRangeDialog by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var pageRangeInput by remember { androidx.compose.runtime.mutableStateOf("All") }
+    var pageRangeError by remember { androidx.compose.runtime.mutableStateOf<String?>(null) }
     Column(modifier = modifier.fillMaxWidth().testTag("batch_review_sheet")) {
         Text(
             text = stringResource(R.string.batch_page_count, pages.size),
@@ -104,10 +111,54 @@ fun BatchReviewSheet(
             OutlinedButton(onClick = onAddPages, enabled = !isCompiling, modifier = Modifier.weight(1f).testTag("batch_add_pages")) {
                 Text(stringResource(R.string.batch_add_pages))
             }
-            Button(onClick = onCompile, enabled = pages.isNotEmpty() && !isCompiling, modifier = Modifier.weight(1f).testTag("batch_compile")) {
+            Button(
+                onClick = {
+                    pageRangeInput = "All"
+                    pageRangeError = null
+                    showPageRangeDialog = true
+                },
+                enabled = pages.isNotEmpty() && !isCompiling,
+                modifier = Modifier.weight(1f).testTag("batch_compile")
+            ) {
                 if (isCompiling) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                 else Text(stringResource(R.string.batch_compile_pdf))
             }
+        }
+        if (showPageRangeDialog) {
+            AlertDialog(
+                onDismissRequest = { showPageRangeDialog = false },
+                title = { Text("Page Range") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Use All or a comma-separated range such as 1-10, 15, 20-25.")
+                        OutlinedTextField(
+                            value = pageRangeInput,
+                            onValueChange = { pageRangeInput = it; pageRangeError = null },
+                            label = { Text("Page Range") },
+                            singleLine = true,
+                            modifier = Modifier.testTag("batch_page_range_input")
+                        )
+                        pageRangeError?.let {
+                            Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                        }
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        runCatching { PageRangeParser.parse(pageRangeInput, pages.size) }
+                            .onSuccess {
+                                showPageRangeDialog = false
+                                onCompile(pageRangeInput.trim())
+                            }
+                            .onFailure {
+                                pageRangeError = "Enter All or valid page numbers from 1 to ${pages.size}."
+                            }
+                    }, modifier = Modifier.testTag("batch_page_range_confirm")) { Text("Compile") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showPageRangeDialog = false }) { Text("Cancel") }
+                }
+            )
         }
         if (isCompiling) {
             Spacer(Modifier.height(10.dp))
@@ -125,9 +176,13 @@ private fun BatchPageThumbnail(
     pageCount: Int
 ) {
     var showFullPreview by remember(page.id) { androidx.compose.runtime.mutableStateOf(false) }
-    val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = page.id) {
+    val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = page.id, key2 = page.file.lastModified()) {
         value = withContext(Dispatchers.IO) {
-            PdfBitmapUtils.decodeFileDownsampled(page.file.absolutePath)
+            if (page.file.exists() && page.file.isFile) {
+                PdfBitmapUtils.decodeFileDownsampled(page.file.absolutePath)
+            } else {
+                null
+            }
         }
     }
     Card(
@@ -165,7 +220,15 @@ private fun BatchPageThumbnail(
                         contentScale = ContentScale.Fit
                     )
                 } else {
-                    Surface(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxWidth().height(112.dp)) {}
+                    Surface(color = MaterialTheme.colorScheme.surfaceVariant, modifier = Modifier.fillMaxSize()) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            Icon(Icons.Default.Image, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("Image unavailable", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
                 }
             }
             Text(stringResource(R.string.batch_page_number, index + 1), style = MaterialTheme.typography.labelMedium)

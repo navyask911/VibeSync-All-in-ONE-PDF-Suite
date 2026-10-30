@@ -8,7 +8,11 @@ import androidx.test.core.app.ApplicationProvider
 import com.vibesync.toolkit.pdf.data.print.PdfPrintDocumentAdapter
 import com.vibesync.toolkit.pdf.data.print.copyPdfBytes
 import com.vibesync.toolkit.pdf.data.pdf.FooterWatermarkLayout
+import com.vibesync.toolkit.pdf.data.pdf.PageRangeParser
+import com.vibesync.toolkit.pdf.core.util.generateSmartFileName
+import com.vibesync.toolkit.pdf.presentation.editor.EditorCanvasCoordinates
 import com.vibesync.toolkit.pdf.presentation.editor.SignatureStrokeMetrics
+import androidx.compose.ui.geometry.Offset
 import com.vibesync.toolkit.pdf.presentation.common.PrintTrigger
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
 import org.junit.Assert.assertEquals
@@ -72,6 +76,50 @@ class PdfPrintViewModelTest {
         )
         assertTrue(position.x > pageWidth * 0.5f)
         assertTrue(position.topY > pageHeight * 0.9f)
+    }
+
+    @Test
+    fun inverseZoomPanCoordinateMappingReturnsOriginalBitmapPoint() {
+        val point = EditorCanvasCoordinates.toBitmapPoint(
+            touchOffset = Offset(250f, 400f),
+            zoomScale = 2f,
+            panOffset = Offset(50f, 100f)
+        )
+        assertEquals(100f, point.x, 0.001f)
+        assertEquals(150f, point.y, 0.001f)
+    }
+
+    @Test
+    fun smartFileNameUsesBrandPrefixTimestampAndExtension() {
+        val name = generateSmartFileName("VibeSync_BatchScan", "pdf")
+        assertTrue(name.matches(Regex("VibeSync_BatchScan_\\d{8}_\\d{6}\\.pdf")))
+        val dotted = generateSmartFileName("VibeSync_Scan", ".pdf")
+        assertTrue(dotted.matches(Regex("VibeSync_Scan_\\d{8}_\\d{6}\\.pdf")))
+    }
+
+    @Test
+    fun pageRangeParserSupportsAllAndCustomRanges() {
+        assertEquals(listOf(1..25), PageRangeParser.parse("All", 25))
+        assertEquals(listOf(1..10, 15..15, 20..25), PageRangeParser.parse("1-10, 15, 20-25", 25))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun pageRangeParserRejectsOutOfBoundsPages() {
+        PageRangeParser.parse("1-10, 27", 25)
+    }
+
+    @Test
+    fun footerWatermarkUsesRequestedRightAndBottomMargins() {
+        val position = FooterWatermarkLayout.topLeft(
+            pageWidth = 595f,
+            pageHeight = 842f,
+            watermarkWidth = 120f,
+            watermarkHeight = 9f,
+            margin = 14f,
+            bottomMargin = 10f
+        )
+        assertEquals(461f, position.x, 0.001f)
+        assertEquals(823f, position.topY, 0.001f)
     }
 
     @Test

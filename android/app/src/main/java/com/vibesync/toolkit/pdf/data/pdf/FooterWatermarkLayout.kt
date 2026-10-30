@@ -12,13 +12,14 @@ internal object FooterWatermarkLayout {
         pageHeight: Float,
         watermarkWidth: Float,
         watermarkHeight: Float,
-        margin: Float = 16f
+        margin: Float = 16f,
+        bottomMargin: Float = margin
     ): FooterWatermarkPosition {
         require(pageWidth > 0f && pageHeight > 0f)
-        require(watermarkWidth >= 0f && watermarkHeight >= 0f && margin >= 0f)
+        require(watermarkWidth >= 0f && watermarkHeight >= 0f && margin >= 0f && bottomMargin >= 0f)
         return FooterWatermarkPosition(
             x = (pageWidth - margin - watermarkWidth).coerceAtLeast(0f),
-            topY = (pageHeight - margin - watermarkHeight).coerceAtLeast(0f)
+            topY = (pageHeight - bottomMargin - watermarkHeight).coerceAtLeast(0f)
         )
     }
 }

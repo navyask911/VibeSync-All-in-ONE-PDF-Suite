@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.PointerEventPass
@@ -412,7 +413,8 @@ fun PdfEditorScreen(
                         scaleX = scale,
                         scaleY = scale,
                         translationX = offset.x,
-                        translationY = offset.y
+                        translationY = offset.y,
+                        transformOrigin = TransformOrigin(0f, 0f)
                     )
                     .onGloballyPositioned { coordinates ->
                         screenWidthPx = coordinates.size.width.toFloat()

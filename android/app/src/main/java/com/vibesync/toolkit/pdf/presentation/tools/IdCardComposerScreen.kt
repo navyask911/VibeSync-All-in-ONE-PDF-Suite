@@ -50,6 +50,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.data.pdf.IdCardComposer
+import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
+import com.vibesync.toolkit.pdf.core.util.generateSmartFileName
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -179,12 +181,23 @@ fun IdCardComposerScreen(
                     busy = true
                     scope.launch {
                         val result = runCatching { withContext(Dispatchers.IO) {
-                            val output = File.createTempFile("id_card_", ".pdf", context.cacheDir)
-                            IdCardComposer.compose(front, back, output).getOrThrow()
+                            val composed = File.createTempFile("id_card_", ".pdf", context.cacheDir)
+                            IdCardComposer.compose(front, back, composed).getOrThrow()
+                            val watermarked = File.createTempFile("id_card_watermarked_", ".pdf", context.cacheDir)
+                            try {
+                                PdfBoxToolkitEngine(context).watermarkPdf(
+                                    sourceUri = Uri.fromFile(composed),
+                                    watermarkText = PdfBoxToolkitEngine.DEFAULT_FOOTER_WATERMARK_TEXT,
+                                    outputFile = watermarked
+                                ).getOrThrow()
+                            } finally {
+                                composed.delete()
+                            }
+                            watermarked
                         } }
                         if (result.isSuccess) {
                             pendingFile = result.getOrThrow()
-                            saveLauncher.launch("ID_Card_${System.currentTimeMillis()}.pdf")
+                            saveLauncher.launch(generateSmartFileName("VibeSync_IDCard", "pdf"))
                         } else {
                             message = R.string.id_card_save_failed
                             busy = false
