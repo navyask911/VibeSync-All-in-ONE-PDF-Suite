@@ -12,14 +12,11 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
-import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
-import com.tom_roush.pdfbox.pdmodel.PDDocument
-import com.tom_roush.pdfbox.pdmodel.PDPage
-import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.data.pdf.ResolutionProfile
 import com.vibesync.toolkit.pdf.data.pdf.ResolutionProfilePrefs
@@ -80,18 +77,15 @@ class ResolutionProfileSelectorTest {
 
     @Test
     fun pdfExportNameDialogShowsProfileSelector() {
-        val context = composeRule.activity
-        PDFBoxResourceLoader.init(context)
-        val file = File(context.cacheDir, "resolution-profile-export-test.pdf")
-        PDDocument().use { document ->
-            document.addPage(PDPage(PDRectangle.A4))
-            document.save(file)
-        }
+        val file = File(composeRule.activity.cacheDir, "resolution-profile-export-test.pdf")
+        file.writeBytes(byteArrayOf(0x25, 0x50, 0x44, 0x46))
 
         try {
             composeRule.activity.runOnUiThread {
+                // Exercise the dialog handoff directly. shareFiles() first performs asynchronous
+                // PDF watermark staging, which is outside this dialog's presentation contract.
                 val method = MainActivity::class.java.getDeclaredMethod(
-                    "shareFiles", List::class.java, String::class.java, String::class.java,
+                    "shareFilesPrepared", List::class.java, String::class.java, String::class.java,
                     Boolean::class.javaPrimitiveType!!
                 )
                 method.isAccessible = true
@@ -102,6 +96,8 @@ class ResolutionProfileSelectorTest {
                 composeRule.onAllNodesWithTag("resolution_profile_export_selector")
                     .fetchSemanticsNodes().isNotEmpty()
             }
+
+            composeRule.onAllNodesWithText("Name your output file").assertCountEquals(1)
 
             composeRule.onNodeWithTag("resolution_profile_SMALLEST")
                 .performScrollTo()
