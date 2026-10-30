@@ -48,18 +48,17 @@ class ExportFormatsTest {
         try {
             select("export_pdf")
             assertEquals("application/pdf", calls.last().first)
-            assertTrue(calls.last().second.endsWith(".pdf"))
+            assertTrue(Regex("""VibeSync_Export_\\d{8}_\\d{6}\\.pdf""").matches(calls.last().second))
 
             select("export_jpg_current")
             assertEquals("image/jpeg", calls.last().first)
-            assertTrue(calls.last().second.endsWith(".jpg"))
-            assertTrue(calls.last().second.contains("page_2"))
+            assertTrue(Regex("""VibeSync_Export_Page2_\\d{8}_\\d{6}\\.jpg""").matches(calls.last().second))
 
             composeRule.onNodeWithTag("export_menu").performClick()
             composeRule.onNodeWithTag("export_jpg_separate").performClick()
             composeRule.waitUntil(20_000) { calls.size >= 3 }
             assertEquals("image/jpeg", calls.last().first)
-            assertTrue(calls.last().second.endsWith(".jpg"))
+            assertTrue(Regex("""VibeSync_Export_Page1_\\d{8}_\\d{6}\\.jpg""").matches(calls.last().second))
 
             select("export_jpg_zip")
             assertEquals("application/zip", calls.last().first)
