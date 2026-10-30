@@ -84,7 +84,7 @@ class BatchScanViewModel(application: Application) : AndroidViewModel(applicatio
                         stagingFile.outputStream().use { output -> input.copyTo(output) }
                     } ?: throw IOException("Unable to read a captured page.")
                     val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    BitmapFactory.decodeFile(temp.absolutePath, options)
+                    BitmapFactory.decodeFile(stagingFile.absolutePath, options)
                     if (options.outWidth <= 0 || options.outHeight <= 0) throw IOException("Unable to decode a captured page.")
                     val bytes = options.outWidth.toLong() * options.outHeight.toLong() * 4L
                     if (bytes > memoryLimit || totalBytes > memoryLimit - bytes) throw BatchMemoryLimitException()
