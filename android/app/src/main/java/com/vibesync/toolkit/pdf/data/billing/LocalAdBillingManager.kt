@@ -6,7 +6,7 @@ import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingFlowParams
 import com.android.billingclient.api.ConsumeParams
-import com.android.billingclient.api.ConsumeResponseListener
+import com.android.billingclient.api.BillingResult
 import com.android.billingclient.api.PendingPurchasesParams
 import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
@@ -38,7 +38,8 @@ class LocalAdBillingManager(
     private val fingerprintProvider: () -> String = { DeviceUtils.fingerprint(context) },
     private val clock: () -> Long = System::currentTimeMillis,
     billingClientForTest: BillingClient? = null,
-    private val managerScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val managerScope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.IO),
+    private val consumeFn: (suspend (String) -> BillingResult)? = null
 ) {
     private val _state = MutableStateFlow(ProEntitlementState(false, 0L, 0))
     val state: StateFlow<ProEntitlementState> = _state.asStateFlow()
@@ -214,11 +215,20 @@ class LocalAdBillingManager(
     }
 
     suspend fun grantIfValid(purchase: Purchase) {
+        if (BillingConstants.PRO_PASS_PRODUCT_ID !in purchase.products) return
+        val quantity = purchase.quantity.coerceIn(1, BillingConstants.MAX_STACK_YEARS)
+        applyGrantForTest(purchase.purchaseToken, quantity, purchase.purchaseState)
+    }
+
+    internal suspend fun applyGrantForTest(
+        token: String,
+        quantity: Int,
+        state: Int
+    ) {
         // Serialize grants so two distinct consumed purchases cannot calculate the same base expiry.
         grantMutex.lock()
         try {
-            if (BillingConstants.PRO_PASS_PRODUCT_ID !in purchase.products) return
-            when (purchase.purchaseState) {
+            when (state) {
                 Purchase.PurchaseState.PENDING -> {
                     _pendingPurchase.value = true
                     _events.tryEmit(BillingConstants.PURCHASE_PENDING_MESSAGE)
@@ -228,30 +238,14 @@ class LocalAdBillingManager(
                 else -> return
             }
 
-            val token = purchase.purchaseToken
             if (prefs.getProcessedTokens().contains(token)) return
 
-            val quantity = purchase.quantity.coerceIn(1, BillingConstants.MAX_STACK_YEARS)
             val newExpiry = maxOf(clock(), prefs.getExpiry()) +
                 quantity.toLong() * BillingConstants.PRO_PASS_DURATION_MS
-            val consumeResult = suspendCancellableCoroutine<com.android.billingclient.api.BillingResult?> { continuation ->
-                try {
-                    val consumeParams = ConsumeParams.newBuilder()
-                        .setPurchaseToken(token)
-                        .build()
-                    billingClient.consumeAsync(
-                        consumeParams,
-                        ConsumeResponseListener { result, _ ->
-                            if (continuation.isActive) continuation.resume(result)
-                        }
-                    )
-                } catch (_: Exception) {
-                    if (continuation.isActive) continuation.resume(null)
-                }
-            }
+            val result = consumeFn?.invoke(token) ?: suspendConsumeDefault(token)
 
-            if (consumeResult?.responseCode == BillingClient.BillingResponseCode.OK) {
-                prefs.persistGrant(newExpiry, fingerprintProvider(), token)
+            if (result.responseCode == BillingClient.BillingResponseCode.OK) {
+                applyConsumeSuccess(prefs, token, newExpiry)
                 refreshState()
             } else {
                 _events.tryEmit(BillingConstants.BILLING_UNAVAILABLE_MESSAGE)
@@ -259,6 +253,34 @@ class LocalAdBillingManager(
         } finally {
             grantMutex.unlock()
         }
+    }
+
+    private suspend fun suspendConsumeDefault(token: String): BillingResult =
+        suspendCancellableCoroutine { continuation ->
+            try {
+                val consumeParams = ConsumeParams.newBuilder()
+                    .setPurchaseToken(token)
+                    .build()
+                billingClient.consumeAsync(consumeParams) { result, _ ->
+                    if (continuation.isActive) continuation.resume(result)
+                }
+            } catch (_: Exception) {
+                if (continuation.isActive) {
+                    continuation.resume(
+                        BillingResult.newBuilder()
+                            .setResponseCode(BillingClient.BillingResponseCode.ERROR)
+                            .build()
+                    )
+                }
+            }
+        }
+
+    private fun applyConsumeSuccess(
+        prefs: BillingPreferences,
+        token: String,
+        newExpiry: Long
+    ) {
+        prefs.persistGrant(newExpiry, fingerprintProvider(), token)
     }
 
     private fun refreshState() {

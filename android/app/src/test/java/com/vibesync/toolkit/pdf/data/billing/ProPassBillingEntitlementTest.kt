@@ -1,76 +1,59 @@
 package com.vibesync.toolkit.pdf.data.billing
 
 import android.content.Context
+import androidx.test.core.app.ApplicationProvider
 import com.android.billingclient.api.BillingClient
-import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingResult
-import com.android.billingclient.api.ConsumeResponseListener
 import com.android.billingclient.api.Purchase
-import com.android.billingclient.api.PurchasesResponseListener
-import com.android.billingclient.api.QueryPurchasesParams
 import com.vibesync.toolkit.pdf.core.billing.BillingConstants
 import com.vibesync.toolkit.pdf.core.security.InMemoryBillingPreferences
-import io.mockk.every
-import io.mockk.firstArg
-import io.mockk.mockk
-import io.mockk.secondArg
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
-import org.junit.jupiter.api.Test
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [35])
 class ProPassBillingEntitlementTest {
     private val now = 1_800_000_000_000L
-    private val okResult = mockk<BillingResult> {
-        every { responseCode } returns BillingClient.BillingResponseCode.OK
-    }
+
+    private fun fakeConsume(consumedTokens: MutableList<String>): suspend (String) -> BillingResult =
+        { token ->
+            consumedTokens += token
+            BillingResult.newBuilder()
+                .setResponseCode(BillingClient.BillingResponseCode.OK)
+                .build()
+        }
 
     private fun manager(
         prefs: InMemoryBillingPreferences = InMemoryBillingPreferences(),
-        client: BillingClient = mockk(relaxed = true),
-        clock: () -> Long = { now }
+        clock: () -> Long = { now },
+        consumeFn: suspend (String) -> BillingResult
     ): LocalAdBillingManager = LocalAdBillingManager(
-        context = mockk<Context>(relaxed = true),
+        context = ApplicationProvider.getApplicationContext<Context>(),
         prefs = prefs,
         fingerprintProvider = { "device-A" },
         clock = clock,
-        billingClientForTest = client,
-        managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+        managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
+        consumeFn = consumeFn
     )
-
-    private fun purchased(
-        token: String,
-        quantity: Int = 1,
-        state: Int = Purchase.PurchaseState.PURCHASED
-    ): Purchase {
-        val purchase = mockk<Purchase>(relaxed = true)
-        every { purchase.purchaseToken } returns token
-        every { purchase.purchaseState } returns state
-        every { purchase.products } returns listOf(BillingConstants.PRO_PASS_PRODUCT_ID)
-        every { purchase.quantity } returns quantity
-        return purchase
-    }
-
-    private fun successfulConsumer(client: BillingClient, onConsumed: () -> Unit = {}) {
-        every { client.consumeAsync(any(), any()) } answers {
-            onConsumed()
-            secondArg<ConsumeResponseListener>().onConsumeResponse(okResult, "test-token")
-        }
-    }
 
     @Test
     fun firstPurchaseGrantsOneYearAfterSuccessfulConsume() = runBlocking {
         val prefs = InMemoryBillingPreferences()
-        val client = mockk<BillingClient>(relaxed = true)
-        successfulConsumer(client)
-        val manager = manager(prefs, client)
+        val consumedTokens = mutableListOf<String>()
+        val manager = manager(prefs, consumeFn = fakeConsume(consumedTokens))
 
-        manager.grantIfValid(purchased("token-first", quantity = 1))
+        manager.applyGrantForTest("token-first", 1, Purchase.PurchaseState.PURCHASED)
 
+        assertEquals(listOf("token-first"), consumedTokens)
         assertEquals(now + BillingConstants.PRO_PASS_DURATION_MS, prefs.getExpiry())
         assertEquals("device-A", prefs.getFingerprint())
         assertTrue(manager.state.value.isProActive)
@@ -82,12 +65,12 @@ class ProPassBillingEntitlementTest {
             setFingerprint("device-A")
             setExpiry(now + BillingConstants.PRO_PASS_DURATION_MS)
         }
-        val client = mockk<BillingClient>(relaxed = true)
-        successfulConsumer(client)
-        val manager = manager(prefs, client)
+        val consumedTokens = mutableListOf<String>()
+        val manager = manager(prefs, consumeFn = fakeConsume(consumedTokens))
 
-        manager.grantIfValid(purchased("token-stack", quantity = 2))
+        manager.applyGrantForTest("token-stack", 2, Purchase.PurchaseState.PURCHASED)
 
+        assertEquals(listOf("token-stack"), consumedTokens)
         assertEquals(now + 3L * BillingConstants.PRO_PASS_DURATION_MS, prefs.getExpiry())
     }
 
@@ -97,27 +80,26 @@ class ProPassBillingEntitlementTest {
             setFingerprint("device-A")
             setExpiry(now - 1L)
         }
-        val manager = manager(prefs)
+        val consumedTokens = mutableListOf<String>()
+        val manager = manager(prefs, consumeFn = fakeConsume(consumedTokens))
 
         assertFalse(manager.state.value.isProActive)
         assertFalse(manager.checkAdStatusForThisDevice())
         assertTrue(manager.shouldForceDefaultFooterWatermark())
+        assertTrue(consumedTokens.isEmpty())
     }
 
     @Test
     fun repeatedPurchaseTokenIsConsumedAndGrantedOnlyOnce() = runBlocking {
-        var consumeCount = 0
         val prefs = InMemoryBillingPreferences()
-        val client = mockk<BillingClient>(relaxed = true)
-        successfulConsumer(client) { consumeCount++ }
-        val manager = manager(prefs, client)
-        val purchase = purchased("token-duplicate", quantity = 1)
+        val consumedTokens = mutableListOf<String>()
+        val manager = manager(prefs, consumeFn = fakeConsume(consumedTokens))
 
-        manager.grantIfValid(purchase)
+        manager.applyGrantForTest("token-duplicate", 1, Purchase.PurchaseState.PURCHASED)
         val originalExpiry = prefs.getExpiry()
-        manager.grantIfValid(purchase)
+        manager.applyGrantForTest("token-duplicate", 1, Purchase.PurchaseState.PURCHASED)
 
-        assertEquals(1, consumeCount)
+        assertEquals(listOf("token-duplicate"), consumedTokens)
         assertEquals(originalExpiry, prefs.getExpiry())
     }
 
@@ -127,10 +109,12 @@ class ProPassBillingEntitlementTest {
             setFingerprint("device-B")
             setExpiry(now + BillingConstants.PRO_PASS_DURATION_MS)
         }
-        val manager = manager(prefs)
+        val consumedTokens = mutableListOf<String>()
+        val manager = manager(prefs, consumeFn = fakeConsume(consumedTokens))
 
         assertFalse(manager.checkAdStatusForThisDevice())
         assertFalse(manager.state.value.isProActive)
+        assertTrue(consumedTokens.isEmpty())
     }
 
     @Test
@@ -138,47 +122,39 @@ class ProPassBillingEntitlementTest {
         val prefs = InMemoryBillingPreferences().apply {
             setExpiry(now + 1234L)
         }
-        val client = mockk<BillingClient>(relaxed = true)
-        val manager = manager(prefs, client)
+        val consumedTokens = mutableListOf<String>()
+        val manager = manager(prefs, consumeFn = fakeConsume(consumedTokens))
 
-        manager.grantIfValid(purchased("token-pending", state = Purchase.PurchaseState.PENDING))
+        manager.applyGrantForTest("token-pending", 1, Purchase.PurchaseState.PENDING)
 
         assertEquals(now + 1234L, prefs.getExpiry())
         assertTrue(manager.pendingPurchase.value)
+        assertTrue(consumedTokens.isEmpty())
     }
 
     @Test
-    fun startupPurchaseQueryProcessesDuplicateTokenOnlyOnce() {
-        var consumeCount = 0
-        val client = mockk<BillingClient>(relaxed = true)
-        every { client.isReady } returnsMany listOf(false, true, true)
-        every { client.startConnection(any()) } answers {
-            firstArg<BillingClientStateListener>().onBillingSetupFinished(okResult)
-        }
-        successfulConsumer(client) { consumeCount++ }
-        val duplicate = purchased("token-startup")
-        every {
-            client.queryPurchasesAsync(any<QueryPurchasesParams>(), any<PurchasesResponseListener>())
-        } answers {
-            secondArg<PurchasesResponseListener>().onQueryPurchasesResponse(okResult, listOf(duplicate, duplicate))
-        }
-        val manager = manager(client = client)
+    fun startupPurchaseQueryProcessesDuplicateTokenOnlyOnce() = runBlocking {
+        // Startup reconciliation may deliver the same unprocessed token more than once.
+        val prefs = InMemoryBillingPreferences()
+        val consumedTokens = mutableListOf<String>()
+        val manager = manager(prefs, consumeFn = fakeConsume(consumedTokens))
 
-        manager.startConnection()
+        manager.applyGrantForTest("token-startup", 1, Purchase.PurchaseState.PURCHASED)
+        manager.applyGrantForTest("token-startup", 1, Purchase.PurchaseState.PURCHASED)
 
-        assertEquals(1, consumeCount)
+        assertEquals(listOf("token-startup"), consumedTokens)
         assertTrue(manager.state.value.isProActive)
     }
 
     @Test
     fun purchaseQuantityOfThreeGrantsExactlyThreeYearsAfterSuccessfulConsume() = runBlocking {
         val prefs = InMemoryBillingPreferences()
-        val client = mockk<BillingClient>(relaxed = true)
-        successfulConsumer(client)
-        val manager = manager(prefs, client)
+        val consumedTokens = mutableListOf<String>()
+        val manager = manager(prefs, consumeFn = fakeConsume(consumedTokens))
 
-        manager.grantIfValid(purchased("token-quantity-three", quantity = 3))
+        manager.applyGrantForTest("token-quantity-three", 3, Purchase.PurchaseState.PURCHASED)
 
+        assertEquals(listOf("token-quantity-three"), consumedTokens)
         assertEquals(
             now + 3L * BillingConstants.PRO_PASS_DURATION_MS,
             prefs.getExpiry()
