@@ -130,6 +130,7 @@ dependencies {
     implementation("com.google.android.play:app-update:2.1.0")
     implementation("com.google.android.play:review:2.0.2")
     implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("com.android.billingclient:billing-ktx:7.1.1")
 
     // Jetpack Compose BOM & UI
     implementation(platform("androidx.compose:compose-bom:2024.12.01"))
