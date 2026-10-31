@@ -111,7 +111,7 @@ class LocalAdBillingManager(
                 billingClient.queryProductDetailsAsync(params) { result, queryResult ->
                     if (!continuation.isActive) return@queryProductDetailsAsync
                     val found = if (result.responseCode == BillingClient.BillingResponseCode.OK) {
-                        queryResult.productDetailsList.firstOrNull {
+                        queryResult.firstOrNull {
                             it.productId == BillingConstants.PRO_PASS_PRODUCT_ID
                         }
                     } else {
