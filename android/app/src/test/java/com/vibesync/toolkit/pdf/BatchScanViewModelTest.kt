@@ -89,7 +89,7 @@ class BatchScanViewModelTest {
         assertTrue(vm.handleCaptureResult(Activity.RESULT_OK,sources.map(Uri::fromFile)))
         waitFor{vm.state.value.pages.size==2}
     }
-    private fun sourcePages(app:Application):List<File>=(1..2).map{index->
+    private fun sourcePages(app: Application): List<File> = (1..2).map { index ->
         val f=File.createTempFile("batch-vm-$index-",".jpg",app.cacheDir)
         val bitmap=Bitmap.createBitmap(96,144,Bitmap.Config.ARGB_8888)
         try {

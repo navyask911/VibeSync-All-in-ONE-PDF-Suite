@@ -77,7 +77,7 @@ class PdfEditorScreenTest {
         composeTestRule.onNodeWithTag("editor_pdf_page").performTouchInput {
             val y = height * 0.45f
             down(0, Offset(width * 0.35f, y)); down(1, Offset(width * 0.65f, y))
-            move(0, Offset(width * 0.20f, y)); move(1, Offset(width * 0.80f, y))
+            moveTo(0, Offset(width * 0.20f, y)); moveTo(1, Offset(width * 0.80f, y))
             up(0); up(1)
         }
         composeTestRule.waitForIdle()
