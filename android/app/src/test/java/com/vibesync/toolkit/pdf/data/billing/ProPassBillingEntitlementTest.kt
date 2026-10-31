@@ -3,8 +3,13 @@ package com.vibesync.toolkit.pdf.data.billing
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.android.billingclient.api.BillingClient
+import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingResult
 import com.android.billingclient.api.Purchase
+import com.android.billingclient.api.PurchasesResponseListener
+import io.mockk.every
+import io.mockk.mockk
+import io.mockk.slot
 import com.vibesync.toolkit.pdf.core.billing.BillingConstants
 import com.vibesync.toolkit.pdf.core.security.InMemoryBillingPreferences
 import kotlinx.coroutines.CoroutineScope
@@ -35,12 +40,14 @@ class ProPassBillingEntitlementTest {
     private fun manager(
         prefs: InMemoryBillingPreferences = InMemoryBillingPreferences(),
         clock: () -> Long = { now },
+        billingClientForTest: BillingClient? = null,
         consumeFn: suspend (String) -> BillingResult
     ): LocalAdBillingManager = LocalAdBillingManager(
         context = ApplicationProvider.getApplicationContext<Context>(),
         prefs = prefs,
         fingerprintProvider = { "device-A" },
         clock = clock,
+        billingClientForTest = billingClientForTest,
         managerScope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
         consumeFn = consumeFn
     )
@@ -134,15 +141,43 @@ class ProPassBillingEntitlementTest {
 
     @Test
     fun startupPurchaseQueryProcessesDuplicateTokenOnlyOnce() = runBlocking {
-        // Startup reconciliation may deliver the same unprocessed token more than once.
+        // Exercise the real startup callbacks and return the same Play purchase twice.
         val prefs = InMemoryBillingPreferences()
         val consumedTokens = mutableListOf<String>()
-        val manager = manager(prefs, consumeFn = fakeConsume(consumedTokens))
+        val billingClient = mockk<BillingClient>()
+        val connectionListener = slot<BillingClientStateListener>()
+        val purchasesListener = slot<PurchasesResponseListener>()
 
-        manager.applyGrantForTest("token-startup", 1, Purchase.PurchaseState.PURCHASED)
-        manager.applyGrantForTest("token-startup", 1, Purchase.PurchaseState.PURCHASED)
+        every { billingClient.isReady } returnsMany listOf(false, true)
+        every { billingClient.startConnection(capture(connectionListener)) } returns Unit
+        every {
+            billingClient.queryPurchasesAsync(any(), capture(purchasesListener))
+        } returns Unit
+
+        val purchase1 = mockk<Purchase>()
+        every { purchase1.products } returns listOf(BillingConstants.PRO_PASS_PRODUCT_ID)
+        every { purchase1.purchaseToken } returns "token-startup"
+        every { purchase1.quantity } returns 1
+        every { purchase1.purchaseState } returns Purchase.PurchaseState.PURCHASED
+
+        val manager = manager(
+            prefs,
+            billingClientForTest = billingClient,
+            consumeFn = fakeConsume(consumedTokens)
+        )
+
+        manager.startConnection()
+        val okResult = BillingResult.newBuilder()
+            .setResponseCode(BillingClient.BillingResponseCode.OK)
+            .build()
+        connectionListener.captured.onBillingSetupFinished(okResult)
+        purchasesListener.captured.onQueryPurchasesResponse(
+            okResult,
+            listOf(purchase1, purchase1)
+        )
 
         assertEquals(listOf("token-startup"), consumedTokens)
+        assertEquals(now + BillingConstants.PRO_PASS_DURATION_MS, prefs.getExpiry())
         assertTrue(manager.state.value.isProActive)
     }
 
