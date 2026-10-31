@@ -50,6 +50,28 @@ internal object ZoomCoordinateMapping {
         return Rect(left, top, left + pageWidth, top + pageHeight)
     }
 
+    /**
+     * Pure screen-to-normalized mapping for pointer targets outside a center-origin graphicsLayer.
+     * The production editor uses Option 1 and does not call this inverse helper.
+     */
+    fun screenToNormalized(
+        touch: Offset,
+        zoomScale: Float,
+        panOffset: Offset,
+        containerSize: Size,
+        pageRect: Rect
+    ): Offset {
+        val safeScale = zoomScale.coerceAtLeast(0.001f)
+        val centerX = containerSize.width / 2f
+        val centerY = containerSize.height / 2f
+        val unzoomedX = (touch.x - centerX - panOffset.x) / safeScale + centerX
+        val unzoomedY = (touch.y - centerY - panOffset.y) / safeScale + centerY
+        return Offset(
+            ((unzoomedX - pageRect.left) / pageRect.width.coerceAtLeast(0.001f)).coerceIn(0f, 1f),
+            ((unzoomedY - pageRect.top) / pageRect.height.coerceAtLeast(0.001f)).coerceIn(0f, 1f)
+        )
+    }
+
     /** Normalizes an already-local CASE A point against the actual fitted page, not its margins. */
     fun toNormalizedPagePoint(
         touch: Offset,

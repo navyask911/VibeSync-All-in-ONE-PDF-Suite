@@ -161,8 +161,10 @@ fun VectorCanvasOverlay(
         else -> modifier
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Canvas(modifier = inputModifier.fillMaxSize()) {
+    // Pointer input and preview Canvas are descendants of the fitted page graphicsLayer.
+    // Compose resolves zoom/pan exactly once before coordinates reach the page-local pointer node.
+    Box(modifier = inputModifier.fillMaxSize()) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
             val pageRect = ZoomCoordinateMapping.calculatePageRect(size, bitmapSize)
             fun toCanvasPoint(point: Point2D): Offset = Offset(
                 pageRect.left + point.x * pageRect.width,

@@ -17,6 +17,8 @@ import com.vibesync.toolkit.pdf.data.print.PdfPrintDocumentAdapter
 import com.vibesync.toolkit.pdf.presentation.common.PrintTrigger
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.data.pdf.PdfRendererEngine
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.text.PDFTextStripper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -278,6 +280,31 @@ class PdfViewerViewModel @JvmOverloads constructor(
 
     fun cacheKeyForPage(pageIndex: Int, scale: Float): String? =
         rendererEngine.cacheKeyForPage(pageIndex, scale)
+
+    fun searchText(query: String, onResult: (Int?) -> Unit) {
+        val value = query.trim()
+        val uri = activeUri
+        if (value.isEmpty() || uri == null) { onResult(null); return }
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) {
+                    val localFile = UriUtils.copyUriToCacheFile(app, uri, "viewer_search")
+                    try {
+                        PDDocument.load(localFile).use { document ->
+                            val stripper = PDFTextStripper()
+                            (0 until document.numberOfPages).firstOrNull { index ->
+                                stripper.startPage = index + 1
+                                stripper.endPage = index + 1
+                                stripper.getText(document).contains(value, ignoreCase = true)
+                            }
+                        }
+                    } finally { localFile.delete() }
+                }
+            }.getOrNull()
+            onResult(result)
+        }
+    }
 
     fun onPageScrolled(pageIndex: Int) {
         if (_uiState.value.currentPageIndex != pageIndex) {

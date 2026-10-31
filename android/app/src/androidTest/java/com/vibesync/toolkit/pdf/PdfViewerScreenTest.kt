@@ -209,6 +209,38 @@ class PdfViewerScreenTest {
         verify(exactly = 1) { mockViewModel.retryLastDocument() }
     }
 
+
+    @Test
+    fun twoRowToolbarKeepsEveryActionAndFilenameCanOpenRename() {
+        val stateFlow = MutableStateFlow(
+            com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(
+                fileName = "Very_Long_Physical_Device_Report_2026.pdf", pageCount = 1,
+                isLoading = false,
+                pagesMetadata = listOf(PageMetadata(pageIndex = 0, widthPt = 595f, heightPt = 842f))
+            )
+        )
+        every { mockViewModel.uiState } returns stateFlow
+        coEvery { mockViewModel.acquirePageBitmap(any(), any()) } returns null
+        var renameRequests = 0
+        composeTestRule.setContent {
+            PdfViewerScreen(documentUri = testUri, viewModel = mockViewModel,
+                onNavigateBack = {}, onNavigateToEditor = {}, onShareDocument = {},
+                onRenameClick = { renameRequests++ })
+        }
+        composeTestRule.onNodeWithTag("viewer_rename_title").assertIsDisplayed()
+            .assertHasClickAction().performClick()
+        composeTestRule.runOnIdle { assert(renameRequests == 1) }
+        composeTestRule.onNodeWithTag("viewer_search").performClick()
+        composeTestRule.onNodeWithText("Search in document").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("viewer_search_field").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Cancel").performClick()
+        composeTestRule.onNodeWithTag("viewer_more_actions").performClick()
+        listOf("viewer_zoom_out","viewer_zoom_in","viewer_previous_page","viewer_next_page",
+            "viewer_share","viewer_edit","viewer_print","viewer_export_menu").forEach { tag ->
+            composeTestRule.onNodeWithTag(tag, useUnmergedTree = true).assertExists()
+        }
+    }
+
     private fun fakeLease(bitmap: Bitmap): BitmapCache.BitmapLease {
         val lease = mockk<BitmapCache.BitmapLease>(relaxed = true)
         every { lease.key } returns "ui-test-${System.identityHashCode(bitmap)}"

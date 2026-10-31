@@ -2,6 +2,7 @@ package com.vibesync.toolkit.pdf
 
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
@@ -16,12 +17,15 @@ import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.presentation.editor.EditorUiState
 import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
 import com.vibesync.toolkit.pdf.data.model.ToolMode
+import com.vibesync.toolkit.pdf.data.model.VectorStroke
 import com.vibesync.toolkit.pdf.presentation.editor.PdfEditorScreen
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.flow.MutableStateFlow
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -53,6 +57,40 @@ class PdfEditorScreenTest {
         composeTestRule.onNodeWithText("Place Text").performClick()
 
         verify(exactly = 1) { viewModel.addTextAnnotation("Hello", any(), any()) }
+    }
+
+
+    @Test
+    fun zoomedPageDragStoresNormalizedStrokeCoordinates() {
+        val vm = mockk<EditorViewModel>(relaxed = true)
+        every { vm.uiState } returns MutableStateFlow(EditorUiState(toolMode = ToolMode.PEN))
+        val bitmap = Bitmap.createBitmap(595, 842, Bitmap.Config.ARGB_8888)
+        coEvery { vm.getPageBitmap(any()) } returns bitmap
+        val captured = slot<VectorStroke>()
+        composeTestRule.setContent {
+            VibeSyncPdfTheme {
+                PdfEditorScreen(documentUri = Uri.parse("content://test/zoomed.pdf"),
+                    viewModel = vm, onNavigateBack = {}, onExportComplete = {})
+            }
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("editor_pdf_page").performTouchInput {
+            val y = height * 0.45f
+            down(0, Offset(width * 0.35f, y)); down(1, Offset(width * 0.65f, y))
+            move(0, Offset(width * 0.20f, y)); move(1, Offset(width * 0.80f, y))
+            up(0); up(1)
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("editor_canvas_overlay").performTouchInput {
+            swipe(start = Offset(width * 0.34f, height * 0.40f),
+                end = Offset(width * 0.53f, height * 0.48f), durationMillis = 450)
+        }
+        composeTestRule.waitForIdle()
+        verify(timeout = 5_000, exactly = 1) { vm.addStroke(capture(captured)) }
+        assertTrue(captured.captured.points.size >= 2)
+        assertTrue(captured.captured.points.all { it.x in 0f..1f && it.y in 0f..1f })
+        assertTrue(captured.captured.points.first().x in 0.20f..0.65f)
+        bitmap.recycle()
     }
 
     @Test

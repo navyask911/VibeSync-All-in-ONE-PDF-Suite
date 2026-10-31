@@ -410,6 +410,8 @@ fun PdfEditorScreen(
                     .testTag("editor_pdf_page") // Standard A4 Aspect Ratio
                     .shadow(8.dp, RoundedCornerShape(4.dp))
                     .background(Color.White)
+                    // Drawing input and preview are descendants of this transformed fitted page.
+                    // Compose applies scale/pan once before the overlay stores normalized coordinates.
                     .graphicsLayer(
                         scaleX = scale,
                         scaleY = scale,

@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -93,6 +94,8 @@ fun PdfViewerScreen(
     var scanMenuExpanded by remember(documentUri) { mutableStateOf(false) }
     var showRenameScanDialog by remember(documentUri) { mutableStateOf(false) }
     var showDeleteScanDialog by remember(documentUri) { mutableStateOf(false) }
+    var showSearchDialog by remember(documentUri) { mutableStateOf(false) }
+    var searchQuery by rememberSaveable(documentUri) { mutableStateOf("") }
     var renamedScanName by rememberSaveable(documentUri) { mutableStateOf("") }
 
     LaunchedEffect(uiState.fileName, documentUri) {
@@ -136,72 +139,30 @@ fun PdfViewerScreen(
     Scaffold(
         topBar = {
             AnimatedVisibility(visible = areBarsVisible) {
-                TopAppBar(
-                    title = {
-                        Text(
-                            text = uiState.fileName,
-                            maxLines = 1,
-                            modifier = Modifier
-                                .fillMaxWidth(0.85f)
-                                .basicMarquee(iterations = Int.MAX_VALUE)
-                                .clickable { onRenameClick(uiState.fileName) }
-                                .testTag("viewer_rename_title"),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    navigationIcon = {
+                val compactActions = LocalConfiguration.current.screenWidthDp < 440
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Row(Modifier.fillMaxWidth().height(56.dp).padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
                         IconButton(onClick = onNavigateBack) {
                             Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
                         }
-                    },
-                    actions = {
-                        Row(
-                            modifier = Modifier.widthIn(max = 260.dp)
-                                .horizontalScroll(rememberScrollState())
-                                .padding(horizontal = 2.dp),
-                            horizontalArrangement = Arrangement.spacedBy(0.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                    IconButton(
-                        onClick = {
-                            scale = (scale / 1.25f).coerceAtLeast(1f)
-                            if (scale <= 1f) { offsetX = 0f; offsetY = 0f }
-                        },
-                        enabled = scale > 1f
-                    ) { Icon(Icons.Default.ZoomOut, contentDescription = stringResource(R.string.reset_zoom)) }
-                    IconButton(onClick = { scale = (scale * 1.25f).coerceAtMost(5f) }) {
-                        Icon(Icons.Default.ZoomIn, contentDescription = stringResource(R.string.reset_zoom))
-                    }
-                    if (scale > 1.05f) {
-                        IconButton(onClick = { scale = 1f; offsetX = 0f; offsetY = 0f }) {
-                            Icon(Icons.Default.ZoomOutMap, contentDescription = stringResource(R.string.reset_zoom))
-                        }
-                    }
-                    IconButton(
-                        onClick = {
-                            val target = (uiState.currentPageIndex - 1).coerceAtLeast(0)
-                            viewModel.onPageScrolled(target)
-                            coroutineScope.launch { listState.scrollToItem(target) }
-                        },
-                        enabled = uiState.currentPageIndex > 0
-                    ) { Icon(Icons.Default.NavigateBefore, contentDescription = "Previous page") }
-                    IconButton(
-                        onClick = {
-                            val target = (uiState.currentPageIndex + 1).coerceAtMost(uiState.pageCount - 1)
-                            viewModel.onPageScrolled(target)
-                            coroutineScope.launch { listState.scrollToItem(target) }
-                        },
-                        enabled = uiState.pageCount > 0 && uiState.currentPageIndex < uiState.pageCount - 1
-                    ) { Icon(Icons.Default.NavigateNext, contentDescription = "Next page") }
-                    if (!isManagedScan) {
-                        IconButton(onClick = onShareDocument) {
-                            Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share_pdf), tint = VibeSyncCrimsonPrimary)
-                        }
-                    }
-                    IconButton(onClick = { onNavigateToEditor(documentUri) }) {
-                        Icon(Icons.Default.Draw, contentDescription = stringResource(R.string.edit_sign_action), tint = VibeSyncCrimsonPrimary)
-                    }
+                        Text(
+                            text = uiState.fileName, maxLines = 1, overflow = TextOverflow.Clip,
+                            modifier = Modifier.weight(1f)
+                                .basicMarquee(iterations = Int.MAX_VALUE)
+                                .clickable { onRenameClick(uiState.fileName) }
+                                .testTag("viewer_rename_title"),
+                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold
+                        )
+                        Box {
+                            IconButton(onClick = { scanMenuExpanded = true },
+                                modifier = Modifier.testTag("viewer_more_actions")) {
+                                Icon(Icons.Default.MoreVert,
+                                    contentDescription = if (isManagedScan) stringResource(R.string.scan_action_menu) else "More actions")
+                            }
+                            DropdownMenu(expanded = scanMenuExpanded, onDismissRequest = { scanMenuExpanded = false }) {
+                                if (compactActions) {
+                                    DropdownMenuItem(text = { Text("Print") }, trailingIcon = {
                     IconButton(
                         onClick = {
                             if (isPreparingPrint) return@IconButton
@@ -280,48 +241,164 @@ fun PdfViewerScreen(
                         if (isPreparingPrint) CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
                         else Icon(Icons.Default.Print, contentDescription = "Print")
                     }
-                    ExportMenu(sourceUri = documentUri, currentPageIndex = uiState.currentPageIndex, testTag = "viewer_export_menu")
-                    if (isManagedScan) {
-                        Box {
-                            IconButton(onClick = { scanMenuExpanded = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.scan_action_menu))
+                                    }, onClick = { scanMenuExpanded = false })
+                                    DropdownMenuItem(text = { Text("Download / Save") }, leadingIcon = {
+                                        ExportMenu(sourceUri = documentUri, currentPageIndex = uiState.currentPageIndex,
+                                            testTag = "viewer_export_menu")
+                                    }, onClick = { scanMenuExpanded = false })
+                                }
+                                if (scale > 1.05f) {
+                                    DropdownMenuItem(text = { Text("Reset zoom") },
+                                        leadingIcon = { Icon(Icons.Default.ZoomOutMap, contentDescription = stringResource(R.string.reset_zoom)) },
+                                        onClick = { scale = 1f; offsetX = 0f; offsetY = 0f; scanMenuExpanded = false })
+                                }
+                                if (isManagedScan) {
+                                    DropdownMenuItem(text = { Text(stringResource(R.string.share_pdf)) },
+                                        leadingIcon = { Icon(Icons.Default.PictureAsPdf, contentDescription = null) },
+                                        onClick = { scanMenuExpanded = false; onShareScanPdf() })
+                                    DropdownMenuItem(text = { Text(stringResource(R.string.scan_share_images)) },
+                                        leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
+                                        onClick = { scanMenuExpanded = false; onShareScanImages() })
+                                    DropdownMenuItem(text = { Text(stringResource(R.string.scan_save_downloads)) },
+                                        leadingIcon = { Icon(Icons.Default.SaveAlt, contentDescription = null) },
+                                        onClick = { scanMenuExpanded = false; onSaveScanToDownloads() })
+                                    DropdownMenuItem(text = { Text(stringResource(R.string.scan_rename)) },
+                                        leadingIcon = { Icon(Icons.Default.DriveFileRenameOutline, contentDescription = null) },
+                                        onClick = {
+                                            scanMenuExpanded = false
+                                            renamedScanName = uiState.fileName.removeSuffix(".pdf").removeSuffix(".PDF")
+                                            showRenameScanDialog = true
+                                        })
+                                    DropdownMenuItem(text = { Text(stringResource(R.string.scan_delete)) },
+                                        leadingIcon = { Icon(Icons.Default.DeleteOutline, contentDescription = null) },
+                                        onClick = { scanMenuExpanded = false; showDeleteScanDialog = true })
+                                }
                             }
-                            DropdownMenu(expanded = scanMenuExpanded, onDismissRequest = { scanMenuExpanded = false }) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.share_pdf)) },
-                                    leadingIcon = { Icon(Icons.Default.PictureAsPdf, contentDescription = null) },
-                                    onClick = { scanMenuExpanded = false; onShareScanPdf() }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.scan_share_images)) },
-                                    leadingIcon = { Icon(Icons.Default.Image, contentDescription = null) },
-                                    onClick = { scanMenuExpanded = false; onShareScanImages() }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.scan_save_downloads)) },
-                                    leadingIcon = { Icon(Icons.Default.SaveAlt, contentDescription = null) },
-                                    onClick = { scanMenuExpanded = false; onSaveScanToDownloads() }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.scan_rename)) },
-                                    leadingIcon = { Icon(Icons.Default.DriveFileRenameOutline, contentDescription = null) },
-                                    onClick = {
-                                        scanMenuExpanded = false
-                                        renamedScanName = uiState.fileName.removeSuffix(".pdf").removeSuffix(".PDF")
-                                        showRenameScanDialog = true
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 2.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { showSearchDialog = true }, modifier = Modifier.testTag("viewer_search")) {
+                            Icon(Icons.Default.Search, contentDescription = "Search")
+                        }
+                        IconButton(
+                            onClick = {
+                                scale = (scale / 1.25f).coerceAtLeast(1f)
+                                if (scale <= 1f) { offsetX = 0f; offsetY = 0f }
+                            }, enabled = scale > 1f, modifier = Modifier.testTag("viewer_zoom_out")
+                        ) { Icon(Icons.Default.ZoomOut, contentDescription = stringResource(R.string.reset_zoom)) }
+                        IconButton(onClick = { scale = (scale * 1.25f).coerceAtMost(5f) },
+                            modifier = Modifier.testTag("viewer_zoom_in")) {
+                            Icon(Icons.Default.ZoomIn, contentDescription = stringResource(R.string.reset_zoom))
+                        }
+                        IconButton(
+                            onClick = {
+                                val target = (uiState.currentPageIndex - 1).coerceAtLeast(0)
+                                viewModel.onPageScrolled(target)
+                                coroutineScope.launch { listState.scrollToItem(target) }
+                            }, enabled = uiState.currentPageIndex > 0,
+                            modifier = Modifier.testTag("viewer_previous_page")
+                        ) { Icon(Icons.Default.NavigateBefore, contentDescription = "Previous page") }
+                        IconButton(
+                            onClick = {
+                                val target = (uiState.currentPageIndex + 1).coerceAtMost(uiState.pageCount - 1)
+                                viewModel.onPageScrolled(target)
+                                coroutineScope.launch { listState.scrollToItem(target) }
+                            }, enabled = uiState.pageCount > 0 && uiState.currentPageIndex < uiState.pageCount - 1,
+                            modifier = Modifier.testTag("viewer_next_page")
+                        ) { Icon(Icons.Default.NavigateNext, contentDescription = "Next page") }
+                        if (!isManagedScan) {
+                            IconButton(onClick = onShareDocument, modifier = Modifier.testTag("viewer_share")) {
+                                Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share_pdf), tint = VibeSyncCrimsonPrimary)
+                            }
+                        }
+                        IconButton(onClick = { onNavigateToEditor(documentUri) }, modifier = Modifier.testTag("viewer_edit")) {
+                            Icon(Icons.Default.Draw, contentDescription = stringResource(R.string.edit_sign_action), tint = VibeSyncCrimsonPrimary)
+                        }
+                        if (!compactActions) {
+                    IconButton(
+                        onClick = {
+                            if (isPreparingPrint) return@IconButton
+                            isPreparingPrint = true
+                            val activity = generateSequence(context) { (it as? ContextWrapper)?.baseContext }
+                                .filterIsInstance<Activity>()
+                                .firstOrNull()
+                            if (activity == null) {
+                                println("PdfViewerScreen: Print click could not resolve Activity from LocalContext")
+                                isPreparingPrint = false
+                                return@IconButton
+                            }
+                            println("PdfViewerScreen: Print click resolved Activity; preparing print dispatch")
+                            val jobName = context.getString(R.string.print_job_name, uiState.fileName)
+                            val attributes = PrintAttributes.Builder()
+                                .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+                                .setResolution(PrintAttributes.Resolution("pdf_print", "PDF print", 300, 300))
+                                .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
+                                .build()
+                            val sourceFile = if (documentUri.scheme == "file") documentUri.path?.let(::File) else null
+                            if (sourceFile != null && sourceFile.isFile && sourceFile.canRead() && sourceFile.length() > 0L) {
+                                var preparedFile: File? = null
+                                try {
+                                    preparedFile = UriUtils.copyUriToCacheFile(context, documentUri, "print_ready").also { file ->
+                                        if (!file.isFile || !file.canRead() || file.length() <= 0L) {
+                                            file.delete()
+                                            throw IOException("The selected PDF is not ready for printing.")
+                                        }
                                     }
-                                )
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.scan_delete)) },
-                                    leadingIcon = { Icon(Icons.Default.DeleteOutline, contentDescription = null) },
-                                    onClick = { scanMenuExpanded = false; showDeleteScanDialog = true }
-                                )
+                                    viewModel.setPreparedPrintFile(preparedFile)
+                                    println("PdfViewerScreen: dispatching Print through PdfViewerViewModel")
+                                    viewModel.printDocument(activity, jobName, attributes)
+                                    preparedFile = null
+                                } catch (error: Exception) {
+                                    preparedFile?.delete()
+                                    android.widget.Toast.makeText(
+                                        context,
+                                        error.localizedMessage ?: context.getString(R.string.print_failed),
+                                        android.widget.Toast.LENGTH_LONG
+                                    ).show()
+                                } finally {
+                                    isPreparingPrint = false
+                                }
+                            } else {
+                                coroutineScope.launch {
+                                    var preparedFile: File? = null
+                                    try {
+                                        preparedFile = withContext(Dispatchers.IO) {
+                                            UriUtils.copyUriToCacheFile(context, documentUri, "print_ready").also { file ->
+                                                if (!file.isFile || !file.canRead() || file.length() <= 0L) {
+                                                    file.delete()
+                                                    throw IOException("The selected PDF is not ready for printing.")
+                                                }
+                                            }
+                                        }
+                                        viewModel.setPreparedPrintFile(requireNotNull(preparedFile))
+                                        println("PdfViewerScreen: dispatching Print through PdfViewerViewModel")
+                                        viewModel.printDocument(activity, jobName, attributes)
+                                        preparedFile = null
+                                    } catch (error: Exception) {
+                                        preparedFile?.delete()
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            error.localizedMessage ?: context.getString(R.string.print_failed),
+                                            android.widget.Toast.LENGTH_LONG
+                                        ).show()
+                                    } finally {
+                                        isPreparingPrint = false
+                                    }
+                                }
                             }
+                        },
+                        enabled = !isPreparingPrint,
+                        modifier = Modifier.testTag("viewer_print")
+                    ) {
+                        if (isPreparingPrint) CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                        else Icon(Icons.Default.Print, contentDescription = "Print")
+                    }
+                            ExportMenu(sourceUri = documentUri, currentPageIndex = uiState.currentPageIndex,
+                                testTag = "viewer_export_menu")
                         }
                     }
-                        }
-                    }
-                )
+                }
             }
         },
         bottomBar = {
@@ -537,6 +614,31 @@ fun PdfViewerScreen(
                 }
             }
         }
+    }
+
+    if (showSearchDialog) {
+        AlertDialog(
+            onDismissRequest = { showSearchDialog = false },
+            title = { Text("Search in document") },
+            text = {
+                OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it },
+                    label = { Text("Text to find") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("viewer_search_field"))
+            },
+            confirmButton = {
+                TextButton(enabled = searchQuery.isNotBlank(), onClick = {
+                    val query = searchQuery.trim()
+                    showSearchDialog = false
+                    viewModel.searchText(query) { pageIndex ->
+                        if (pageIndex != null) {
+                            viewModel.onPageScrolled(pageIndex)
+                            coroutineScope.launch { listState.scrollToItem(pageIndex) }
+                        } else android.widget.Toast.makeText(context, "No matching text found.", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }) { Text("Search") }
+            },
+            dismissButton = { TextButton(onClick = { showSearchDialog = false }) { Text("Cancel") } }
+        )
     }
 
     if (isManagedScan && showRenameScanDialog) {
