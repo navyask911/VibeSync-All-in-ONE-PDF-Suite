@@ -1,7 +1,6 @@
 package com.vibesync.toolkit.pdf.presentation.editor
 
 import android.graphics.Bitmap
-import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -68,9 +67,7 @@ fun VectorCanvasOverlay(
     onStrokeAdded: (VectorStroke) -> Unit,
     onTap: (Offset) -> Unit,
     modifier: Modifier = Modifier,
-    bitmapSize: IntSize = IntSize.Zero,
-    zoomScale: Float = 1f,
-    panOffset: Offset = Offset.Zero
+    bitmapSize: IntSize = IntSize.Zero
 ) {
     var activePoints by remember { mutableStateOf<List<Point2D>>(emptyList()) }
     var eraserEnabled by remember { mutableStateOf(toolMode == ToolMode.ERASER) }
@@ -98,13 +95,6 @@ fun VectorCanvasOverlay(
             val normalizedStrokeWidth = strokeWidth / pageRect.width.coerceAtLeast(1f)
             fun toNormalizedPoint(touch: Offset): Point2D {
                 val point = ZoomCoordinateMapping.toNormalizedPagePoint(touch, containerSize, bitmapSize)
-                Log.d(
-                    "PdfEditorCoordinates",
-                    "localCanvasSize=${containerSize.width}x${containerSize.height}, " +
-                        "bitmapSize=${bitmapSize.width}x${bitmapSize.height}, " +
-                        "zoomScale=${zoomScale}, panOffset=${panOffset}, " +
-                        "touch=${touch}, normalized=${point}"
-                )
                 return Point2D(point.x, point.y)
             }
             detectDragGestures(
