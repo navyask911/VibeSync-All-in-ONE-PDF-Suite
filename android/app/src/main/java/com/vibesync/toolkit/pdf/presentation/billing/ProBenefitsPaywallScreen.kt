@@ -78,8 +78,9 @@ fun ProBenefitsPaywallScreen(
     val selectedQuantity = quantity.toInt().coerceIn(1, BillingConstants.MAX_STACK_YEARS)
     val fallbackBase = BillingConstants.PRO_PASS_DISPLAY_PRICE_FALLBACK
         .removeSuffix(BillingConstants.YEAR_PRICE_SUFFIX)
-    val fallbackTotal = "$fallbackBase × $selectedQuantity${BillingConstants.YEAR_PRICE_SUFFIX}"
+    val fallbackTotal = "$fallbackBase × $selectedQuantity"
     val offer = productDetails?.oneTimePurchaseOfferDetails
+    val estimatedUnitPrice = offer?.formattedPrice ?: fallbackBase
     val totalPrice = offer?.let {
         runCatching {
             val formatter = NumberFormat.getCurrencyInstance(Locale.getDefault())
@@ -87,6 +88,8 @@ fun ProBenefitsPaywallScreen(
             formatter.format(it.priceAmountMicros.toDouble() * selectedQuantity / 1_000_000.0)
         }.getOrDefault("${it.formattedPrice} × $selectedQuantity")
     } ?: fallbackTotal
+    val selectedYearsLabel = if (selectedQuantity == 1) BillingConstants.YEAR_LABEL else BillingConstants.YEARS_LABEL
+    val estimatedPriceLine = "Estimated: $totalPrice ($selectedQuantity $selectedYearsLabel × $estimatedUnitPrice)"
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -142,7 +145,7 @@ fun ProBenefitsPaywallScreen(
                     }
                 }
                 Button(
-                    onClick = { billingManager.launchPurchase(activity, 1) },
+                    onClick = { billingManager.launchPurchase(activity) },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Extend +1 Year")
@@ -159,8 +162,13 @@ fun ProBenefitsPaywallScreen(
                 }
             }
 
-            Text("Choose how many years to add", style = MaterialTheme.typography.titleMedium)
-            Text("$selectedQuantity ${if (selectedQuantity == 1) BillingConstants.YEAR_LABEL else BillingConstants.YEARS_LABEL}")
+            Text("Estimate a purchase quantity", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "You'll choose how many years to buy in the Play dialog. Up to ${BillingConstants.MAX_STACK_YEARS} years allowed.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text("$selectedQuantity $selectedYearsLabel")
             Slider(
                 value = quantity,
                 onValueChange = { quantity = it },
@@ -168,18 +176,14 @@ fun ProBenefitsPaywallScreen(
                 steps = (BillingConstants.MAX_STACK_YEARS - 2).coerceAtLeast(0)
             )
             Text(
-                text = if (offer == null) {
-                    "Price: $fallbackTotal"
-                } else {
-                    "Price: ${offer.formattedPrice} × $selectedQuantity  •  Total: $totalPrice"
-                },
+                text = estimatedPriceLine,
                 style = MaterialTheme.typography.titleMedium
             )
             Button(
-                onClick = { billingManager.launchPurchase(activity, selectedQuantity) },
+                onClick = { billingManager.launchPurchase(activity) },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("Unlock Pro Now ($totalPrice)")
+                Text("Unlock Pro Now")
             }
             TextButton(
                 onClick = {

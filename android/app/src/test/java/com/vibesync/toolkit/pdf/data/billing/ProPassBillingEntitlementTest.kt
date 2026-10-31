@@ -169,4 +169,20 @@ class ProPassBillingEntitlementTest {
         assertEquals(1, consumeCount)
         assertTrue(manager.state.value.isProActive)
     }
+
+    @Test
+    fun purchaseQuantityOfThreeGrantsExactlyThreeYearsAfterSuccessfulConsume() = runBlocking {
+        val prefs = InMemoryBillingPreferences()
+        val client = mockk<BillingClient>(relaxed = true)
+        successfulConsumer(client)
+        val manager = manager(prefs, client)
+
+        manager.grantIfValid(purchased("token-quantity-three", quantity = 3))
+
+        assertEquals(
+            now + 3L * BillingConstants.PRO_PASS_DURATION_MS,
+            prefs.getExpiry()
+        )
+        assertTrue(manager.state.value.isProActive)
+    }
 }

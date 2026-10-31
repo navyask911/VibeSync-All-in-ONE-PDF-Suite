@@ -128,22 +128,24 @@ class LocalAdBillingManager(
         return details
     }
 
-    fun launchPurchase(activity: Activity, quantity: Int) {
+    fun launchPurchase(activity: Activity) {
         val details = _productDetails.value
         if (!billingClient.isReady || details == null) {
             _events.tryEmit(BillingConstants.BILLING_UNAVAILABLE_MESSAGE)
             return
         }
 
-        val clampedQuantity = quantity.coerceIn(1, BillingConstants.MAX_STACK_YEARS)
-        val productParams = BillingFlowParams.ProductDetailsParams.newBuilder()
-            .setProductDetails(details)
-            .setQuantity(clampedQuantity)
-            .build()
-        val flowParams = BillingFlowParams.newBuilder()
-            .setProductDetailsParamsList(listOf(productParams))
-            .build()
-        val result = billingClient.launchBillingFlow(activity, flowParams)
+        val productDetailsParams =
+            BillingFlowParams.ProductDetailsParams.newBuilder()
+                .setProductDetails(details)
+                .build()
+
+        val billingFlowParams =
+            BillingFlowParams.newBuilder()
+                .setProductDetailsParamsList(listOf(productDetailsParams))
+                .build()
+
+        val result = billingClient.launchBillingFlow(activity, billingFlowParams)
         if (result.responseCode != BillingClient.BillingResponseCode.OK &&
             result.responseCode != BillingClient.BillingResponseCode.USER_CANCELED
         ) {
