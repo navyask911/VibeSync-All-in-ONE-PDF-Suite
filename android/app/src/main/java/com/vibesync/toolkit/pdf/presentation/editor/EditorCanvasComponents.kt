@@ -36,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Path
@@ -57,18 +58,6 @@ import com.vibesync.toolkit.pdf.data.model.Point2D
 import com.vibesync.toolkit.pdf.data.model.ToolMode
 import com.vibesync.toolkit.pdf.data.model.VectorStroke
 
-/**
- * Converts transformed page pointer coordinates into the original unscaled bitmap coordinates.
- */
-internal object EditorCanvasCoordinates {
-    fun toBitmapPoint(touchOffset: Offset, zoomScale: Float, panOffset: Offset): Point2D {
-        val safeZoomScale = zoomScale.coerceAtLeast(0.001f)
-        val bitmapX = (touchOffset.x - panOffset.x) / safeZoomScale
-        val bitmapY = (touchOffset.y - panOffset.y) / safeZoomScale
-        return Point2D(bitmapX, bitmapY)
-    }
-}
-
 @Composable
 fun VectorCanvasOverlay(
     toolMode: ToolMode,
@@ -78,8 +67,7 @@ fun VectorCanvasOverlay(
     onStrokeAdded: (VectorStroke) -> Unit,
     onTap: (Offset) -> Unit,
     modifier: Modifier = Modifier,
-    zoomScale: Float = 1f,
-    panOffset: Offset = Offset.Zero
+    bitmapSize: IntSize = IntSize.Zero
 ) {
     var activePoints by remember { mutableStateOf<List<Point2D>>(emptyList()) }
     var eraserEnabled by remember { mutableStateOf(toolMode == ToolMode.ERASER) }
@@ -93,35 +81,37 @@ fun VectorCanvasOverlay(
     }
     val eraserRadiusPx = with(LocalDensity.current) { 8.dp.toPx() }
 
-    fun toCanvasPoint(touchOffset: Offset): Point2D =
-        EditorCanvasCoordinates.toBitmapPoint(touchOffset, zoomScale, panOffset)
-
     val inputModifier = when (activeToolMode) {
-        ToolMode.TEXT -> modifier.pointerInput(zoomScale, panOffset) {
-            detectTapGestures { touchOffset ->
-                val point = toCanvasPoint(touchOffset)
-                onTap(Offset(point.x, point.y))
-            }
+        // The pointer node is inside the transformed page layer. Compose already
+        // maps taps into this canvas's unscaled local coordinate space.
+        ToolMode.TEXT -> modifier.pointerInput(bitmapSize) {
+            detectTapGestures { touchOffset -> onTap(touchOffset) }
         }
         ToolMode.PEN, ToolMode.HIGHLIGHTER -> modifier.pointerInput(
-            activeToolMode, strokeColor, strokeWidth, zoomScale, panOffset
+            activeToolMode, strokeColor, strokeWidth, bitmapSize
         ) {
+            val containerSize = Size(size.width.toFloat(), size.height.toFloat())
+            val pageRect = ZoomCoordinateMapping.calculatePageRect(containerSize, bitmapSize)
+            val normalizedStrokeWidth = strokeWidth / pageRect.width.coerceAtLeast(1f)
+            fun toNormalizedPoint(touch: Offset): Point2D {
+                val point = ZoomCoordinateMapping.toNormalizedPagePoint(touch, containerSize, bitmapSize)
+                return Point2D(point.x, point.y)
+            }
             detectDragGestures(
                 onDragStart = { touchOffset ->
-                    activePoints = listOf(toCanvasPoint(touchOffset))
+                    activePoints = listOf(toNormalizedPoint(touchOffset))
                 },
                 onDrag = { change, _ ->
                     change.consume()
-                    activePoints = activePoints + toCanvasPoint(change.position)
+                    activePoints = activePoints + toNormalizedPoint(change.position)
                 },
                 onDragEnd = {
-                    // Persist inverse-transformed points in original page bitmap coordinates.
                     if (activePoints.size >= 2) {
                         onStrokeAdded(
                             VectorStroke(
                                 points = activePoints,
                                 colorArgb = strokeColor.toArgb(),
-                                strokeWidth = strokeWidth,
+                                strokeWidth = normalizedStrokeWidth,
                                 isHighlighter = activeToolMode == ToolMode.HIGHLIGHTER,
                                 alpha = if (activeToolMode == ToolMode.HIGHLIGHTER) 0.35f else 1.0f
                             )
@@ -129,39 +119,41 @@ fun VectorCanvasOverlay(
                     }
                     activePoints = emptyList()
                 },
-                onDragCancel = {
-                    activePoints = emptyList()
-                }
+                onDragCancel = { activePoints = emptyList() }
             )
         }
         ToolMode.ERASER -> modifier.pointerInput(
-            activeToolMode, eraserRadiusPx, onStrokeAdded, zoomScale, panOffset
+            activeToolMode, eraserRadiusPx, onStrokeAdded, bitmapSize
         ) {
+            val containerSize = Size(size.width.toFloat(), size.height.toFloat())
+            val pageRect = ZoomCoordinateMapping.calculatePageRect(containerSize, bitmapSize)
+            val normalizedRadius = eraserRadiusPx / pageRect.width.coerceAtLeast(1f)
+            fun toNormalizedPoint(touch: Offset): Point2D {
+                val point = ZoomCoordinateMapping.toNormalizedPagePoint(touch, containerSize, bitmapSize)
+                return Point2D(point.x, point.y)
+            }
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
-                val pathPoints = mutableListOf(toCanvasPoint(down.position))
+                val pathPoints = mutableListOf(toNormalizedPoint(down.position))
                 var lastPosition = down.position
                 down.consume()
-
                 do {
                     val event = awaitPointerEvent()
                     val change = event.changes.firstOrNull { it.id == down.id }
                     if (change != null) {
                         if (change.position != lastPosition) {
-                            pathPoints.add(toCanvasPoint(change.position))
+                            pathPoints.add(toNormalizedPoint(change.position))
                             lastPosition = change.position
                         }
                         if (change.pressed) change.consume()
                     }
                 } while (event.changes.any { it.pressed })
-
-                // The ViewModel consumes this marker; it never becomes a saved drawing stroke.
                 onStrokeAdded(
                     VectorStroke(
                         id = EditorViewModel.ERASER_GESTURE_ID,
                         points = pathPoints,
                         colorArgb = Color.Transparent.toArgb(),
-                        strokeWidth = eraserRadiusPx
+                        strokeWidth = normalizedRadius
                     )
                 )
             }
@@ -171,42 +163,54 @@ fun VectorCanvasOverlay(
 
     Box(modifier = Modifier.fillMaxSize()) {
         Canvas(modifier = inputModifier.fillMaxSize()) {
-        existingStrokes.forEach { stroke ->
-            if (stroke.points.size >= 2) {
-                val path = Path().apply {
-                    moveTo(stroke.points.first().x, stroke.points.first().y)
-                    stroke.points.drop(1).forEach { lineTo(it.x, it.y) }
+            val pageRect = ZoomCoordinateMapping.calculatePageRect(size, bitmapSize)
+            fun toCanvasPoint(point: Point2D): Offset = Offset(
+                pageRect.left + point.x * pageRect.width,
+                pageRect.top + point.y * pageRect.height
+            )
+            existingStrokes.forEach { stroke ->
+                if (stroke.points.size >= 2) {
+                    val path = Path().apply {
+                        val first = toCanvasPoint(stroke.points.first())
+                        moveTo(first.x, first.y)
+                        stroke.points.drop(1).forEach { point ->
+                            val mapped = toCanvasPoint(point)
+                            lineTo(mapped.x, mapped.y)
+                        }
+                    }
+                    val isHighlighter = stroke.isHighlighter
+                    val color = Color(stroke.colorArgb).copy(alpha = if (isHighlighter) 0.35f else stroke.alpha)
+                    drawPath(
+                        path = path,
+                        color = color,
+                        style = Stroke(
+                            width = stroke.strokeWidth * pageRect.width,
+                            cap = StrokeCap.Round,
+                            join = StrokeJoin.Round
+                        ),
+                        blendMode = if (isHighlighter) BlendMode.Multiply else BlendMode.SrcOver
+                    )
                 }
-                val isHighlighter = stroke.isHighlighter
-                val color = Color(stroke.colorArgb).copy(alpha = if (isHighlighter) 0.35f else stroke.alpha)
+            }
+            val active = activePoints
+            if (active.size >= 2) {
+                val isHighlighter = activeToolMode == ToolMode.HIGHLIGHTER
+                val color = if (isHighlighter) strokeColor.copy(alpha = 0.35f) else strokeColor
+                val path = Path().apply {
+                    val first = toCanvasPoint(active.first())
+                    moveTo(first.x, first.y)
+                    active.drop(1).forEach { point ->
+                        val mapped = toCanvasPoint(point)
+                        lineTo(mapped.x, mapped.y)
+                    }
+                }
                 drawPath(
                     path = path,
                     color = color,
-                    style = Stroke(
-                        width = stroke.strokeWidth,
-                        cap = StrokeCap.Round,
-                        join = StrokeJoin.Round
-                    ),
+                    style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round),
                     blendMode = if (isHighlighter) BlendMode.Multiply else BlendMode.SrcOver
                 )
             }
-        }
-
-        val active = activePoints
-        if (active.size >= 2) {
-            val isHighlighter = activeToolMode == ToolMode.HIGHLIGHTER
-            val color = if (isHighlighter) strokeColor.copy(alpha = 0.35f) else strokeColor
-            val path = Path().apply {
-                moveTo(active.first().x, active.first().y)
-                active.drop(1).forEach { lineTo(it.x, it.y) }
-            }
-            drawPath(
-                path = path,
-                color = color,
-                style = Stroke(width = strokeWidth, cap = StrokeCap.Round, join = StrokeJoin.Round),
-                blendMode = if (isHighlighter) BlendMode.Multiply else BlendMode.SrcOver
-            )
-        }
         }
 
         TextButton(

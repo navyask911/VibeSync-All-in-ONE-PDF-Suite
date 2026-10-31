@@ -7,8 +7,9 @@ internal object PageRangeParser {
     fun parse(input: String, pageCount: Int): List<IntRange> {
         require(pageCount > 0) { "The document has no pages." }
         val value = input.trim()
-        require(value.isNotEmpty()) { "Enter All or at least one page number." }
-        if (value.equals("all", ignoreCase = true)) return listOf(1..pageCount)
+        if (value.isEmpty() || value.equals("all", ignoreCase = true)) {
+            return listOf(1..pageCount)
+        }
 
         return value.split(',').map { token ->
             val part = token.trim()

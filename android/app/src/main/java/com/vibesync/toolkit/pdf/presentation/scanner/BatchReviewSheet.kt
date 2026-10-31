@@ -76,7 +76,8 @@ fun BatchReviewSheet(
     onCompile: (String) -> Unit,
     isCompiling: Boolean = false,
     progress: Float = 0f,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClearAll: () -> Unit = {}
 ) {
     var showPageRangeDialog by remember { androidx.compose.runtime.mutableStateOf(false) }
     var pageRangeInput by remember { androidx.compose.runtime.mutableStateOf("All") }
@@ -123,6 +124,13 @@ fun BatchReviewSheet(
                 if (isCompiling) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
                 else Text(stringResource(R.string.batch_compile_pdf))
             }
+        }
+        TextButton(
+            onClick = onClearAll,
+            enabled = pages.isNotEmpty() && !isCompiling,
+            modifier = Modifier.fillMaxWidth().testTag("batch_clear_all")
+        ) {
+            Text("Clear All")
         }
         if (showPageRangeDialog) {
             AlertDialog(
@@ -376,6 +384,7 @@ fun BatchScanScreen(
                     onAddPages = { viewModel.requestCapture(); onStartCapture() },
                     onCompile = viewModel::compileBatch,
                     isCompiling = state.isCompiling,
+                    onClearAll = viewModel::clearPages,
                     progress = state.progress
                 )
             }

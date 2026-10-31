@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -502,8 +503,7 @@ fun PdfEditorScreen(
                             showTextInputDialog = true
                         }
                     },
-                    zoomScale = scale,
-                    panOffset = offset
+                    bitmapSize = bitmap?.let { IntSize(it.width, it.height) } ?: IntSize.Zero
                 )
             }
         }

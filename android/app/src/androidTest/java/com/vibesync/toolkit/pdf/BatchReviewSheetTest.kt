@@ -55,7 +55,8 @@ class BatchReviewSheetTest {
                 },
                 onDeletePage = { id -> pages.removeAll { it.id == id } },
                 onAddPages = {},
-                onCompile = { _ -> }
+                onCompile = { _ -> },
+                onClearAll = { pages.clear() }
             )
         }
         composeRule.onNodeWithTag("batch_page_count").assertIsDisplayed()
@@ -79,6 +80,11 @@ class BatchReviewSheetTest {
         composeRule.runOnIdle { assertEquals(listOf("c", "b"), pages.map { it.id }) }
         composeRule.onNodeWithTag("batch_page_count").assertIsDisplayed()
         composeRule.onNodeWithTag("batch_review_sheet").assertIsDisplayed()
+        composeRule.onNodeWithTag("batch_compile").performClick()
+        composeRule.onNodeWithTag("batch_page_range_input").assertIsDisplayed()
+        composeRule.onNodeWithTag("batch_page_range_confirm").performClick()
+        composeRule.onNodeWithTag("batch_clear_all").performClick()
+        composeRule.runOnIdle { assertEquals(emptyList<String>(), pages.map { it.id }) }
         listOf(a.file, b.file, c.file).forEach { it.delete() }
     }
 

@@ -135,7 +135,8 @@ class BatchScanViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun clearPages() {
         compileJob?.cancel()
-        // Captured JPGs are persistent user files; this only clears transient review state.
+        // Delete persistent scan images only after the user explicitly chooses Clear All.
+        _state.value.pages.forEach { page -> page.file.delete() }
         _state.value = _state.value.copy(pages = emptyList(), isCompiling = false, progress = 0f, savedFile = null)
     }
 
@@ -173,7 +174,6 @@ class BatchScanViewModel(application: Application) : AndroidViewModel(applicatio
                 ).getOrThrow()
                 // Keep the original JPEGs. Clear only the transient UI queue after successful compile.
                 _state.value = _state.value.copy(
-                    pages = emptyList(),
                     isCompiling = false,
                     progress = 1f,
                     savedFile = result.file,

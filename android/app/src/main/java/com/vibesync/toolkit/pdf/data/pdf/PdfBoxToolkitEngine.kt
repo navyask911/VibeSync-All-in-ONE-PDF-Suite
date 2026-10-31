@@ -638,16 +638,16 @@ class PdfBoxToolkitEngine(private val context: Context) {
                                     val g = Color.green(stroke.colorArgb) / 255f
                                     val b = Color.blue(stroke.colorArgb) / 255f
                                     cs.setStrokingColor(r, g, b)
-                                    cs.setLineWidth(stroke.strokeWidth * scaleFactor)
+                                    cs.setLineWidth(stroke.strokeWidth * pageWidthPt)
 
                                     val first = stroke.points.first()
-                                    val startPdfX = first.x * scaleFactor
-                                    val startPdfY = pageHeightPt - (first.y * scaleFactor)
+                                    val startPdfX = first.x.coerceIn(0f, 1f) * pageWidthPt
+                                    val startPdfY = pageHeightPt - (first.y.coerceIn(0f, 1f) * pageHeightPt)
                                     cs.moveTo(startPdfX, startPdfY)
 
                                     for (i in 1 until stroke.points.size) {
                                         val pt = stroke.points[i]
-                                        cs.lineTo(pt.x * scaleFactor, pageHeightPt - (pt.y * scaleFactor))
+                                        cs.lineTo(pt.x.coerceIn(0f, 1f) * pageWidthPt, pageHeightPt - (pt.y.coerceIn(0f, 1f) * pageHeightPt))
                                     }
                                     cs.stroke()
                                 }
@@ -666,16 +666,16 @@ class PdfBoxToolkitEngine(private val context: Context) {
                                     val g = Color.green(stroke.colorArgb) / 255f
                                     val b = Color.blue(stroke.colorArgb) / 255f
                                     cs.setStrokingColor(r, g, b)
-                                    cs.setLineWidth(stroke.strokeWidth * scaleFactor)
+                                    cs.setLineWidth(stroke.strokeWidth * pageWidthPt)
 
                                     val first = stroke.points.first()
-                                    val startPdfX = first.x * scaleFactor
-                                    val startPdfY = pageHeightPt - (first.y * scaleFactor)
+                                    val startPdfX = first.x.coerceIn(0f, 1f) * pageWidthPt
+                                    val startPdfY = pageHeightPt - (first.y.coerceIn(0f, 1f) * pageHeightPt)
                                     cs.moveTo(startPdfX, startPdfY)
 
                                     for (i in 1 until stroke.points.size) {
                                         val pt = stroke.points[i]
-                                        cs.lineTo(pt.x * scaleFactor, pageHeightPt - (pt.y * scaleFactor))
+                                        cs.lineTo(pt.x.coerceIn(0f, 1f) * pageWidthPt, pageHeightPt - (pt.y.coerceIn(0f, 1f) * pageHeightPt))
                                     }
                                     cs.stroke()
                                 }
