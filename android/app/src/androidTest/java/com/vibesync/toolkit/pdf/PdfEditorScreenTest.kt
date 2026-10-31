@@ -89,7 +89,10 @@ class PdfEditorScreenTest {
         verify(timeout = 5_000, exactly = 1) { vm.addStroke(capture(captured)) }
         assertTrue(captured.captured.points.size >= 2)
         assertTrue(captured.captured.points.all { it.x in 0f..1f && it.y in 0f..1f })
-        assertTrue(captured.captured.points.first().x in 0.20f..0.65f)
+        assertTrue(
+            "actual normalized=(${captured.captured.points.first().x}, ${captured.captured.points.first().y})",
+            captured.captured.points.first().x in 0.20f..0.65f
+        )
         bitmap.recycle()
     }
 

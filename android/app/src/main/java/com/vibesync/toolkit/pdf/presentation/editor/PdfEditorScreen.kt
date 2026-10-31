@@ -505,7 +505,9 @@ fun PdfEditorScreen(
                             showTextInputDialog = true
                         }
                     },
-                    bitmapSize = bitmap?.let { IntSize(it.width, it.height) } ?: IntSize.Zero
+                    bitmapSize = bitmap?.let { IntSize(it.width, it.height) } ?: IntSize.Zero,
+                    zoomScale = scale,
+                    panOffset = offset
                 )
             }
         }
