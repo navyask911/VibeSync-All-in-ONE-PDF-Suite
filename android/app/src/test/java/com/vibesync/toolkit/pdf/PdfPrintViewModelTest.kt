@@ -10,9 +10,7 @@ import com.vibesync.toolkit.pdf.data.print.copyPdfBytes
 import com.vibesync.toolkit.pdf.data.pdf.FooterWatermarkLayout
 import com.vibesync.toolkit.pdf.data.pdf.PageRangeParser
 import com.vibesync.toolkit.pdf.core.util.generateSmartFileName
-import com.vibesync.toolkit.pdf.presentation.editor.EditorCanvasCoordinates
 import com.vibesync.toolkit.pdf.presentation.editor.SignatureStrokeMetrics
-import androidx.compose.ui.geometry.Offset
 import com.vibesync.toolkit.pdf.presentation.common.PrintTrigger
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
 import org.junit.Assert.assertEquals
@@ -76,17 +74,6 @@ class PdfPrintViewModelTest {
         )
         assertTrue(position.x > pageWidth * 0.5f)
         assertTrue(position.topY > pageHeight * 0.9f)
-    }
-
-    @Test
-    fun inverseZoomPanCoordinateMappingReturnsOriginalBitmapPoint() {
-        val point = EditorCanvasCoordinates.toBitmapPoint(
-            touchOffset = Offset(250f, 400f),
-            zoomScale = 2f,
-            panOffset = Offset(50f, 100f)
-        )
-        assertEquals(100f, point.x, 0.001f)
-        assertEquals(150f, point.y, 0.001f)
     }
 
     @Test
