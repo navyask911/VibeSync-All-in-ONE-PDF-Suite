@@ -92,7 +92,6 @@
     <string name="failed_to_open_pdf">تعذر فتح PDF</string>
     <string name="pdf_page_description">صفحة PDF %1$d</string>
     <string name="admob_app_id">ca-app-pub-4783826505860771~4377815936</string>
-    <string name="admob_banner_unit_id">ca-app-pub-4783826505860771/3755922842</string>
     <string name="selected_file_name">المحدد: %1$s</string>
     <string name="tool_select_pdf_to_split">حدد PDF لتقسيمه</string>
     <string name="tool_choose_pdf_document">اختر مستند PDF</string>

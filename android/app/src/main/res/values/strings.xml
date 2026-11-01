@@ -99,7 +99,6 @@
 
     <!-- Google AdMob Configuration -->
     <string name="admob_app_id">ca-app-pub-4783826505860771~4377815936</string>
-    <string name="admob_banner_unit_id">ca-app-pub-4783826505860771/3755922842</string>
 
     <!-- PDF toolkit screens -->
     <string name="selected_file_name">Selected: %1$s</string>

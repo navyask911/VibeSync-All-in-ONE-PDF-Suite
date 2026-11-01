@@ -92,7 +92,6 @@
     <string name="failed_to_open_pdf">PDF کھولنے میں ناکام</string>
     <string name="pdf_page_description">PDF صفحہ %1$d</string>
     <string name="admob_app_id">ca-app-pub-4783826505860771~4377815936</string>
-    <string name="admob_banner_unit_id">ca-app-pub-4783826505860771/3755922842</string>
     <string name="selected_file_name">منتخب: %1$s</string>
     <string name="tool_select_pdf_to_split">تقسیم کے لیے PDF منتخب کریں</string>
     <string name="tool_choose_pdf_document">PDF دستاویز منتخب کریں</string>

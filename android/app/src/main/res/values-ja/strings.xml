@@ -92,7 +92,6 @@
     <string name="failed_to_open_pdf">PDF を開けませんでした</string>
     <string name="pdf_page_description">PDF ページ %1$d</string>
     <string name="admob_app_id">ca-app-pub-4783826505860771~4377815936</string>
-    <string name="admob_banner_unit_id">ca-app-pub-4783826505860771/3755922842</string>
     <string name="selected_file_name">選択済み: %1$s</string>
     <string name="tool_select_pdf_to_split">分割する PDF を選択</string>
     <string name="tool_choose_pdf_document">PDF 文書を選択</string>

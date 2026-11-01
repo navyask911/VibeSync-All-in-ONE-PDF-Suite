@@ -43,6 +43,9 @@ android {
 
     buildTypes {
         release {
+            manifestPlaceholders["admobAppId"] = "ca-app-pub-4783826505860771~4377815936"
+            buildConfigField("String", "ADMOB_BANNER_ID", "\"ca-app-pub-4783826505860771/4710308648\"")
+            buildConfigField("String", "ADMOB_INTERSTITIAL_ID", "\"ca-app-pub-4783826505860771/9523651625\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
@@ -56,6 +59,9 @@ android {
             signingConfig = if (hasReleaseSigning) signingConfigs.getByName("release") else null
         }
         debug {
+            manifestPlaceholders["admobAppId"] = "ca-app-pub-3940256099942544~3347511713"
+            buildConfigField("String", "ADMOB_BANNER_ID", "\"ca-app-pub-3940256099942544/6300978111\"")
+            buildConfigField("String", "ADMOB_INTERSTITIAL_ID", "\"ca-app-pub-3940256099942544/1033173712\"")
             applicationIdSuffix = ".debug"
             isDebuggable = true
         }
