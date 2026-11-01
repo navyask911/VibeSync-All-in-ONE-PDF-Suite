@@ -37,10 +37,7 @@ import kotlinx.coroutines.flow.StateFlow
 object AdMobManager {
     private const val TAG = "AdMobManager"
 
-    const val BANNER_TEST_ID = "ca-app-pub-3940256099942544/6300978111"
-    const val INTERSTITIAL_TEST_ID = "ca-app-pub-3940256099942544/1033173712"
-    const val BANNER_PROD_ID = "ca-app-pub-4783826505860771/3755922842"
-    const val INTERSTITIAL_PROD_ID = ""
+    // Ad unit IDs are supplied exclusively by build-type BuildConfig fields.
 
     private val emptyEntitlement = MutableStateFlow(ProEntitlementState(false, 0L, 0))
     val entitlementState: StateFlow<ProEntitlementState>
@@ -53,7 +50,7 @@ object AdMobManager {
     val reconnectionGeneration: StateFlow<Long> = _reconnectionGeneration
 
     val BANNER_AD_UNIT_ID: String
-        get() = if (BuildConfig.DEBUG) BANNER_TEST_ID else BANNER_PROD_ID
+        get() = BuildConfig.ADMOB_BANNER_ID
 
     fun injectBillingManager(manager: com.vibesync.toolkit.pdf.data.billing.LocalAdBillingManager) {
         BillingManagerProvider.inject(manager)
@@ -87,7 +84,7 @@ object AdMobManager {
             return
         }
         if (interstitialAd != null || isAdLoading) return
-        val interstitialUnitId = if (BuildConfig.DEBUG) INTERSTITIAL_TEST_ID else INTERSTITIAL_PROD_ID
+        val interstitialUnitId = BuildConfig.ADMOB_INTERSTITIAL_ID
         if (interstitialUnitId.isBlank()) {
             Log.w(TAG, "Production interstitial ad unit is not configured; skipping interstitial load.")
             return
