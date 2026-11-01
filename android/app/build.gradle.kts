@@ -44,8 +44,8 @@ android {
     buildTypes {
         release {
             manifestPlaceholders["admobAppId"] = "ca-app-pub-4783826505860771~4377815936"
-            buildConfigField("String", "ADMOB_BANNER_ID", "\"ca-app-pub-4783826505860771/3755922842\"")
-            buildConfigField("String", "ADMOB_INTERSTITIAL_ID", "\"ca-app-pub-4783826505860771/3346787369\"")
+            buildConfigField("String", "ADMOB_BANNER_ID", "\"ca-app-pub-4783826505860771/4710308648\"")
+            buildConfigField("String", "ADMOB_INTERSTITIAL_ID", "\"ca-app-pub-4783826505860771/9523651625\"")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
