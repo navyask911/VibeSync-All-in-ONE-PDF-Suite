@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.text.Layout
@@ -14,6 +15,8 @@ import android.text.TextPaint
 import android.net.Uri
 import android.util.Log
 import com.vibesync.toolkit.pdf.core.util.UriUtils
+import com.vibesync.toolkit.pdf.data.billing.BillingManagerProvider
+import com.vibesync.toolkit.pdf.data.billing.LocalAdBillingManager
 import com.vibesync.toolkit.pdf.data.model.FormFieldItem
 import com.vibesync.toolkit.pdf.data.model.FormFieldType
 import com.vibesync.toolkit.pdf.data.model.PageAnnotations
@@ -60,7 +63,10 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
  * Implements Split, Merge, Extract Images, Convert Images, Encrypt/Decrypt, Form Fill,
  * and 72-DPI Vector Annotation Flattening.
  */
-class PdfBoxToolkitEngine(private val context: Context) {
+class PdfBoxToolkitEngine(
+    private val context: Context,
+    private val billingManager: LocalAdBillingManager? = BillingManagerProvider.current()
+) {
 
     /**
      * Splits a PDF document by specified page ranges (e.g., "1-3", "4", "5-8").
@@ -570,17 +576,11 @@ class PdfBoxToolkitEngine(private val context: Context) {
         angleDegrees: Float = 0f
     ): Result<File> = withContext(Dispatchers.IO) {
         var sourceFileToDelete: File? = null
-        val watermarkPreferences = context.getSharedPreferences("pdf_watermark_options", Context.MODE_PRIVATE)
-        val useCustomOptions = watermarkPreferences.getBoolean("watermark_custom_enabled", false)
-        if (useCustomOptions) {
-            watermarkPreferences.edit().putBoolean("watermark_custom_enabled", false).apply()
-        }
-
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "watermark_src_")
             sourceFileToDelete = sourceFile
             PDDocument.load(sourceFile).use { document ->
-                applyVibeSyncWatermark(document)
+                applyVibeSyncWatermark(document, watermarkText, opacity, angleDegrees)
                 document.save(outputFile)
             }
             Result.success(outputFile)
@@ -839,15 +839,63 @@ class PdfBoxToolkitEngine(private val context: Context) {
         }
     }
 
+    private fun forceDefaultFooterWatermark() {
+        // Never read a free user's custom watermark values. Free exports always use the
+        // original built-in footer; custom settings are reserved for an active Pro pass.
+        context.getSharedPreferences(WATERMARK_PREFERENCES, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(WATERMARK_ENABLED_KEY, false)
+            .apply()
+    }
+
     private fun applyVibeSyncWatermark(
         document: PDDocument,
-        watermarkText: String = DEFAULT_FOOTER_WATERMARK_TEXT
+        watermarkText: String = DEFAULT_FOOTER_WATERMARK_TEXT,
+        opacity: Float = DEFAULT_WATERMARK_OPACITY,
+        angleDegrees: Float = 0f
+    ) {
+        val proActive = billingManager?.checkAdStatusForThisDevice() == true
+        if (!proActive) {
+            forceDefaultFooterWatermark()
+            drawFooterWatermark(
+                document = document,
+                text = DEFAULT_FOOTER_WATERMARK_TEXT,
+                opacity = DEFAULT_WATERMARK_OPACITY,
+                angleDegrees = 0f
+            )
+            return
+        }
+
+        // Custom settings are read only after confirming the entitlement on this device.
+        val preferences = context.getSharedPreferences(WATERMARK_PREFERENCES, Context.MODE_PRIVATE)
+        if (!preferences.getBoolean(WATERMARK_ENABLED_KEY, false)) {
+            return // Pro exports are watermark-free unless the user explicitly applies a custom mark.
+        }
+
+        val customText = preferences.getString(WATERMARK_TEXT_KEY, watermarkText) ?: watermarkText
+        val customOpacity = preferences.getFloat(WATERMARK_OPACITY_KEY, opacity).coerceIn(0f, 1f)
+        val customAngle = preferences.getFloat(WATERMARK_ANGLE_KEY, angleDegrees).coerceIn(0f, 90f)
+        preferences.edit().putBoolean(WATERMARK_ENABLED_KEY, false).apply()
+
+        drawFooterWatermark(
+            document = document,
+            text = customText,
+            opacity = customOpacity,
+            angleDegrees = customAngle
+        )
+    }
+
+    private fun drawFooterWatermark(
+        document: PDDocument,
+        text: String,
+        opacity: Float,
+        angleDegrees: Float
     ) {
         val documentInfo = document.documentInformation
         if (documentInfo.getCustomMetadataValue(WATERMARK_METADATA_KEY) == WATERMARK_METADATA_VALUE) {
             return
         }
-        if (watermarkText.isBlank()) return
+        if (text.isBlank()) return
 
         // Built-in Type1 fonts cannot encode Arabic, CJK, and many Indic glyphs. Shape the
         // localized footer with Android text layout and embed a transparent image in the PDF.
@@ -856,16 +904,17 @@ class PdfBoxToolkitEngine(private val context: Context) {
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
             textSize = 28f
         }
-        val measuredTextWidth = ceil(paint.measureText(watermarkText)).toInt().coerceAtLeast(1)
+        val measuredTextWidth = ceil(paint.measureText(text)).toInt().coerceAtLeast(1)
         val sidePaddingPx = 8
         val bitmap = Bitmap.createBitmap(
             measuredTextWidth + sidePaddingPx * 2,
             (ceil(paint.fontMetrics.descent - paint.fontMetrics.ascent).toInt() + 8).coerceAtLeast(1),
             Bitmap.Config.ARGB_8888
         )
+        var rotatedBitmap: Bitmap? = null
         try {
             val textLayout = StaticLayout.Builder
-                .obtain(watermarkText, 0, watermarkText.length, paint, measuredTextWidth)
+                .obtain(text, 0, text.length, paint, measuredTextWidth)
                 .setAlignment(Layout.Alignment.ALIGN_CENTER)
                 .setTextDirection(TextDirectionHeuristics.FIRSTSTRONG_LTR)
                 .setIncludePad(true)
@@ -878,11 +927,24 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 restore()
             }
 
-            val watermarkImage = LosslessFactory.createFromImage(document, bitmap)
+            val drawableBitmap = if (angleDegrees != 0f) {
+                Bitmap.createBitmap(
+                    bitmap,
+                    0,
+                    0,
+                    bitmap.width,
+                    bitmap.height,
+                    Matrix().apply { postRotate(angleDegrees) },
+                    true
+                ).also { rotatedBitmap = it }
+            } else {
+                bitmap
+            }
+            val watermarkImage = LosslessFactory.createFromImage(document, drawableBitmap)
             for (page in document.pages) {
                 val mediaBox = page.mediaBox
                 val maxWidthPt = mediaBox.width * 0.85f
-                val aspectRatio = bitmap.width.toFloat() / bitmap.height.toFloat().coerceAtLeast(1f)
+                val aspectRatio = drawableBitmap.width.toFloat() / drawableBitmap.height.toFloat().coerceAtLeast(1f)
                 val targetHeightPt = minOf(9f, maxWidthPt / aspectRatio)
                 val targetWidthPt = targetHeightPt * aspectRatio
                 val footer = FooterWatermarkLayout.topLeft(
@@ -897,8 +959,8 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 val y = mediaBox.lowerLeftY + mediaBox.height - footer.topY - targetHeightPt
 
                 val graphicsState = PDExtendedGraphicsState().apply {
-                    nonStrokingAlphaConstant = 0.45f
-                    strokingAlphaConstant = 0.45f
+                    nonStrokingAlphaConstant = opacity.coerceIn(0f, 1f)
+                    strokingAlphaConstant = opacity.coerceIn(0f, 1f)
                 }
                 PDPageContentStream(
                     document,
@@ -912,6 +974,7 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 }
             }
         } finally {
+            rotatedBitmap?.let { if (!it.isRecycled) it.recycle() }
             if (!bitmap.isRecycled) bitmap.recycle()
         }
 
@@ -924,18 +987,47 @@ class PdfBoxToolkitEngine(private val context: Context) {
 
         try {
             val canvas = Canvas(mutableBitmap)
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                color = Color.argb(150, 40, 40, 40)
-                typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-                textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.012f).coerceIn(10f, 36f)
-            }
+            val proActive = billingManager?.checkAdStatusForThisDevice() == true
+            if (!proActive) {
+                forceDefaultFooterWatermark()
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = Color.argb(150, 40, 40, 40)
+                    typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                    textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.012f).coerceIn(10f, 36f)
+                }
+                val watermarkText = DEFAULT_FOOTER_WATERMARK_TEXT
+                val margin = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.015f).coerceAtLeast(16f)
+                val x = (mutableBitmap.width - margin - paint.measureText(watermarkText))
+                    .coerceAtLeast(mutableBitmap.width * 0.5f)
+                canvas.drawText(watermarkText, x, mutableBitmap.height - margin, paint)
+            } else {
+                // Pro users may export without a watermark. Apply a custom mark only for an
+                // explicit one-shot request, and consume that request after reading its options.
+                val preferences = context.getSharedPreferences(WATERMARK_PREFERENCES, Context.MODE_PRIVATE)
+                if (preferences.getBoolean(WATERMARK_ENABLED_KEY, false)) {
+                    val watermarkText = preferences.getString(
+                        WATERMARK_TEXT_KEY,
+                        DEFAULT_FOOTER_WATERMARK_TEXT
+                    ) ?: DEFAULT_FOOTER_WATERMARK_TEXT
+                    val opacity = preferences.getFloat(WATERMARK_OPACITY_KEY, DEFAULT_WATERMARK_OPACITY)
+                        .coerceIn(0f, 1f)
+                    val angle = preferences.getFloat(WATERMARK_ANGLE_KEY, 0f).coerceIn(0f, 90f)
+                    preferences.edit().putBoolean(WATERMARK_ENABLED_KEY, false).apply()
 
-            val watermarkText = DEFAULT_FOOTER_WATERMARK_TEXT
-            val margin = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.015f).coerceAtLeast(16f)
-            val x = (mutableBitmap.width - margin - paint.measureText(watermarkText))
-                .coerceAtLeast(mutableBitmap.width * 0.5f)
-            val y = mutableBitmap.height - margin
-            canvas.drawText(watermarkText, x, y, paint)
+                    val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                        color = Color.argb((opacity * 255f).toInt(), 40, 40, 40)
+                        typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                        textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.012f).coerceIn(10f, 36f)
+                    }
+                    val margin = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.015f).coerceAtLeast(16f)
+                    val x = (mutableBitmap.width - margin - paint.measureText(watermarkText))
+                        .coerceAtLeast(mutableBitmap.width * 0.5f)
+                    canvas.save()
+                    canvas.rotate(angle, mutableBitmap.width / 2f, mutableBitmap.height / 2f)
+                    canvas.drawText(watermarkText, x, mutableBitmap.height - margin, paint)
+                    canvas.restore()
+                }
+            }
 
             FileOutputStream(outputFile).use { output ->
                 if (!mutableBitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
@@ -955,6 +1047,12 @@ class PdfBoxToolkitEngine(private val context: Context) {
         private const val TAG = "PdfBoxToolkitEngine"
         private const val WATERMARK_METADATA_KEY = "VibeSync-Watermarked-V2"
         private const val WATERMARK_METADATA_VALUE = "true"
+        private const val WATERMARK_PREFERENCES = "pdf_watermark_options"
+        private const val WATERMARK_TEXT_KEY = "watermark_text"
+        private const val WATERMARK_OPACITY_KEY = "watermark_opacity"
+        private const val WATERMARK_ANGLE_KEY = "watermark_angle"
+        private const val WATERMARK_ENABLED_KEY = "watermark_custom_enabled"
+        private const val DEFAULT_WATERMARK_OPACITY = 0.45f
     }
 }
 

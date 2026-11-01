@@ -80,6 +80,9 @@ import com.google.android.play.core.install.model.UpdateAvailability
 import com.google.android.play.core.review.ReviewManagerFactory
 import com.vibesync.toolkit.pdf.BuildConfig
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
+import com.vibesync.toolkit.pdf.core.security.EncryptedBillingPreferences
+import com.vibesync.toolkit.pdf.data.billing.LocalAdBillingManager
+import com.vibesync.toolkit.pdf.presentation.billing.ProBenefitsPaywallScreen
 import com.vibesync.toolkit.pdf.core.util.EngagementPolicy
 import com.vibesync.toolkit.pdf.core.util.ReviewEligibilityTracker
 import com.vibesync.toolkit.pdf.core.util.UriUtils
@@ -128,6 +131,7 @@ class MainActivity : AppCompatActivity() {
     private val engagementPreferences by lazy { getSharedPreferences("vibesync_engagement", MODE_PRIVATE) }
     private val reviewEligibilityTracker by lazy { ReviewEligibilityTracker(this) }
     private lateinit var appUpdateManager: AppUpdateManager
+    private lateinit var billingManager: LocalAdBillingManager
     private lateinit var updateFlowLauncher: ActivityResultLauncher<IntentSenderRequest>
     private var pendingUpdateInfo: AppUpdateInfo? = null
     private var updatePromptVisible by mutableStateOf(false)
@@ -187,7 +191,7 @@ class MainActivity : AppCompatActivity() {
     private val scannerHistoryViewModel: ScannerHistoryViewModel by viewModels()
     private val batchScanViewModel: BatchScanViewModel by viewModels()
     private val scannerHistoryRepository by lazy { ScannerHistoryRepository(File(filesDir, "scans")) }
-    private val toolkitEngine by lazy { PdfBoxToolkitEngine(applicationContext) }
+    private val toolkitEngine by lazy { PdfBoxToolkitEngine(applicationContext, billingManager) }
 
     private lateinit var scannerManager: DocumentScannerManager
     private lateinit var scannerLauncher: ActivityResultLauncher<IntentSenderRequest>
@@ -198,6 +202,11 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        billingManager = LocalAdBillingManager(
+            context = applicationContext,
+            prefs = EncryptedBillingPreferences(applicationContext)
+        )
+        AdMobManager.injectBillingManager(billingManager)
 
         updateFlowLauncher = registerForActivityResult(
             ActivityResultContracts.StartIntentSenderForResult()
@@ -459,7 +468,16 @@ class MainActivity : AppCompatActivity() {
                                 onNavigateToPdfTool = { route, uri ->
                                     if (route == "watermark") getSharedPreferences("pdf_watermark_options", MODE_PRIVATE).edit().putBoolean("watermark_custom_enabled", true).apply()
                                     navController.navigate("$route/${encodeUriRoute(uri)}")
-                                }
+                                },
+                                onNavigateToPro = { navController.navigate("pro") }
+                            )
+                        }
+
+                        composable("pro") {
+                            ProBenefitsPaywallScreen(
+                                billingManager = billingManager,
+                                activity = this@MainActivity,
+                                onNavigateBack = { navController.popBackStack() }
                             )
                         }
 
@@ -1458,6 +1476,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+        billingManager.startConnection()
         registerConnectivityCallback()
     }
 
@@ -1477,6 +1496,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         if (::appUpdateManager.isInitialized) runCatching { appUpdateManager.unregisterListener(updateInstallStateListener) }
+        if (::billingManager.isInitialized) billingManager.endConnection()
         super.onDestroy()
     }
 

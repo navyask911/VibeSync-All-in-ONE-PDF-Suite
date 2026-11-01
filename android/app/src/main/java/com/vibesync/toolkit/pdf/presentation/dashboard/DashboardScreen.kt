@@ -72,7 +72,8 @@ fun DashboardScreen(
     onShareJpgImages: (Uri) -> Unit = {},
     onRenameDocument: (Uri, String) -> Unit = { _, _ -> },
     onDeleteDocument: (Uri) -> Unit = {},
-    onNavigateToPdfTool: (String, Uri) -> Unit = { route, _ -> onNavigateToTool(route) }
+    onNavigateToPdfTool: (String, Uri) -> Unit = { route, _ -> onNavigateToTool(route) },
+    onNavigateToPro: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
@@ -226,6 +227,9 @@ fun DashboardScreen(
                         }
                         IconButton(onClick = { showLanguageDialog = true }, modifier = Modifier.testTag("dashboard_action_language")) {
                             Icon(Icons.Default.Language, contentDescription = stringResource(R.string.language_settings), tint = VibeSyncCrimsonPrimary)
+                        }
+                        IconButton(onClick = onNavigateToPro, modifier = Modifier.testTag("dashboard_action_pro")) {
+                            Icon(Icons.Default.WorkspacePremium, contentDescription = "VibeSync PDF Pro", tint = MaterialTheme.colorScheme.primary)
                         }
                         IconButton(onClick = { launchPickerSafely { folderPickerLauncher.launch(null) } }, modifier = Modifier.testTag("dashboard_action_folder")) {
                             Icon(Icons.Default.FolderOpen, contentDescription = stringResource(R.string.choose_pdf_folder), tint = VibeSyncCrimsonPrimary)
