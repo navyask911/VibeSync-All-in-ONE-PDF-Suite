@@ -112,7 +112,7 @@ class LocalAdBillingManager(
         val details = try {
             val queryResult = billingClient.queryProductDetails(params)
             if (queryResult.billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                queryResult.productDetailsList.firstOrNull {
+                queryResult.productDetailsList?.firstOrNull {
                     it.productId == BillingConstants.PRO_PASS_PRODUCT_ID
                 }
             } else {
