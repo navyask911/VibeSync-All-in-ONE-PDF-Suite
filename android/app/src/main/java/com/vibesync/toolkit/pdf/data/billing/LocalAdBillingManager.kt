@@ -12,6 +12,7 @@ import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
+import com.android.billingclient.api.queryProductDetails
 import com.android.billingclient.api.QueryPurchasesParams
 import com.android.billingclient.api.PurchasesResponseListener
 import com.vibesync.toolkit.pdf.core.billing.BillingConstants
@@ -79,6 +80,7 @@ class LocalAdBillingManager(
                 .enableOneTimeProducts()
                 .build()
         )
+        .enableAutoServiceReconnection()
         .build()
 
     init {
@@ -107,22 +109,17 @@ class LocalAdBillingManager(
             .setProductList(listOf(product))
             .build()
 
-        val details = suspendCancellableCoroutine<ProductDetails?> { continuation ->
-            try {
-                billingClient.queryProductDetailsAsync(params) { result, queryResult ->
-                    if (!continuation.isActive) return@queryProductDetailsAsync
-                    val found = if (result.responseCode == BillingClient.BillingResponseCode.OK) {
-                        queryResult.firstOrNull {
-                            it.productId == BillingConstants.PRO_PASS_PRODUCT_ID
-                        }
-                    } else {
-                        null
-                    }
-                    continuation.resume(found)
+        val details = try {
+            val queryResult = billingClient.queryProductDetails(params)
+            if (queryResult.billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                queryResult.productDetailsList.firstOrNull {
+                    it.productId == BillingConstants.PRO_PASS_PRODUCT_ID
                 }
-            } catch (_: Exception) {
-                if (continuation.isActive) continuation.resume(null)
+            } else {
+                null
             }
+        } catch (_: Exception) {
+            null
         }
         _productDetails.value = details
         if (details == null) _events.tryEmit(BillingConstants.BILLING_UNAVAILABLE_MESSAGE)
@@ -174,7 +171,10 @@ class LocalAdBillingManager(
             }
 
             override fun onBillingServiceDisconnected() {
-                _connectionState.value = false
+                android.util.Log.w(
+                    "LocalAdBillingManager",
+                    "Billing service disconnected; automatic reconnection is enabled."
+                )
             }
         })
     }
@@ -261,6 +261,9 @@ class LocalAdBillingManager(
                 val consumeParams = ConsumeParams.newBuilder()
                     .setPurchaseToken(token)
                     .build()
+                // NOTE (PBL 8+): Google Play Billing 8 removed the ability to query CONSUMED one-time products.
+                // Once consumeAsync() succeeds, the purchase is gone permanently. It cannot be restored
+                // on reinstall. Do NOT attempt a restore-purchase flow.
                 billingClient.consumeAsync(consumeParams) { result, _ ->
                     if (continuation.isActive) continuation.resume(result)
                 }
