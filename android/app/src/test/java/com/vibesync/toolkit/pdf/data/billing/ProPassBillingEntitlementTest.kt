@@ -6,8 +6,11 @@ import com.android.billingclient.api.BillingClient
 import com.android.billingclient.api.BillingClientStateListener
 import com.android.billingclient.api.BillingResult
 import com.android.billingclient.api.Purchase
+import com.android.billingclient.api.QueryPurchasesParams
 import com.android.billingclient.api.PurchasesResponseListener
 import io.mockk.every
+import io.mockk.Runs
+import io.mockk.just
 import io.mockk.mockk
 import io.mockk.slot
 import com.vibesync.toolkit.pdf.core.billing.BillingConstants
@@ -149,10 +152,13 @@ class ProPassBillingEntitlementTest {
         val purchasesListener = slot<PurchasesResponseListener>()
 
         every { billingClient.isReady } returnsMany listOf(false, true)
-        every { billingClient.startConnection(capture(connectionListener)) } returns Unit
+        every { billingClient.startConnection(capture(connectionListener)) } just Runs
         every {
-            billingClient.queryPurchasesAsync(any(), capture(purchasesListener))
-        } returns Unit
+            billingClient.queryPurchasesAsync(
+                any<QueryPurchasesParams>(),
+                capture(purchasesListener)
+            )
+        } just Runs
 
         val purchase1 = mockk<Purchase>()
         every { purchase1.products } returns listOf(BillingConstants.PRO_PASS_PRODUCT_ID)
