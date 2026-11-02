@@ -129,7 +129,7 @@ class ProPassBillingEntitlementTest {
             listener.captured.onQueryPurchasesResponse(okResult(), listOf(owned))
         }
         val acked = mutableListOf<String>()
-        val manager = manager(prefs, client, acknowledge = { acked += it; okResult() })
+        val manager = manager(prefs = prefs, billingClientForTest = client, acknowledge = { acked += it; okResult() })
         manager.restoreProLicenseFromPlayStore(context)
         assertEquals(listOf("token-restored"), acked)
         assertEquals(now + BillingConstants.PRO_PASS_DURATION_MS, prefs.getExpiry())
@@ -149,7 +149,7 @@ class ProPassBillingEntitlementTest {
         every { client.queryPurchasesAsync(any<QueryPurchasesParams>(), any()) } answers {
             secondArg<PurchasesResponseListener>().onQueryPurchasesResponse(okResult(), emptyList())
         }
-        val manager = manager(prefs, client)
+        val manager = manager(prefs = prefs, billingClientForTest = client)
         manager.restoreProLicenseFromPlayStore(context)
         assertTrue(manager.checkAdStatusForThisDevice())
         assertTrue(manager.state.value.isProActive)
