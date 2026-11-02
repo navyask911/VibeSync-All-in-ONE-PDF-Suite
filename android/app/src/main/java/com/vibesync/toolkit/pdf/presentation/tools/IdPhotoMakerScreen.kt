@@ -59,6 +59,7 @@ import androidx.compose.ui.layout.ContentScale
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.data.pdf.IdPhotoExporter
 import com.vibesync.toolkit.pdf.data.pdf.IdPhotoPresets
+import com.vibesync.toolkit.pdf.data.pdf.ResolutionProfilePrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -215,8 +216,21 @@ fun IdPhotoMakerScreen(
                     scope.launch {
                         val result = withContext(Dispatchers.IO) {
                             runCatching {
-                                val cropped = IdPhotoExporter.cropForPreset(bitmap, selected, zoom, panX, panY)
-                                try { IdPhotoExporter.save(context, cropped, selected).getOrThrow() }
+                                val profile = ResolutionProfilePrefs(context).read()
+                                val outputDpi = profile.outputDpi(
+                                    Runtime.getRuntime().maxMemory(),
+                                    bitmap.width,
+                                    bitmap.height
+                                )
+                                val cropped = IdPhotoExporter.cropForPreset(
+                                    bitmap,
+                                    selected,
+                                    zoom,
+                                    panX,
+                                    panY,
+                                    outputDpi
+                                )
+                                try { IdPhotoExporter.save(context, cropped, selected, outputDpi).getOrThrow() }
                                 finally { if (!cropped.isRecycled && cropped !== bitmap) cropped.recycle() }
                             }
                         }

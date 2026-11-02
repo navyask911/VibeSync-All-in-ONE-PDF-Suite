@@ -55,6 +55,7 @@ import java.io.FileOutputStream
 import java.io.InputStream
 import java.io.OutputStream
 import kotlin.math.ceil
+import kotlin.math.roundToInt
 import java.security.Security
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 
@@ -229,7 +230,8 @@ class PdfBoxToolkitEngine(
      */
     suspend fun convertImagesToPdf(
         imageUris: List<Uri>,
-        outputFile: File
+        outputFile: File,
+        profile: ResolutionProfile = ResolutionProfilePrefs(context).read()
     ): Result<File> = withContext(Dispatchers.IO) {
         var documentToClose: PDDocument? = null
         try {
@@ -244,7 +246,7 @@ class PdfBoxToolkitEngine(
             for (imageUri in imageUris) {
                 val sourceFile = UriUtils.copyUriToCacheFile(context, imageUri, "image_src_")
                 val bitmap = try {
-                    PdfBitmapUtils.decodeFileDownsampled(sourceFile.absolutePath)
+                    decodeImageForProfile(sourceFile, profile)
                 } finally {
                     sourceFile.delete()
                 }
@@ -303,6 +305,42 @@ class PdfBoxToolkitEngine(
             Result.failure(e)
         } finally {
             runCatching { documentToClose?.close() }
+        }
+    }
+
+    /**
+     * Decodes image-to-PDF input within the selected output profile's pixel bounds.
+     * Small source images are not enlarged; larger images are sampled/scaled before PDF embedding.
+     */
+    private fun decodeImageForProfile(sourceFile: File, profile: ResolutionProfile): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(sourceFile.absolutePath, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        val spec = profile.spec(
+            Runtime.getRuntime().maxMemory(),
+            bounds.outWidth,
+            bounds.outHeight
+        )
+        val targetWidth = minOf(spec.targetWidthPx ?: bounds.outWidth, bounds.outWidth).coerceAtLeast(1)
+        val targetHeight = minOf(spec.targetHeightPx ?: bounds.outHeight, bounds.outHeight).coerceAtLeast(1)
+        val maxDimension = maxOf(targetWidth, targetHeight)
+        val decoded = PdfBitmapUtils.decodeFileDownsampled(sourceFile.absolutePath, maxDimension) ?: return null
+        try {
+            val scale = minOf(
+                1f,
+                targetWidth.toFloat() / decoded.width.toFloat(),
+                targetHeight.toFloat() / decoded.height.toFloat()
+            )
+            val outputWidth = (decoded.width * scale).roundToInt().coerceAtLeast(1)
+            val outputHeight = (decoded.height * scale).roundToInt().coerceAtLeast(1)
+            if (outputWidth == decoded.width && outputHeight == decoded.height) return decoded
+            return Bitmap.createScaledBitmap(decoded, outputWidth, outputHeight, true).also {
+                if (it !== decoded && !decoded.isRecycled) decoded.recycle()
+            }
+        } catch (error: Throwable) {
+            if (!decoded.isRecycled) decoded.recycle()
+            throw error
         }
     }
 

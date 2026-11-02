@@ -10,6 +10,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.vibesync.toolkit.pdf.data.model.DrawingStroke
 import com.vibesync.toolkit.pdf.data.model.PageAnnotations
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
+import com.vibesync.toolkit.pdf.data.pdf.ResolutionProfile
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
@@ -282,6 +283,48 @@ class PdfBoxToolkitEngineTest {
             assertEquals(PDRectangle.A4.width, document.getPage(0).mediaBox.width, 0.01f)
             assertEquals(PDRectangle.A4.height, document.getPage(0).mediaBox.height, 0.01f)
         }
+    }
+
+    @Test
+    fun imageToPdfUsesSelectedProfileToBoundEmbeddedRasterDimensions() = runTest {
+        val imageFile = File(tempFolder, "profile_input.png")
+        Bitmap.createBitmap(2400, 1600, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.rgb(80, 120, 160))
+            FileOutputStream(imageFile).use { output -> compress(Bitmap.CompressFormat.PNG, 100, output) }
+            recycle()
+        }
+
+        val smallestOutput = File(tempFolder, "images_to_pdf_smallest.pdf")
+        val standardOutput = File(tempFolder, "images_to_pdf_standard.pdf")
+        val smallest = engine.convertImagesToPdf(
+            imageUris = listOf(Uri.fromFile(imageFile)),
+            outputFile = smallestOutput,
+            profile = ResolutionProfile.SMALLEST
+        )
+        val standard = engine.convertImagesToPdf(
+            imageUris = listOf(Uri.fromFile(imageFile)),
+            outputFile = standardOutput,
+            profile = ResolutionProfile.STANDARD
+        )
+        assertTrue("Smallest-profile image conversion should succeed.", smallest.isSuccess)
+        assertTrue("Standard-profile image conversion should succeed.", standard.isSuccess)
+
+        fun embeddedDimensions(file: File): Pair<Int, Int> =
+            PDDocument.load(file).use { document ->
+                val image = document.getPage(0).resources?.xObjectNames
+                    ?.mapNotNull { name ->
+                        document.getPage(0).resources?.getXObject(name) as? PDImageXObject
+                    }
+                    ?.maxByOrNull { it.width.toLong() * it.height.toLong() }
+                    ?: error("Converted page did not embed its source image.")
+                image.width to image.height
+            }
+
+        val smallDimensions = embeddedDimensions(smallestOutput)
+        val standardDimensions = embeddedDimensions(standardOutput)
+        assertTrue(smallDimensions.first <= 1754 && smallDimensions.second <= 1240)
+        assertTrue(smallDimensions.first < standardDimensions.first)
+        assertTrue(smallDimensions.second < standardDimensions.second)
     }
 
     @Test

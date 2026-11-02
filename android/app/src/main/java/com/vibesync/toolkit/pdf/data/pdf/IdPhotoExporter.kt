@@ -12,17 +12,20 @@ import android.provider.MediaStore
 import android.provider.MediaStore.Images
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import kotlin.math.roundToInt
 
-/** Scoped-storage JPEG exporter; embeds a JFIF density unit of inches and 300x300 DPI. */
+/** Scoped-storage JPEG exporter; output pixel dimensions and JFIF density follow ResolutionProfile. */
 object IdPhotoExporter {
     fun cropForPreset(
         source: Bitmap,
         preset: IdPhotoPresets,
         zoom: Float = 1f,
         panX: Float = 0f,
-        panY: Float = 0f
+        panY: Float = 0f,
+        outputDpi: Int = IdPhotoPresets.REFERENCE_DPI
     ): Bitmap {
         require(source.width > 0 && source.height > 0)
+        require(outputDpi in 1..65_535)
         val targetAspect = preset.widthPx.toFloat() / preset.heightPx.toFloat()
         val sourceAspect = source.width.toFloat() / source.height.toFloat()
         var cropWidth = source.width.toFloat()
@@ -43,14 +46,31 @@ object IdPhotoExporter {
             rect.width().toInt().coerceAtLeast(1).coerceAtMost(source.width - rect.left.toInt()),
             rect.height().toInt().coerceAtLeast(1).coerceAtMost(source.height - rect.top.toInt())
         )
-        return Bitmap.createScaledBitmap(cropped, preset.widthPx, preset.heightPx, true).also {
+        return Bitmap.createScaledBitmap(
+            cropped,
+            preset.widthAtDpi(outputDpi),
+            preset.heightAtDpi(outputDpi),
+            true
+        ).also {
             if (cropped !== source && !cropped.isRecycled) cropped.recycle()
         }
     }
 
-    suspend fun save(context: Context, bitmap: Bitmap, preset: IdPhotoPresets): Result<Uri> {
+    suspend fun save(
+        context: Context,
+        bitmap: Bitmap,
+        preset: IdPhotoPresets,
+        outputDpi: Int = ResolutionProfilePrefs(context).read().outputDpi(
+            Runtime.getRuntime().maxMemory(),
+            bitmap.width,
+            bitmap.height
+        )
+    ): Result<Uri> {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             return Result.failure(UnsupportedOperationException(context.getString(R.string.id_photo_requires_scoped_storage)))
+        }
+        if (outputDpi !in 1..65_535) {
+            return Result.failure(IllegalArgumentException("JPEG density must fit the JFIF 16-bit field."))
         }
         val values = ContentValues().apply {
             put(Images.Media.DISPLAY_NAME, "VibeSync_ID_Photo_${preset.name}_${System.currentTimeMillis()}.jpg")
@@ -63,9 +83,20 @@ object IdPhotoExporter {
         return try {
             uri = resolver.insert(Images.Media.EXTERNAL_CONTENT_URI, values)
                 ?: throw IOException(context.getString(R.string.id_photo_save_failed))
-            resolver.openOutputStream(uri, "w")?.use { output ->
-                output.write(jpegBytesWithDpi(bitmap))
-            } ?: throw IOException(context.getString(R.string.id_photo_save_failed))
+            val expectedWidth = preset.widthAtDpi(outputDpi)
+            val expectedHeight = preset.heightAtDpi(outputDpi)
+            val outputBitmap = if (bitmap.width == expectedWidth && bitmap.height == expectedHeight) {
+                bitmap
+            } else {
+                Bitmap.createScaledBitmap(bitmap, expectedWidth, expectedHeight, true)
+            }
+            try {
+                resolver.openOutputStream(uri, "w")?.use { output ->
+                    output.write(jpegBytesWithDpi(outputBitmap, outputDpi))
+                } ?: throw IOException(context.getString(R.string.id_photo_save_failed))
+            } finally {
+                if (outputBitmap !== bitmap && !outputBitmap.isRecycled) outputBitmap.recycle()
+            }
             val published = ContentValues().apply { put(Images.Media.IS_PENDING, 0) }
             resolver.update(uri, published, null, null)
             Result.success(uri)
@@ -75,12 +106,15 @@ object IdPhotoExporter {
         }
     }
 
-    internal fun jpegBytesWithDpi(sourceBitmap: Bitmap): ByteArray {
+    internal fun jpegBytesWithDpi(
+        sourceBitmap: Bitmap,
+        dpi: Int = IdPhotoPresets.REFERENCE_DPI
+    ): ByteArray {
+        require(dpi in 1..65_535) { "JPEG density must fit the JFIF 16-bit field." }
         val outputStream = ByteArrayOutputStream()
 
-        // Ensure transparent areas are forced onto a solid white canvas before JPEG encoding
-        val opaqueBitmap = com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils.ensureWhiteBackgroundForJpeg(sourceBitmap)
-
+        // Ensure transparent areas are forced onto a solid white canvas before JPEG encoding.
+        val opaqueBitmap = PdfBitmapUtils.ensureWhiteBackgroundForJpeg(sourceBitmap)
         try {
             if (!opaqueBitmap.compress(Bitmap.CompressFormat.JPEG, 90, outputStream)) {
                 throw IOException("Could not encode the JPEG image.")
@@ -90,7 +124,8 @@ object IdPhotoExporter {
             val jfif = byteArrayOf(
                 0xff.toByte(), 0xe0.toByte(), 0x00, 0x10,
                 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x02,
-                0x01, 0x01, 0x2c, 0x01, 0x2c, 0x00, 0x00
+                0x01, 0x01, (dpi shr 8).toByte(), dpi.toByte(),
+                (dpi shr 8).toByte(), dpi.toByte(), 0x00, 0x00
             )
             return ByteArray(jpeg.size + jfif.size).also { out ->
                 jpeg.copyInto(out, 0, 0, 2)

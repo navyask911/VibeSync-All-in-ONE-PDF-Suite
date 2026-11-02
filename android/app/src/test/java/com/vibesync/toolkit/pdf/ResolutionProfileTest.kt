@@ -102,6 +102,17 @@ class ResolutionProfileTest {
         assertTrue(spec.applyUnsharpMask)
     }
 
+    @Test
+    fun outputDpiMapsAllProfilesAndHonorsMemoryFallback() {
+        assertEquals(150, ResolutionProfile.SMALLEST.outputDpi(512 * mb, 2480, 3508))
+        assertEquals(300, ResolutionProfile.STANDARD.outputDpi(512 * mb, 2480, 3508))
+        assertEquals(600, ResolutionProfile.LARGEST.outputDpi(1024 * mb, 2400, 3400))
+        assertEquals(300, ResolutionProfile.LARGEST.outputDpi(256 * mb, 12000, 12000))
+        assertEquals(300, ResolutionProfile.HD_AUTO.outputDpi(255 * mb, 1000, 1400))
+        assertEquals(600, ResolutionProfile.HD_AUTO.outputDpi(256 * mb, 1000, 1400))
+        assertEquals(300, ResolutionProfile.HD_AUTO.outputDpi(256 * mb, 12000, 12000))
+    }
+
     private fun assertAspectRatio(sourceWidth: Int, sourceHeight: Int, outputWidth: Int, outputHeight: Int) {
         val sourceRatio = sourceWidth.toDouble() / sourceHeight.toDouble()
         val outputRatio = outputWidth.toDouble() / outputHeight.toDouble()

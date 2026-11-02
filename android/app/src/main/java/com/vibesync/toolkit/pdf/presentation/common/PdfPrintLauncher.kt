@@ -8,11 +8,12 @@ import android.print.PrintJob
 import android.print.PrintManager
 import com.vibesync.toolkit.pdf.data.print.PdfPrintDocumentAdapter
 import com.vibesync.toolkit.pdf.core.util.UriUtils
+import com.vibesync.toolkit.pdf.data.pdf.ResolutionProfilePrefs
 import java.io.File
 import java.io.IOException
 import java.io.RandomAccessFile
 
-/** Opens Android's system print UI with A4, color, 300 DPI and no duplex as the defaults. */
+/** Opens Android's system print UI using the selected A4 output profile, color and no duplex. */
 @Volatile private var activeSystemPrintJob: PrintJob? = null
 
 fun launchSystemPdfPrint(
@@ -55,9 +56,22 @@ fun launchSystemPdfPrint(
         } else {
             null
         }
+        val profile = ResolutionProfilePrefs(context).read()
+        val printDpi = profile.outputDpi(
+            Runtime.getRuntime().maxMemory(),
+            A4_PROFILE_WIDTH_PX,
+            A4_PROFILE_HEIGHT_PX
+        )
         val attributes = PrintAttributes.Builder()
             .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
-            .setResolution(PrintAttributes.Resolution("vibesync_300dpi", "VibeSync 300 DPI", 300, 300))
+            .setResolution(
+                PrintAttributes.Resolution(
+                    "vibesync_${printDpi}dpi",
+                    "VibeSync ${printDpi} DPI",
+                    printDpi,
+                    printDpi
+                )
+            )
             .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
             .setDuplexMode(PrintAttributes.DUPLEX_MODE_NONE)
             .build()
@@ -83,3 +97,6 @@ fun launchSystemPdfPrint(
         throw error
     }
 }
+
+private const val A4_PROFILE_WIDTH_PX = 2480
+private const val A4_PROFILE_HEIGHT_PX = 3508

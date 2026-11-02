@@ -35,6 +35,24 @@ enum class ResolutionProfile {
         }
     }
 
+    /**
+     * Resolves the density for raster/JPEG/print destinations from this same profile.
+     * LARGEST and HD_AUTO honor the memory fallback reported by spec(), matching compression.
+     */
+    fun outputDpi(deviceMaxMemoryBytes: Long, sourceWidth: Int, sourceHeight: Int): Int {
+        val resolved = spec(deviceMaxMemoryBytes, sourceWidth, sourceHeight)
+        return when (this) {
+            SMALLEST -> SMALLEST_OUTPUT_DPI
+            STANDARD -> STANDARD_OUTPUT_DPI
+            LARGEST -> if (resolved.fellBack) STANDARD_OUTPUT_DPI else LARGEST_OUTPUT_DPI
+            HD_AUTO -> if (resolved.fellBack || resolved.targetWidthPx != null) {
+                STANDARD_OUTPUT_DPI
+            } else {
+                LARGEST_OUTPUT_DPI
+            }
+        }
+    }
+
     private fun boundedSpec(
         profile: ResolutionProfile,
         quality: Int,
@@ -74,6 +92,9 @@ enum class ResolutionProfile {
     }
 
     companion object {
+        const val SMALLEST_OUTPUT_DPI = 150
+        const val STANDARD_OUTPUT_DPI = 300
+        const val LARGEST_OUTPUT_DPI = 600
         private const val BYTES_PER_PIXEL = 4L
         private const val MEMORY_SAFETY_DIVISOR = 4L
         private const val A4_SMALL_WIDTH = 1240
