@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference
 @Config(sdk = [35])
 class ProPassBillingEntitlementTest {
     private val now = 1_800_000_000_000L
+    private val graceBufferMs = 24L * 60L * 60L * 1000L
     private val context: Context get() = ApplicationProvider.getApplicationContext()
 
     private fun okResult() = BillingResult.newBuilder().setResponseCode(BillingClient.BillingResponseCode.OK).build()
@@ -66,7 +67,7 @@ class ProPassBillingEntitlementTest {
         val manager = manager(prefs, acknowledge = { acked += it; okResult() })
         manager.grantIfValid(purchase("token-first", purchaseTime))
         assertEquals(listOf("token-first"), acked)
-        assertEquals(purchaseTime + BillingConstants.PRO_PASS_DURATION_MS, prefs.getExpiry())
+        assertEquals(purchaseTime + BillingConstants.PRO_PASS_DURATION_MS + graceBufferMs, prefs.getExpiry())
         assertEquals("device-A", prefs.getFingerprint())
         assertNotNull(prefs.getHardwareBindingId())
         assertEquals(setOf("token-first"), prefs.getProcessedTokens())
@@ -78,20 +79,22 @@ class ProPassBillingEntitlementTest {
         val manager = manager(acknowledge = { acked += it; okResult() })
         manager.grantIfValid(purchase("token-acknowledged", acknowledged = true))
         assertTrue(acked.isEmpty())
-        assertEquals(now + BillingConstants.PRO_PASS_DURATION_MS, manager.state.value.expiryEpochMillis)
+        assertEquals(now + BillingConstants.PRO_PASS_DURATION_MS + graceBufferMs, manager.state.value.expiryEpochMillis)
         assertTrue(manager.state.value.isProActive)
     }
 
-    @Test fun repeatedPurchaseTokenIsAcknowledgedAndGrantedOnlyOnce() = runBlocking {
+    @Test fun sameSubscriptionTokenRefreshesTheCachedExpiryOnRenewal() = runBlocking {
         val prefs = InMemoryBillingPreferences()
         val acked = mutableListOf<String>()
         val manager = manager(prefs, acknowledge = { acked += it; okResult() })
-        val p = purchase("token-duplicate")
-        manager.grantIfValid(p)
-        val expiry = prefs.getExpiry()
-        manager.grantIfValid(p)
-        assertEquals(listOf("token-duplicate"), acked)
-        assertEquals(expiry, prefs.getExpiry())
+        manager.grantIfValid(purchase("token-renewal", purchaseTime = now))
+        val renewedPurchaseTime = now + 30L * BillingConstants.MILLIS_PER_DAY
+        manager.grantIfValid(purchase("token-renewal", purchaseTime = renewedPurchaseTime, acknowledged = true))
+        assertEquals(listOf("token-renewal"), acked)
+        assertEquals(
+            renewedPurchaseTime + BillingConstants.PRO_PASS_DURATION_MS + graceBufferMs,
+            prefs.getExpiry()
+        )
     }
 
     @Test fun pendingPurchaseNeverChangesExpiryOrGetsAcknowledged() = runBlocking {
@@ -109,7 +112,7 @@ class ProPassBillingEntitlementTest {
         val manager = manager(prefs)
         manager.grantIfValid(purchase(
             "token-expired",
-            purchaseTime = now - BillingConstants.PRO_PASS_DURATION_MS - 1L,
+            purchaseTime = now - BillingConstants.PRO_PASS_DURATION_MS - graceBufferMs - 1L,
             acknowledged = true
         ))
         assertEquals(now - 1L, prefs.getExpiry())
@@ -121,10 +124,11 @@ class ProPassBillingEntitlementTest {
         val prefs = InMemoryBillingPreferences()
         val client = mockk<BillingClient>()
         val listener = slot<PurchasesResponseListener>()
+        val queryParams = slot<QueryPurchasesParams>()
         val queryThread = AtomicReference<Thread?>()
         val owned = purchase("token-restored")
         every { client.isReady } returns true
-        every { client.queryPurchasesAsync(any<QueryPurchasesParams>(), capture(listener)) } answers {
+        every { client.queryPurchasesAsync(capture(queryParams), capture(listener)) } answers {
             queryThread.set(Thread.currentThread())
             listener.captured.onQueryPurchasesResponse(okResult(), listOf(owned))
         }
@@ -132,16 +136,17 @@ class ProPassBillingEntitlementTest {
         val manager = manager(prefs = prefs, billingClientForTest = client, acknowledge = { acked += it; okResult() })
         manager.restoreProLicenseFromPlayStore(context)
         assertEquals(listOf("token-restored"), acked)
-        assertEquals(now + BillingConstants.PRO_PASS_DURATION_MS, prefs.getExpiry())
+        assertEquals(BillingClient.ProductType.SUBS, queryParams.captured.productType)
+        assertEquals(now + BillingConstants.PRO_PASS_DURATION_MS + graceBufferMs, prefs.getExpiry())
         assertTrue(manager.state.value.isProActive)
         assertNotNull(queryThread.get())
         assertFalse(queryThread.get() === Thread.currentThread())
     }
 
-    @Test fun localV1013ConsumedGrantSurvivesWhenPlayReturnsNoOwnedPurchases() = runBlocking {
+    @Test fun emptySubscriptionQueryDoesNotRestoreAnExpiredLocalGrant() = runBlocking {
         val prefs = InMemoryBillingPreferences().apply {
             setFingerprint("device-A")
-            setExpiry(now + 7L * BillingConstants.MILLIS_PER_DAY)
+            setExpiry(now - 1L)
             addProcessedToken("legacy-consumed-token")
         }
         val client = mockk<BillingClient>()
@@ -151,9 +156,8 @@ class ProPassBillingEntitlementTest {
         }
         val manager = manager(prefs = prefs, billingClientForTest = client)
         manager.restoreProLicenseFromPlayStore(context)
-        assertTrue(manager.checkAdStatusForThisDevice())
-        assertTrue(manager.state.value.isProActive)
-        assertNotNull(prefs.getHardwareBindingId())
-        assertEquals(now + 7L * BillingConstants.MILLIS_PER_DAY, prefs.getExpiry())
+        assertFalse(manager.checkAdStatusForThisDevice())
+        assertFalse(manager.state.value.isProActive)
+        assertFalse(manager.isProOwned.value)
     }
 }
