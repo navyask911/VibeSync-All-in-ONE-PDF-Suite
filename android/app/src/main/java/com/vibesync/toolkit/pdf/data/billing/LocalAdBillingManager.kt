@@ -15,7 +15,6 @@ import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
 import com.android.billingclient.api.queryProductDetails
 import com.android.billingclient.api.QueryPurchasesParams
-import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.billing.BillingConstants
 import com.vibesync.toolkit.pdf.core.security.BillingPreferences
 import com.vibesync.toolkit.pdf.core.util.DeviceUtils
@@ -105,13 +104,15 @@ class LocalAdBillingManager(
         }
         val product = QueryProductDetailsParams.Product.newBuilder()
             .setProductId(BillingConstants.PRO_PASS_PRODUCT_ID)
-            .setProductType(BillingClient.ProductType.INAPP)
+            .setProductType(BillingClient.ProductType.SUBS)
             .build()
         val params = QueryProductDetailsParams.newBuilder().setProductList(listOf(product)).build()
         val details = try {
             val queryResult = billingClient.queryProductDetails(params)
             if (queryResult.billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                queryResult.productDetailsList?.firstOrNull { it.productId == BillingConstants.PRO_PASS_PRODUCT_ID }
+                queryResult.productDetailsList
+                    ?.firstOrNull { it.productId == BillingConstants.PRO_PASS_PRODUCT_ID }
+                    ?.takeIf { !it.subscriptionOfferDetails.isNullOrEmpty() }
             } else null
         } catch (error: Exception) {
             Log.w(TAG, "Could not query the Pro Pass product details.", error)
@@ -128,8 +129,17 @@ class LocalAdBillingManager(
             _events.tryEmit(BillingConstants.BILLING_UNAVAILABLE_MESSAGE)
             return
         }
+        val subscriptionOffer = details.subscriptionOfferDetails
+            ?.firstOrNull { it.offerId == null }
+            ?: details.subscriptionOfferDetails?.firstOrNull()
+        val offerToken = subscriptionOffer?.offerToken
+        if (offerToken.isNullOrBlank()) {
+            _events.tryEmit(BillingConstants.BILLING_UNAVAILABLE_MESSAGE)
+            return
+        }
         val productDetailsParams = BillingFlowParams.ProductDetailsParams.newBuilder()
             .setProductDetails(details)
+            .setOfferToken(offerToken)
             .build()
         val params = BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(listOf(productDetailsParams))
@@ -150,7 +160,7 @@ class LocalAdBillingManager(
         runCatching { billingClient.endConnection() }
     }
 
-    /** Connects and queries Play-owned INAPP purchases on Dispatchers.IO. */
+    /** Connects and queries Play-owned SUBS purchases on Dispatchers.IO. */
     suspend fun restoreProLicenseFromPlayStore(context: Context) = withContext(Dispatchers.IO) {
         val safeContext = context.applicationContext
         if (!ensureBillingConnection()) {
@@ -178,9 +188,6 @@ class LocalAdBillingManager(
         _isProOwned.value = purchased.isNotEmpty()
         purchased.forEach { grantIfValid(it, safeContext) }
 
-        // v1.0.13 consumable purchases are absent from Play. Preserve a still-valid local grant
-        // during an in-place update when its encrypted token, fingerprint, and expiry remain valid.
-        if (purchased.isEmpty()) restoreLegacyLocalGrant()
         refreshState()
     }
 
@@ -205,12 +212,6 @@ class LocalAdBillingManager(
 
         grantMutex.withLock {
             val token = purchase.purchaseToken
-            if (prefs.getProcessedTokens().contains(token)) {
-                _isProOwned.value = true
-                refreshState()
-                return@withLock
-            }
-
             // Acknowledge newly observed PURCHASED items before persisting the entitlement.
             if (!purchase.isAcknowledged) {
                 val ack = acknowledgeFn?.invoke(token) ?: suspendAcknowledgeDefault(token)
@@ -222,17 +223,15 @@ class LocalAdBillingManager(
 
             _isProOwned.value = true
             val deviceId = getOrCreateHardwareBindingId()
-            val purchaseDeviceId = purchase.accountIdentifiers?.obfuscatedAccountId
-            if (purchaseDeviceId != null && purchaseDeviceId != deviceId) {
-                _events.tryEmit(eventContext.getString(R.string.pro_pass_device_mismatch))
-                return@withLock
-            }
             if (purchase.purchaseTime <= 0L) {
                 _events.tryEmit(BillingConstants.BILLING_UNAVAILABLE_MESSAGE)
                 return@withLock
             }
             val expiry = try {
-                Math.addExact(purchase.purchaseTime, BillingConstants.PRO_PASS_DURATION_MS)
+                Math.addExact(
+                    Math.addExact(purchase.purchaseTime, BillingConstants.PRO_PASS_DURATION_MS),
+                    SUBSCRIPTION_GRACE_BUFFER_MS
+                )
             } catch (error: ArithmeticException) {
                 Log.w(TAG, "Pro Pass purchase time overflowed the expiry timestamp.", error)
                 _events.tryEmit(BillingConstants.BILLING_UNAVAILABLE_MESSAGE)
@@ -278,7 +277,7 @@ class LocalAdBillingManager(
         suspendCancellableCoroutine { continuation ->
             try {
                 val params = QueryPurchasesParams.newBuilder()
-                    .setProductType(BillingClient.ProductType.INAPP)
+                    .setProductType(BillingClient.ProductType.SUBS)
                     .build()
                 billingClient.queryPurchasesAsync(params) { result, purchases ->
                     if (continuation.isActive) continuation.resume(result to purchases)
@@ -305,12 +304,6 @@ class LocalAdBillingManager(
             }
         }
 
-    private fun restoreLegacyLocalGrant() {
-        if (prefs.getProcessedTokens().isNotEmpty() && checkAdStatusForThisDevice()) {
-            getOrCreateHardwareBindingId()
-        }
-    }
-
     /**
      * Creates a stable UUID from the app-scoped Android ID, stores it in EncryptedSharedPreferences,
      * and sends only this opaque value to Play as the obfuscated account identifier.
@@ -332,7 +325,10 @@ class LocalAdBillingManager(
         _state.value = ProEntitlementState(active, expiry, days)
     }
 
-    private companion object { const val TAG = "LocalAdBillingManager" }
+    private companion object {
+        const val TAG = "LocalAdBillingManager"
+        const val SUBSCRIPTION_GRACE_BUFFER_MS = 24L * 60L * 60L * 1000L
+    }
 }
 
 object BillingManagerProvider {
