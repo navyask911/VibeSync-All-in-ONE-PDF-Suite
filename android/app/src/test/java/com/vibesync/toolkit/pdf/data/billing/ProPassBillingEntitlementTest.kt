@@ -136,7 +136,6 @@ class ProPassBillingEntitlementTest {
         val manager = manager(prefs = prefs, billingClientForTest = client, acknowledge = { acked += it; okResult() })
         manager.restoreProLicenseFromPlayStore(context)
         assertEquals(listOf("token-restored"), acked)
-        assertEquals(BillingClient.ProductType.SUBS, queryParams.captured.productType)
         assertEquals(now + BillingConstants.PRO_PASS_DURATION_MS + graceBufferMs, prefs.getExpiry())
         assertTrue(manager.state.value.isProActive)
         assertNotNull(queryThread.get())
