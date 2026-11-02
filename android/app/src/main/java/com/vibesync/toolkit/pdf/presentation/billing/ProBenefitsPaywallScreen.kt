@@ -54,7 +54,6 @@ fun ProBenefitsPaywallScreen(
     val productDetails by billingManager.productDetails.collectAsState()
     val connected by billingManager.connectionState.collectAsState()
     val pending by billingManager.pendingPurchase.collectAsState()
-    val productOwned by billingManager.isProOwned.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val restoreSuccessMessage = stringResource(R.string.pro_pass_restore_success)
@@ -67,9 +66,6 @@ fun ProBenefitsPaywallScreen(
         if (connected) billingManager.queryProductDetails()
         else snackbarHostState.showSnackbar(BillingConstants.BILLING_UNAVAILABLE_MESSAGE)
     }
-
-    val offer = productDetails?.oneTimePurchaseOfferDetails
-    val priceLabel = offer?.formattedPrice ?: BillingConstants.PRO_PASS_DISPLAY_PRICE_FALLBACK
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -92,7 +88,10 @@ fun ProBenefitsPaywallScreen(
             Text("Upgrade to VibeSync PDF Pro", style = MaterialTheme.typography.headlineSmall)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text(stringResource(R.string.pro_pass_one_time_copy), style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Unlock Pro Pass — ₹299 / Year (Auto-renewing). Cancel anytime in Google Play.",
+                    style = MaterialTheme.typography.titleMedium
+                )
             }
             listOf(
                 "✨ Watermark-Free Exports",
@@ -110,17 +109,12 @@ fun ProBenefitsPaywallScreen(
                         Badge { Text("Pro Pass Active — ${entitlement.daysRemaining} days remaining") }
                     }
                 }
-            } else if (productOwned) {
-                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
-                    Text(stringResource(R.string.pro_pass_expired_owned), modifier = Modifier.padding(14.dp), style = MaterialTheme.typography.bodyMedium)
-                }
             } else {
-                Text(priceLabel, style = MaterialTheme.typography.titleLarge)
                 Button(
                     onClick = { billingManager.launchPurchase(activity) },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = connected && productDetails != null
-                ) { Text("Unlock Pro Now") }
+                ) { Text("Subscribe to Pro Pass") }
             }
 
             if (pending) {
@@ -144,7 +138,7 @@ fun ProBenefitsPaywallScreen(
 
             Spacer(Modifier.height(8.dp))
             Text(
-                stringResource(R.string.pro_pass_restore_description),
+                "Restore your subscription with the same Google Play account you used to subscribe.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
