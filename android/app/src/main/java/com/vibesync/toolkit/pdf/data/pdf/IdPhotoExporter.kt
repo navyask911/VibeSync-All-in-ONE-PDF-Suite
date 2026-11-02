@@ -124,7 +124,7 @@ object IdPhotoExporter {
             val jfif = byteArrayOf(
                 0xff.toByte(), 0xe0.toByte(), 0x00, 0x10,
                 0x4a, 0x46, 0x49, 0x46, 0x00, 0x01, 0x02,
-                0x01, 0x01, (dpi shr 8).toByte(), dpi.toByte(),
+                0x01, (dpi shr 8).toByte(), dpi.toByte(),
                 (dpi shr 8).toByte(), dpi.toByte(), 0x00, 0x00
             )
             return ByteArray(jpeg.size + jfif.size).also { out ->
