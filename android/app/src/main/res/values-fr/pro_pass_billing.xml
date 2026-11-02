@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">Achat unique · 1 an d’accès Pro</string>
+    <string name="pro_pass_restore_description">Restaurez votre Pro Pass après réinstallation avec le même compte Google Play. L’accès est associé à cet appareil.</string>
+    <string name="pro_pass_restore_action">Restaurer le Pro Pass</string>
+    <string name="pro_pass_restore_success">Votre Pro Pass est actif sur cet appareil.</string>
+    <string name="pro_pass_restore_not_found">Aucun Pro Pass actif n’a été trouvé pour ce compte Google Play.</string>
+    <string name="pro_pass_device_mismatch">Ce Pro Pass est enregistré sur un autre appareil.</string>
+    <string name="pro_pass_expired_owned">Ce Pro Pass à achat unique a expiré. Google Play conserve toujours l’achat, il ne peut donc pas être acheté à nouveau avec ce compte.</string>
+</resources>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">Acquisto una tantum · 1 anno di accesso Pro</string>
+    <string name="pro_pass_restore_description">Ripristina Pro Pass dopo la reinstallazione usando lo stesso account Google Play. L’accesso è associato a questo dispositivo.</string>
+    <string name="pro_pass_restore_action">Ripristina Pro Pass</string>
+    <string name="pro_pass_restore_success">Pro Pass è attivo su questo dispositivo.</string>
+    <string name="pro_pass_restore_not_found">Nessun Pro Pass attivo trovato per questo account Google Play.</string>
+    <string name="pro_pass_device_mismatch">Questo Pro Pass è registrato su un altro dispositivo.</string>
+    <string name="pro_pass_expired_owned">Questo Pro Pass una tantum è scaduto. Google Play registra ancora l’acquisto, quindi non può essere acquistato di nuovo con questo account.</string>
+</resources>

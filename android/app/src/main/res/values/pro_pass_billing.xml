@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">One-time purchase · 1 year of Pro access</string>
+    <string name="pro_pass_restore_description">Restore your Pro Pass after reinstall with the same Google Play account. Access is bound to this device.</string>
+    <string name="pro_pass_restore_action">Restore Pro Pass</string>
+    <string name="pro_pass_restore_success">Your Pro Pass is active on this device.</string>
+    <string name="pro_pass_restore_not_found">No active Pro Pass was found for this Google Play account.</string>
+    <string name="pro_pass_device_mismatch">This Pro Pass is registered to a different device.</string>
+    <string name="pro_pass_expired_owned">This one-time Pro Pass has expired. Google Play still records the purchase, so it cannot be purchased again with this account.</string>
+</resources>

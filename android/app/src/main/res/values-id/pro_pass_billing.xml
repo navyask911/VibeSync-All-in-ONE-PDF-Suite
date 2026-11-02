@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">Pembelian sekali · 1 tahun akses Pro</string>
+    <string name="pro_pass_restore_description">Pulihkan Pro Pass setelah memasang ulang dengan akun Google Play yang sama. Akses terikat pada perangkat ini.</string>
+    <string name="pro_pass_restore_action">Pulihkan Pro Pass</string>
+    <string name="pro_pass_restore_success">Pro Pass aktif di perangkat ini.</string>
+    <string name="pro_pass_restore_not_found">Tidak ditemukan Pro Pass aktif untuk akun Google Play ini.</string>
+    <string name="pro_pass_device_mismatch">Pro Pass ini terdaftar pada perangkat lain.</string>
+    <string name="pro_pass_expired_owned">Masa berlaku Pro Pass sekali beli ini telah berakhir. Google Play masih mencatat pembelian sehingga produk ini tidak dapat dibeli lagi dengan akun ini.</string>
+</resources>

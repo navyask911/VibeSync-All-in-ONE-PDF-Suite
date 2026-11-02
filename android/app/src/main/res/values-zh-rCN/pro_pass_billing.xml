@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">一次性购买 · 1 年 Pro 使用权</string>
+    <string name="pro_pass_restore_description">重新安装后，使用同一个 Google Play 账号恢复 Pro Pass。使用权与此设备绑定。</string>
+    <string name="pro_pass_restore_action">恢复 Pro Pass</string>
+    <string name="pro_pass_restore_success">此设备上的 Pro Pass 已启用。</string>
+    <string name="pro_pass_restore_not_found">未找到此 Google Play 账号的有效 Pro Pass。</string>
+    <string name="pro_pass_device_mismatch">此 Pro Pass 已在其他设备上注册。</string>
+    <string name="pro_pass_expired_owned">此一次性 Pro Pass 已过期。Google Play 仍保留购买记录，因此无法使用此账号再次购买。</string>
+</resources>

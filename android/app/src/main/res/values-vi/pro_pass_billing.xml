@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">Mua một lần · 1 năm sử dụng Pro</string>
+    <string name="pro_pass_restore_description">Khôi phục Pro Pass sau khi cài đặt lại bằng cùng tài khoản Google Play. Quyền truy cập được liên kết với thiết bị này.</string>
+    <string name="pro_pass_restore_action">Khôi phục Pro Pass</string>
+    <string name="pro_pass_restore_success">Pro Pass của bạn đang hoạt động trên thiết bị này.</string>
+    <string name="pro_pass_restore_not_found">Không tìm thấy Pro Pass đang hoạt động cho tài khoản Google Play này.</string>
+    <string name="pro_pass_device_mismatch">Pro Pass này được đăng ký trên một thiết bị khác.</string>
+    <string name="pro_pass_expired_owned">Pro Pass mua một lần này đã hết hạn. Google Play vẫn lưu giao dịch mua nên không thể mua lại bằng tài khoản này.</string>
+</resources>

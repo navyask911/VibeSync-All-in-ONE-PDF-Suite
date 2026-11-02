@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">Isang beses na pagbili · 1 taon ng Pro access</string>
+    <string name="pro_pass_restore_description">Ibalik ang iyong Pro Pass pagkatapos muling i-install gamit ang parehong Google Play account. Nakatali ang access sa device na ito.</string>
+    <string name="pro_pass_restore_action">Ibalik ang Pro Pass</string>
+    <string name="pro_pass_restore_success">Aktibo ang iyong Pro Pass sa device na ito.</string>
+    <string name="pro_pass_restore_not_found">Walang aktibong Pro Pass na nakita para sa Google Play account na ito.</string>
+    <string name="pro_pass_device_mismatch">Nakarehistro ang Pro Pass na ito sa ibang device.</string>
+    <string name="pro_pass_expired_owned">Nag-expire na ang isang beses na Pro Pass na ito. Nananatili sa Google Play ang tala ng pagbili kaya hindi na ito mabibili muli gamit ang account na ito.</string>
+</resources>

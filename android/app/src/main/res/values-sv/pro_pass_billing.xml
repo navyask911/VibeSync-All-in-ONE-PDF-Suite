@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">Engångsköp · 1 års Pro-åtkomst</string>
+    <string name="pro_pass_restore_description">Återställ ditt Pro Pass efter ominstallation med samma Google Play-konto. Åtkomsten är knuten till den här enheten.</string>
+    <string name="pro_pass_restore_action">Återställ Pro Pass</string>
+    <string name="pro_pass_restore_success">Ditt Pro Pass är aktivt på den här enheten.</string>
+    <string name="pro_pass_restore_not_found">Inget aktivt Pro Pass hittades för det här Google Play-kontot.</string>
+    <string name="pro_pass_device_mismatch">Det här Pro Pass är registrerat på en annan enhet.</string>
+    <string name="pro_pass_expired_owned">Det här Pro Pass för engångsköp har löpt ut. Google Play registrerar fortfarande köpet, så det kan inte köpas igen med det här kontot.</string>
+</resources>

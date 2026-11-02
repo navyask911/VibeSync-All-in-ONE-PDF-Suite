@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">ഒറ്റത്തവണ വാങ്ങൽ · 1 വർഷത്തെ Pro ആക്‌സസ്</string>
+    <string name="pro_pass_restore_description">അതേ Google Play അക്കൗണ്ട് ഉപയോഗിച്ച് വീണ്ടും ഇൻസ്റ്റാൾ ചെയ്ത ശേഷം Pro Pass പുനഃസ്ഥാപിക്കുക. ആക്‌സസ് ഈ ഉപകരണവുമായി ബന്ധിപ്പിച്ചിരിക്കുന്നു.</string>
+    <string name="pro_pass_restore_action">Pro Pass പുനഃസ്ഥാപിക്കുക</string>
+    <string name="pro_pass_restore_success">ഈ ഉപകരണത്തിൽ നിങ്ങളുടെ Pro Pass സജീവമാണ്.</string>
+    <string name="pro_pass_restore_not_found">ഈ Google Play അക്കൗണ്ടിനായി സജീവമായ Pro Pass കണ്ടെത്തിയില്ല.</string>
+    <string name="pro_pass_device_mismatch">ഈ Pro Pass മറ്റൊരു ഉപകരണത്തിൽ രജിസ്റ്റർ ചെയ്തിരിക്കുന്നു.</string>
+    <string name="pro_pass_expired_owned">ഈ ഒറ്റത്തവണ Pro Pass കാലഹരണപ്പെട്ടു. Google Play വാങ്ങൽ രേഖ ഇപ്പോഴും സൂക്ഷിക്കുന്നതിനാൽ ഈ അക്കൗണ്ട് ഉപയോഗിച്ച് വീണ്ടും വാങ്ങാനാകില്ല.</string>
+</resources>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">Одноразова покупка · 1 рік доступу Pro</string>
+    <string name="pro_pass_restore_description">Відновіть Pro Pass після повторного встановлення за допомогою того самого облікового запису Google Play. Доступ прив’язано до цього пристрою.</string>
+    <string name="pro_pass_restore_action">Відновити Pro Pass</string>
+    <string name="pro_pass_restore_success">Pro Pass активний на цьому пристрої.</string>
+    <string name="pro_pass_restore_not_found">Для цього облікового запису Google Play активний Pro Pass не знайдено.</string>
+    <string name="pro_pass_device_mismatch">Цей Pro Pass зареєстровано на іншому пристрої.</string>
+    <string name="pro_pass_expired_owned">Термін дії одноразового Pro Pass завершився. Google Play зберігає запис про покупку, тому повторно придбати його з цим обліковим записом неможливо.</string>
+</resources>

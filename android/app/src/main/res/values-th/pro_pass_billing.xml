@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">ซื้อครั้งเดียว · ใช้งาน Pro ได้ 1 ปี</string>
+    <string name="pro_pass_restore_description">กู้คืน Pro Pass หลังติดตั้งแอปใหม่โดยใช้บัญชี Google Play เดิม สิทธิ์การใช้งานจะผูกกับอุปกรณ์นี้</string>
+    <string name="pro_pass_restore_action">กู้คืน Pro Pass</string>
+    <string name="pro_pass_restore_success">Pro Pass ของคุณใช้งานได้บนอุปกรณ์นี้</string>
+    <string name="pro_pass_restore_not_found">ไม่พบ Pro Pass ที่ใช้งานอยู่สำหรับบัญชี Google Play นี้</string>
+    <string name="pro_pass_device_mismatch">Pro Pass นี้ลงทะเบียนไว้กับอุปกรณ์อื่น</string>
+    <string name="pro_pass_expired_owned">Pro Pass แบบซื้อครั้งเดียวนี้หมดอายุแล้ว Google Play ยังคงบันทึกการซื้อไว้ จึงไม่สามารถซื้อซ้ำด้วยบัญชีนี้ได้</string>
+</resources>

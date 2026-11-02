@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">Egyszeri vásárlás · 1 év Pro-hozzáférés</string>
+    <string name="pro_pass_restore_description">Újratelepítés után ugyanazzal a Google Play-fiókkal állíthatod vissza a Pro Passt. A hozzáférés ehhez az eszközhöz kötött.</string>
+    <string name="pro_pass_restore_action">Pro Pass visszaállítása</string>
+    <string name="pro_pass_restore_success">A Pro Pass aktív ezen az eszközön.</string>
+    <string name="pro_pass_restore_not_found">Ehhez a Google Play-fiókhoz nem található aktív Pro Pass.</string>
+    <string name="pro_pass_device_mismatch">Ez a Pro Pass egy másik eszközön van regisztrálva.</string>
+    <string name="pro_pass_expired_owned">Ez az egyszeri Pro Pass lejárt. A Google Play továbbra is nyilvántartja a vásárlást, ezért ezzel a fiókkal nem vásárolható meg újra.</string>
+</resources>

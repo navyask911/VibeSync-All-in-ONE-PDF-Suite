@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">Ununuzi wa mara moja · mwaka 1 wa ufikiaji wa Pro</string>
+    <string name="pro_pass_restore_description">Rejesha Pro Pass baada ya kusakinisha upya kwa kutumia akaunti ileile ya Google Play. Ufikiaji umefungamanishwa na kifaa hiki.</string>
+    <string name="pro_pass_restore_action">Rejesha Pro Pass</string>
+    <string name="pro_pass_restore_success">Pro Pass yako inatumika kwenye kifaa hiki.</string>
+    <string name="pro_pass_restore_not_found">Pro Pass inayotumika haikupatikana kwa akaunti hii ya Google Play.</string>
+    <string name="pro_pass_device_mismatch">Pro Pass hii imesajiliwa kwenye kifaa kingine.</string>
+    <string name="pro_pass_expired_owned">Muda wa Pro Pass hii ya ununuzi wa mara moja umeisha. Google Play bado ina rekodi ya ununuzi, kwa hivyo haiwezi kununuliwa tena kwa akaunti hii.</string>
+</resources>

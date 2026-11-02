@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">একবারের ক্রয় · ১ বছরের Pro সুবিধা</string>
+    <string name="pro_pass_restore_description">একই Google Play অ্যাকাউন্ট ব্যবহার করে পুনরায় ইনস্টল করার পর Pro Pass পুনরুদ্ধার করুন। অ্যাক্সেস এই ডিভাইসের সঙ্গে যুক্ত।</string>
+    <string name="pro_pass_restore_action">Pro Pass পুনরুদ্ধার করুন</string>
+    <string name="pro_pass_restore_success">এই ডিভাইসে আপনার Pro Pass সক্রিয় আছে।</string>
+    <string name="pro_pass_restore_not_found">এই Google Play অ্যাকাউন্টের জন্য কোনো সক্রিয় Pro Pass পাওয়া যায়নি।</string>
+    <string name="pro_pass_device_mismatch">এই Pro Pass অন্য একটি ডিভাইসে নিবন্ধিত।</string>
+    <string name="pro_pass_expired_owned">এই এককালীন Pro Pass-এর মেয়াদ শেষ হয়েছে। Google Play এখনও ক্রয়টি ধরে রেখেছে, তাই এই অ্যাকাউন্ট দিয়ে এটি আবার কেনা যাবে না।</string>
+</resources>

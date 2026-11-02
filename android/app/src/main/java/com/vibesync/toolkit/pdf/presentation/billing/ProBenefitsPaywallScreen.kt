@@ -23,7 +23,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -33,19 +32,16 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.billing.BillingConstants
 import com.vibesync.toolkit.pdf.data.billing.LocalAdBillingManager
 import kotlinx.coroutines.launch
-import java.text.NumberFormat
-import java.util.Currency
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,38 +54,22 @@ fun ProBenefitsPaywallScreen(
     val productDetails by billingManager.productDetails.collectAsState()
     val connected by billingManager.connectionState.collectAsState()
     val pending by billingManager.pendingPurchase.collectAsState()
+    val productOwned by billingManager.isProOwned.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
-    var quantity by remember { mutableStateOf(1f) }
+    val restoreSuccessMessage = stringResource(R.string.pro_pass_restore_success)
+    val restoreMissingMessage = stringResource(R.string.pro_pass_restore_not_found)
 
     LaunchedEffect(billingManager) {
-        billingManager.events.collect { message ->
-            snackbarHostState.showSnackbar(message)
-        }
+        billingManager.events.collect { message -> snackbarHostState.showSnackbar(message) }
     }
     LaunchedEffect(connected) {
-        if (connected) {
-            billingManager.queryProductDetails()
-        } else {
-            snackbarHostState.showSnackbar(BillingConstants.BILLING_UNAVAILABLE_MESSAGE)
-        }
+        if (connected) billingManager.queryProductDetails()
+        else snackbarHostState.showSnackbar(BillingConstants.BILLING_UNAVAILABLE_MESSAGE)
     }
 
-    val selectedQuantity = quantity.toInt().coerceIn(1, BillingConstants.MAX_STACK_YEARS)
-    val fallbackBase = BillingConstants.PRO_PASS_DISPLAY_PRICE_FALLBACK
-        .removeSuffix(BillingConstants.YEAR_PRICE_SUFFIX)
-    val fallbackTotal = "$fallbackBase × $selectedQuantity"
     val offer = productDetails?.oneTimePurchaseOfferDetails
-    val estimatedUnitPrice = offer?.formattedPrice ?: fallbackBase
-    val totalPrice = offer?.let {
-        runCatching {
-            val formatter = NumberFormat.getCurrencyInstance(Locale.getDefault())
-            formatter.currency = Currency.getInstance(it.priceCurrencyCode)
-            formatter.format(it.priceAmountMicros.toDouble() * selectedQuantity / 1_000_000.0)
-        }.getOrDefault("${it.formattedPrice} × $selectedQuantity")
-    } ?: fallbackTotal
-    val selectedYearsLabel = if (selectedQuantity == 1) BillingConstants.YEAR_LABEL else BillingConstants.YEARS_LABEL
-    val estimatedPriceLine = "Estimated: $totalPrice ($selectedQuantity $selectedYearsLabel × $estimatedUnitPrice)"
+    val priceLabel = offer?.formattedPrice ?: BillingConstants.PRO_PASS_DISPLAY_PRICE_FALLBACK
 
     Scaffold(
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -105,104 +85,66 @@ fun ProBenefitsPaywallScreen(
         }
     ) { padding ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
+            modifier = Modifier.fillMaxSize().padding(padding)
+                .verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text(
-                "Upgrade to VibeSync PDF Pro",
-                style = MaterialTheme.typography.headlineSmall
-            )
+            Text("Upgrade to VibeSync PDF Pro", style = MaterialTheme.typography.headlineSmall)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Text("Per-device Pro Pass", style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.pro_pass_one_time_copy), style = MaterialTheme.typography.titleMedium)
             }
-
             listOf(
                 "✨ Watermark-Free Exports",
                 "🚫 100% Ad-Free Experience",
-                "🛡️ Custom Watermarks",
-                "📂 Multi-Year Stacking (up to ${BillingConstants.MAX_STACK_YEARS} years)"
+                "🛡️ Custom Watermarks"
             ).forEach { benefit ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text(benefit, style = MaterialTheme.typography.bodyLarge)
                 }
             }
 
             if (entitlement.isProActive) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
                         Badge { Text("Pro Pass Active — ${entitlement.daysRemaining} days remaining") }
                     }
                 }
+            } else if (productOwned) {
+                Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
+                    Text(stringResource(R.string.pro_pass_expired_owned), modifier = Modifier.padding(14.dp), style = MaterialTheme.typography.bodyMedium)
+                }
+            } else {
+                Text(priceLabel, style = MaterialTheme.typography.titleLarge)
                 Button(
                     onClick = { billingManager.launchPurchase(activity) },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Extend +1 Year")
-                }
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = connected && productDetails != null
+                ) { Text("Unlock Pro Now") }
             }
 
             if (pending) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)) {
-                    Text(
-                        BillingConstants.PURCHASE_PENDING_MESSAGE,
-                        modifier = Modifier.padding(14.dp),
-                        style = MaterialTheme.typography.titleSmall
-                    )
+                    Text(BillingConstants.PURCHASE_PENDING_MESSAGE, modifier = Modifier.padding(14.dp), style = MaterialTheme.typography.titleSmall)
                 }
             }
 
-            Text("Estimate a purchase quantity", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "You'll choose how many years to buy in the Play dialog. Up to ${BillingConstants.MAX_STACK_YEARS} years allowed.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text("$selectedQuantity $selectedYearsLabel")
-            Slider(
-                value = quantity,
-                onValueChange = { quantity = it },
-                valueRange = 1f..BillingConstants.MAX_STACK_YEARS.toFloat(),
-                steps = (BillingConstants.MAX_STACK_YEARS - 2).coerceAtLeast(0)
-            )
-            Text(
-                text = estimatedPriceLine,
-                style = MaterialTheme.typography.titleMedium
-            )
-            Button(
-                onClick = { billingManager.launchPurchase(activity) },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Unlock Pro Now")
-            }
             TextButton(
                 onClick = {
-                    billingManager.refreshPurchases { active ->
-                        scope.launch {
-                            snackbarHostState.showSnackbar(
-                                if (active) "Pro Pass is active on this device." else "No active Pro pass found."
-                            )
-                        }
+                    scope.launch {
+                        billingManager.restoreProLicenseFromPlayStore(activity.applicationContext)
+                        snackbarHostState.showSnackbar(
+                            if (billingManager.state.value.isProActive) restoreSuccessMessage else restoreMissingMessage
+                        )
                     }
                 },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text("Check Status / Restore")
-            }
+                modifier = Modifier.fillMaxWidth(),
+                enabled = connected
+            ) { Text(stringResource(R.string.pro_pass_restore_action)) }
 
             Spacer(Modifier.height(8.dp))
             Text(
-                "This pass is tied to this device and cannot be restored after uninstall or clearing app data.",
+                stringResource(R.string.pro_pass_restore_description),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
