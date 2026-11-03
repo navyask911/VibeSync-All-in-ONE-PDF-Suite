@@ -490,6 +490,11 @@ class PdfBoxToolkitEngine(
 
             ensureBouncyCastleProvider()
 
+            // Keep normalized credentials in the full operation scope: they are also used
+            // below to reopen the completed encrypted file for verification.
+            val encodedUserPassword = normalizePasswordForPdfBox(userPassword)
+            val encodedOwnerPassword = normalizePasswordForPdfBox(ownerPassword)
+
             sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "encrypt_src_")
             PDDocument.load(sourceFile).use { document ->
                 val permissions = AccessPermission().apply {
@@ -503,8 +508,6 @@ class PdfBoxToolkitEngine(
                 // PDFBox's policy API accepts Strings. Round-trip through UTF-8 explicitly so
                 // credentials enter the security handler with deterministic UTF-8 text, including
                 // non-ASCII passwords, rather than relying on a platform-default charset.
-                val encodedUserPassword = normalizePasswordForPdfBox(userPassword)
-                val encodedOwnerPassword = normalizePasswordForPdfBox(ownerPassword)
                 val policy = StandardProtectionPolicy(
                     encodedOwnerPassword,
                     encodedUserPassword,
