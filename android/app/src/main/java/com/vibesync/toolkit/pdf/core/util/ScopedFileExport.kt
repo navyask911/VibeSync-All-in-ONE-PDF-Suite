@@ -10,6 +10,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.core.content.ContextCompat
+import androidx.annotation.RequiresApi
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -26,6 +27,7 @@ object ScopedFileExport {
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.Q)
     private fun saveWithMediaStore(context: Context, sourceFile: File?, sourceUri: Uri?, displayName: String, mimeType: String) {
         val resolver = context.contentResolver
         val values = ContentValues().apply {
