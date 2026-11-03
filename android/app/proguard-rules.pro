@@ -72,3 +72,20 @@
     <init>(android.app.Application);
     <init>(...);
 }
+
+# ==========================================
+# Apache POI DOCX / XMLBeans
+# ==========================================
+-keep class org.apache.poi.xwpf.** { *; }
+-keep class org.apache.poi.ooxml.** { *; }
+-keep class org.apache.poi.openxml4j.** { *; }
+-keep class org.apache.poi.schemas.** { *; }
+-keep class org.apache.xmlbeans.** { *; }
+-keep class org.openxmlformats.schemas.** { *; }
+-keep class org.apache.poi.javax.xml.stream.** { *; }
+-keep class com.fasterxml.aalto.** { *; }
+-dontwarn org.apache.poi.**
+-dontwarn org.apache.xmlbeans.**
+
+-keep class org.apache.logging.log4j.** { *; }
+-dontwarn org.apache.logging.log4j.**

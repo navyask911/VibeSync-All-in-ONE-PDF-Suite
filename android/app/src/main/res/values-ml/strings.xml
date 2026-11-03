@@ -184,4 +184,6 @@
     <string name="vault_lock_action">Lock vault</string>
     <string name="vault_biometric_title">Unlock VibeSync Vault</string>
     <string name="vault_biometric_subtitle">Authenticate with strong biometrics or your device PIN.</string>
+    <string name="export_docx">OCR ടെക്സ്റ്റ് Word (.docx) ആയി എക്സ്പോർട്ട് ചെയ്യുക</string>
+    <string name="export_saved_docx">Word ഡോക്യുമെന്റ് പങ്കിടാൻ തയ്യാറാണ്.</string>
 </resources>

@@ -49,6 +49,7 @@ import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.core.util.generateSmartFileName
 import com.vibesync.toolkit.pdf.data.pdf.createWhiteBackgroundBitmap
 import com.vibesync.toolkit.pdf.data.ocr.MlKitOcrEngine
+import com.vibesync.toolkit.pdf.data.ocr.OcrDocxExporter
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -89,6 +90,7 @@ fun ExportMenu(
     var passwordDialog by remember { mutableStateOf(false) }
     var password by remember { mutableStateOf("") }
     var pendingTextTarget by remember { mutableStateOf<Uri?>(null) }
+    var pendingDocxExport by remember { mutableStateOf(false) }
     var queuedJpgPages by remember { mutableStateOf<List<Int>>(emptyList()) }
 
     val baseName = remember(sourceUri) {
@@ -101,6 +103,51 @@ fun ExportMenu(
     fun requestSaf(mimeType: String, displayName: String, launch: () -> Unit) {
         onExportSelected(mimeType, displayName)
         if (onSafLaunch != null) onSafLaunch(mimeType, displayName) else launch()
+    }
+
+    fun beginOcrExport(targetUri: Uri?, passwordValue: String?, asDocx: Boolean) {
+        startOcrExport(
+            scope = coroutineScope,
+            context = context,
+            sourceUri = sourceUri,
+            passwordValue = passwordValue,
+            onOcrTextReady = { allText ->
+                if (asDocx) {
+                    val docxFile = OcrDocxExporter.create(context, "${baseName}_OCR", allText)
+                    withContext(Dispatchers.Main.immediate) {
+                        OcrDocxExporter.share(context, docxFile)
+                    }
+                } else {
+                    val target = targetUri ?: throw IOException("The selected destination is missing.")
+                    context.contentResolver.openOutputStream(target, "wt")?.bufferedWriter(Charsets.UTF_8)?.use {
+                        it.write(allText)
+                    } ?: throw IOException("The selected destination could not be opened.")
+                }
+            },
+            onStart = { job -> activeJob = job; running = true },
+            onProgress = { complete, total ->
+                completedPages = complete
+                totalPages = total
+                progress = if (total > 0) complete.toFloat() / total else 0f
+            },
+            onPasswordRequired = { running = false; passwordDialog = true },
+            onDone = {
+                running = false
+                activeJob = null
+                pendingTextTarget = null
+                pendingDocxExport = false
+                password = ""
+                val message = if (asDocx) R.string.export_saved_docx else R.string.export_saved_txt
+                Toast.makeText(context, context.getString(message), Toast.LENGTH_LONG).show()
+            },
+            onError = {
+                running = false
+                activeJob = null
+                pendingTextTarget = null
+                pendingDocxExport = false
+                showExportError(context, it)
+            }
+        )
     }
 
     val pdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { target ->
@@ -161,27 +208,8 @@ fun ExportMenu(
     val txtLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { target ->
         if (target != null) {
             pendingTextTarget = target
-            startTextExport(
-                scope = coroutineScope,
-                context = context,
-                sourceUri = sourceUri,
-                targetUri = target,
-                passwordValue = null,
-                onStart = { job -> activeJob = job; running = true },
-                onProgress = { complete, total ->
-                    completedPages = complete
-                    totalPages = total
-                    progress = if (total > 0) complete.toFloat() / total else 0f
-                },
-                onPasswordRequired = { running = false; passwordDialog = true },
-                onDone = {
-                    running = false
-                    pendingTextTarget = null
-                    password = ""
-                    Toast.makeText(context, context.getString(R.string.export_saved_txt), Toast.LENGTH_LONG).show()
-                },
-                onError = { running = false; showExportError(context, it) }
-            )
+            pendingDocxExport = false
+            beginOcrExport(targetUri = target, passwordValue = null, asDocx = false)
         }
     }
 
@@ -247,6 +275,17 @@ fun ExportMenu(
                         requestSaf("text/plain", name) { txtLauncher.launch(name) }
                     }
                 )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.export_docx)) },
+                    modifier = Modifier.testTag("export_docx"),
+                    onClick = {
+                        expanded = false
+                        pendingTextTarget = null
+                        pendingDocxExport = true
+                        onExportSelected(OcrDocxExporter.MIME_TYPE, "$baseName.docx")
+                        beginOcrExport(targetUri = null, passwordValue = null, asDocx = true)
+                    }
+                )
             }
         }
         if (running) {
@@ -264,7 +303,7 @@ fun ExportMenu(
 
     if (passwordDialog) {
         AlertDialog(
-            onDismissRequest = { passwordDialog = false; password = ""; pendingTextTarget = null },
+            onDismissRequest = { passwordDialog = false; password = ""; pendingTextTarget = null; pendingDocxExport = false },
             title = { Text(stringResource(R.string.export_password_title)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -280,37 +319,19 @@ fun ExportMenu(
             },
             confirmButton = {
                 TextButton(
-                    enabled = password.isNotBlank() && pendingTextTarget != null,
+                    enabled = password.isNotBlank() && (pendingDocxExport || pendingTextTarget != null),
                     onClick = {
-                        val target = pendingTextTarget ?: return@TextButton
+                        val asDocx = pendingDocxExport
+                        val target = pendingTextTarget
+                        if (!asDocx && target == null) return@TextButton
                         passwordDialog = false
-                        startTextExport(
-                            scope = coroutineScope,
-                            context = context,
-                            sourceUri = sourceUri,
-                            targetUri = target,
-                            passwordValue = password,
-                            onStart = { job -> activeJob = job; running = true },
-                            onProgress = { complete, total ->
-                                completedPages = complete
-                                totalPages = total
-                                progress = if (total > 0) complete.toFloat() / total else 0f
-                            },
-                            onPasswordRequired = { running = false; passwordDialog = true },
-                            onDone = {
-                                running = false
-                                pendingTextTarget = null
-                                password = ""
-                                Toast.makeText(context, context.getString(R.string.export_saved_txt), Toast.LENGTH_LONG).show()
-                            },
-                            onError = { running = false; showExportError(context, it) }
-                        )
+                        beginOcrExport(targetUri = target, passwordValue = password, asDocx = asDocx)
                     },
                     modifier = Modifier.testTag("export_password_submit")
                 ) { Text(stringResource(R.string.continue_label)) }
             },
             dismissButton = {
-                TextButton(onClick = { passwordDialog = false; password = ""; pendingTextTarget = null }) {
+                TextButton(onClick = { passwordDialog = false; password = ""; pendingTextTarget = null; pendingDocxExport = false }) {
                     Text(stringResource(R.string.cancel))
                 }
             }
@@ -318,12 +339,12 @@ fun ExportMenu(
     }
 }
 
-private fun startTextExport(
+private fun startOcrExport(
     scope: CoroutineScope,
     context: Context,
     sourceUri: Uri,
-    targetUri: Uri,
     passwordValue: String?,
+    onOcrTextReady: suspend (String) -> Unit,
     onStart: (Job) -> Unit,
     onProgress: (Int, Int) -> Unit,
     onPasswordRequired: () -> Unit,
@@ -357,9 +378,7 @@ private fun startTextExport(
                     }
                 }
                 withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(targetUri, "wt")?.bufferedWriter(Charsets.UTF_8)?.use {
-                        it.write(allText)
-                    } ?: throw IOException("The selected destination could not be opened.")
+                    onOcrTextReady(allText)
                 }
                 withContext(Dispatchers.Main.immediate) { onDone() }
             } finally {

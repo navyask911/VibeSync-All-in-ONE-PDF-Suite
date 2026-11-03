@@ -11,6 +11,8 @@ import androidx.compose.ui.test.performClick
 import androidx.test.platform.app.InstrumentationRegistry
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
+import com.vibesync.toolkit.pdf.core.util.UriUtils
+import com.vibesync.toolkit.pdf.data.ocr.OcrDocxExporter
 import com.vibesync.toolkit.pdf.presentation.viewer.ExportMenu
 import com.vibesync.toolkit.pdf.presentation.viewer.buildJpgPagesZip
 import com.tom_roush.pdfbox.pdmodel.PDDocument
@@ -100,6 +102,33 @@ class ExportFormatsTest {
             assertEquals(listOf(1 to 3, 2 to 3, 3 to 3), progress)
         } finally {
             work.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun ocrTextCreatesDocxWithExpectedContentAndShareableFileProviderUri() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val expectedText = "VibeSync OCR DOCX verification & share test."
+        val docx = OcrDocxExporter.create(context, "ocr-docx-verification", expectedText)
+        try {
+            assertTrue("DOCX output must exist and be non-empty", docx.isFile && docx.length() > 0L)
+            ZipFile(docx).use { archive ->
+                val documentEntry = archive.getEntry("word/document.xml")
+                assertTrue("DOCX must contain its Word document part", documentEntry != null)
+                val documentXml = archive.getInputStream(documentEntry).bufferedReader(Charsets.UTF_8).use {
+                    it.readText()
+                }
+                assertTrue(
+                    "Generated Word document must contain the recognized OCR text",
+                    documentXml.contains("VibeSync OCR DOCX verification &amp; share test.")
+                )
+            }
+
+            val shareUri = UriUtils.getShareableUri(context, docx)
+            assertEquals("content", shareUri.scheme)
+            assertTrue("DOCX share URI must use the configured FileProvider", shareUri.authority?.endsWith(".fileprovider") == true)
+        } finally {
+            docx.delete()
         }
     }
 

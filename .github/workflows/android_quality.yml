@@ -133,6 +133,8 @@ jobs:
               "compression_try_again",
               "compression_use_output",
               "export_failed",
+              "export_docx",
+              "export_saved_docx",
               "export_jpg_current",
               "export_jpg_separate",
               "export_jpg_zip",

@@ -37,6 +37,15 @@ class ExportMenuTest {
         }
     }
 
+    @Test
+    fun exportMenuOffersOcrWordDocxAction() {
+        setTestContent {
+            ExportMenu(sourceUri = Uri.parse("file:///tmp/unused-export.pdf"))
+        }
+        composeRule.onNodeWithTag("export_menu").performClick()
+        composeRule.onNodeWithTag("export_docx").assertIsDisplayed()
+    }
+
     private fun setTestContent(content: @Composable () -> Unit) {
         composeRule.activity.runOnUiThread {
             val composeView = findComposeView(composeRule.activity.window.decorView)
