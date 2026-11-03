@@ -200,7 +200,10 @@ android {
 
     packaging {
         resources {
-            // Standard exclusions for Apache POI / Log4j on Android
+            // Keep the first occurrence of this file (required by POI)
+            pickFirsts += "Log4j-charsets.properties"
+
+            // Exclude redundant metadata files that cause merge conflicts
             excludes += "META-INF/DEPENDENCIES"
             excludes += "META-INF/LICENSE"
             excludes += "META-INF/LICENSE.txt"
