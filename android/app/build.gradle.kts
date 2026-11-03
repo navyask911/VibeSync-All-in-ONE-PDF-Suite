@@ -141,8 +141,8 @@ android {
         applicationId = "com.vibesync.toolkit.pdf"
         minSdk = 24
         targetSdk = 36
-        versionCode = 20
-        versionName = "1.0.17"
+        versionCode = 21
+        versionName = "1.0.18"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -202,6 +202,7 @@ android {
         resources {
             excludes += "/META-INF/LICENSE.md"
             excludes += "/META-INF/LICENSE-notice.md"
+            pickFirsts += "Log4j-charsets.properties"
         }
     }
 
