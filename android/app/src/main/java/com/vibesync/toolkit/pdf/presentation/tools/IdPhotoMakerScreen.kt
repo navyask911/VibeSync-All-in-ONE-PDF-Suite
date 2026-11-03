@@ -1,6 +1,5 @@
 package com.vibesync.toolkit.pdf.presentation.tools
 
-import android.content.Intent
 import android.graphics.Bitmap
 import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import android.net.Uri
@@ -24,8 +23,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Card
@@ -67,7 +64,8 @@ import kotlinx.coroutines.withContext
 @Composable
 fun IdPhotoMakerScreen(
     onNavigateBack: () -> Unit,
-    previewBitmap: Bitmap? = null
+    previewBitmap: Bitmap? = null,
+    onExportReady: (Uri, String) -> Unit = { _, _ -> }
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -95,17 +93,6 @@ fun IdPhotoMakerScreen(
             }
         }
     }
-    val openOrShare = { share: Boolean ->
-        savedUri?.let { uri ->
-            val intent = if (share) Intent(Intent.ACTION_SEND).setType("image/jpeg").putExtra(Intent.EXTRA_STREAM, uri)
-            else Intent(Intent.ACTION_VIEW).setDataAndType(uri, "image/jpeg")
-            intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            runCatching {
-                context.startActivity(if (share) Intent.createChooser(intent, context.getString(R.string.id_photo_share)) else intent)
-            }
-        }
-    }
-
     Scaffold(topBar = {
         TopAppBar(title = { Text(stringResource(R.string.id_photo_title)) }, navigationIcon = {
             androidx.compose.material3.IconButton(onClick = onNavigateBack) {
@@ -196,12 +183,14 @@ fun IdPhotoMakerScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                             Text(stringResource(R.string.id_photo_saved), modifier = Modifier.weight(1f))
-                            androidx.compose.material3.IconButton(onClick = { openOrShare(false) }, modifier = Modifier.testTag("id_photo_open")) {
-                                Icon(Icons.Default.OpenInNew, contentDescription = stringResource(R.string.id_photo_open))
-                            }
-                            androidx.compose.material3.IconButton(onClick = { openOrShare(true) }, modifier = Modifier.testTag("id_photo_share")) {
-                                Icon(Icons.Default.Share, contentDescription = stringResource(R.string.id_photo_share))
-                            }
+                            androidx.compose.material3.TextButton(
+                                onClick = {
+                                    savedUri?.let { uri ->
+                                        onExportReady(uri, "VibeSync_ID_Photo_${selected.name}.jpg")
+                                    }
+                                },
+                                modifier = Modifier.testTag("id_photo_export")
+                            ) { Text("Save / Share") }
                         }
                     }
                 }
@@ -234,7 +223,13 @@ fun IdPhotoMakerScreen(
                                 finally { if (!cropped.isRecycled && cropped !== bitmap) cropped.recycle() }
                             }
                         }
-                        result.fold(onSuccess = { savedUri = it }, onFailure = { error = it.localizedMessage ?: context.getString(R.string.id_photo_save_failed) })
+                        result.fold(
+                            onSuccess = {
+                                savedUri = it
+                                onExportReady(it, "VibeSync_ID_Photo_${selected.name}.jpg")
+                            },
+                            onFailure = { error = it.localizedMessage ?: context.getString(R.string.id_photo_save_failed) }
+                        )
                         saving = false
                     }
                 },

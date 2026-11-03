@@ -79,7 +79,8 @@ fun PdfViewerScreen(
     onLaunchPrint: (Context, Uri, String) -> Unit = { printContext, uri, jobName ->
         launchSystemPdfPrint(printContext, uri, jobName)
     },
-    onRenameClick: (String) -> Unit = {}
+    onRenameClick: (String) -> Unit = {},
+    onExportReady: (File, String, String) -> Unit = { _, _, _ -> }
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
@@ -243,8 +244,12 @@ fun PdfViewerScreen(
                     }
                                     }, onClick = { scanMenuExpanded = false })
                                     DropdownMenuItem(text = { Text("Download / Save") }, leadingIcon = {
-                                        ExportMenu(sourceUri = documentUri, currentPageIndex = uiState.currentPageIndex,
-                                            testTag = "viewer_export_menu")
+                                        ExportMenu(
+                                            sourceUri = documentUri,
+                                            currentPageIndex = uiState.currentPageIndex,
+                                            testTag = "viewer_export_menu",
+                                            onExportReady = onExportReady
+                                        )
                                     }, onClick = { scanMenuExpanded = false })
                                 }
                                 if (scale > 1.05f) {
@@ -394,8 +399,12 @@ fun PdfViewerScreen(
                         if (isPreparingPrint) CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
                         else Icon(Icons.Default.Print, contentDescription = "Print")
                     }
-                            ExportMenu(sourceUri = documentUri, currentPageIndex = uiState.currentPageIndex,
-                                testTag = "viewer_export_menu")
+                            ExportMenu(
+                                sourceUri = documentUri,
+                                currentPageIndex = uiState.currentPageIndex,
+                                testTag = "viewer_export_menu",
+                                onExportReady = onExportReady
+                            )
                         }
                     }
                 }

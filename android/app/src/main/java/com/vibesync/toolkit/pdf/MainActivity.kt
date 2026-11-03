@@ -86,6 +86,7 @@ import com.vibesync.toolkit.pdf.presentation.billing.ProBenefitsPaywallScreen
 import com.vibesync.toolkit.pdf.core.util.EngagementPolicy
 import com.vibesync.toolkit.pdf.core.util.ReviewEligibilityTracker
 import com.vibesync.toolkit.pdf.core.util.UriUtils
+import com.vibesync.toolkit.pdf.presentation.export.FileExportBottomSheet
 import com.vibesync.toolkit.pdf.core.util.generateSmartFileName
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.data.pdf.createWhiteBackgroundBitmap
@@ -141,6 +142,10 @@ class MainActivity : AppCompatActivity() {
     private var internetAvailable by mutableStateOf(false)
     private var activeRoute by mutableStateOf("dashboard")
     private var pendingShareFiles by mutableStateOf<List<File>>(emptyList())
+    private var pendingFileExport by mutableStateOf<File?>(null)
+    private var pendingExportUri by mutableStateOf<Uri?>(null)
+    private var pendingExportMimeType by mutableStateOf("application/pdf")
+    private var pendingExportDisplayName by mutableStateOf("document.pdf")
     private var showRenameDialog by mutableStateOf(false)
     private var showDocumentRenameDialog by mutableStateOf(false)
     private var pendingDocumentRenameUri by mutableStateOf<Uri?>(null)
@@ -500,7 +505,7 @@ class MainActivity : AppCompatActivity() {
                                 },
                                 onSharePdf = { file -> shareScanPdf(file) },
                                 onShareImages = { file -> shareScanImages(file) },
-                                onSaveToDownloads = { file -> saveScanToDownloads(file) },
+                                onSaveToDownloads = { file -> showFileExport(file, "application/pdf", file.name) },
                                 onNavigateToEditor = { uri -> navController.navigate("editor/${encodeUriRoute(uri)}") },
                                 onNavigateToPdfTool = { route, uri ->
                                     if (route == "watermark") getSharedPreferences("pdf_watermark_options", MODE_PRIVATE).edit().putBoolean("watermark_custom_enabled", true).apply()
@@ -520,6 +525,7 @@ class MainActivity : AppCompatActivity() {
                                     }
                                 },
                                 onOpenPdf = { file ->
+                                    showFileExport(file, "application/pdf", file.name)
                                     scannerHistoryViewModel.refresh()
                                     dashboardViewModel.refreshRecentDocuments()
                                     navController.navigate("viewer/${encodeUriRoute(Uri.fromFile(file))}")
@@ -554,7 +560,10 @@ class MainActivity : AppCompatActivity() {
                         }
 
                         composable("id_photo") {
-                            IdPhotoMakerScreen(onNavigateBack = { navController.popBackStack() })
+                            IdPhotoMakerScreen(
+                                onNavigateBack = { navController.popBackStack() },
+                                onExportReady = { uri, displayName -> showUriExport(uri, "image/jpeg", displayName) }
+                            )
                         }
 
                         composable("translation_scan") {
@@ -597,6 +606,7 @@ class MainActivity : AppCompatActivity() {
                                                 }
                                             }
                                             scannerHistoryViewModel.refresh()
+                                            showFileExport(saved, "application/pdf", saved.name)
                                             Toast.makeText(this@MainActivity, getString(R.string.manual_crop_saved, saved.name), Toast.LENGTH_LONG).show()
                                         } catch (error: Exception) {
                                             Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.manual_crop_error), Toast.LENGTH_LONG).show()
@@ -692,7 +702,7 @@ class MainActivity : AppCompatActivity() {
                                 },
                                 onShareScanPdf = { managedScanFile?.let { shareScanPdf(it) } },
                                 onShareScanImages = { managedScanFile?.let { shareScanImages(it) } },
-                                onSaveScanToDownloads = { managedScanFile?.let { saveScanToDownloads(it) } },
+                                onSaveScanToDownloads = { managedScanFile?.let { showFileExport(it, "application/pdf", it.name) } },
                                 onDeleteScan = {
                                     if (managedScanFile != null) {
                                         scannerHistoryViewModel.deleteScan(managedScanFile) { result ->
@@ -706,6 +716,9 @@ class MainActivity : AppCompatActivity() {
                                                 }
                                         }
                                     }
+                                },
+                                onExportReady = { file, mimeType, displayName ->
+                                    showFileExport(file, mimeType, displayName)
                                 }
                             )
                         }
@@ -816,7 +829,7 @@ class MainActivity : AppCompatActivity() {
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { output ->
                                     recordSuccessfulPdfOperation()
-                                    shareFiles(listOf(output), "application/pdf", "VibeSync_Compressed_Document")
+                                    showFileExport(output, "application/pdf", output.name)
                                     navController.popBackStack()
                                 }
                             )
@@ -832,7 +845,7 @@ class MainActivity : AppCompatActivity() {
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { output ->
                                     recordSuccessfulPdfOperation()
-                                    shareFiles(listOf(output), "application/pdf", "VibeSync_Watermarked_Document")
+                                    showFileExport(output, "application/pdf", output.name)
                                     navController.popBackStack()
                                 }
                             )
@@ -860,6 +873,17 @@ class MainActivity : AppCompatActivity() {
                             )
                         }
                     }
+
+                    FileExportBottomSheet(
+                        file = pendingFileExport,
+                        sourceUri = pendingExportUri,
+                        mimeType = pendingExportMimeType,
+                        displayName = pendingExportDisplayName,
+                        onDismiss = {
+                            pendingFileExport = null
+                            pendingExportUri = null
+                        }
+                    )
 
                     if (updatePromptVisible && activeRoute == "dashboard" && !updateDownloaded) {
                         AlertDialog(
@@ -1006,6 +1030,24 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    private fun showFileExport(file: File, mimeType: String = "application/pdf", displayName: String = file.name) {
+        if (!file.isFile || file.length() <= 0L) {
+            Toast.makeText(this, getString(R.string.error_no_output_files), Toast.LENGTH_LONG).show()
+            return
+        }
+        pendingFileExport = file
+        pendingExportUri = null
+        pendingExportMimeType = mimeType
+        pendingExportDisplayName = displayName
+    }
+
+    private fun showUriExport(uri: Uri, mimeType: String, displayName: String) {
+        pendingFileExport = null
+        pendingExportUri = uri
+        pendingExportMimeType = mimeType
+        pendingExportDisplayName = displayName
     }
 
     private fun saveScanToDownloads(scanFile: File) {

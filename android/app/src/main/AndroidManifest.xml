@@ -5,6 +5,8 @@
     <!-- PDF and image input use SAF and system pickers; no broad storage permission is needed. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Legacy public Downloads writes only; API 29+ uses MediaStore scoped storage. -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
 
     <application
         android:name=".VibeSyncApp"

@@ -77,7 +77,8 @@ fun ExportMenu(
     modifier: Modifier = Modifier,
     testTag: String = "export_menu",
     onExportSelected: (mimeType: String, displayName: String) -> Unit = { _, _ -> },
-    onSafLaunch: ((mimeType: String, displayName: String) -> Unit)? = null
+    onSafLaunch: ((mimeType: String, displayName: String) -> Unit)? = null,
+    onExportReady: (File, String, String) -> Unit = { _, _, _ -> }
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -115,13 +116,18 @@ fun ExportMenu(
                 if (asDocx) {
                     val docxFile = OcrDocxExporter.create(context, "${baseName}_OCR", allText)
                     withContext(Dispatchers.Main.immediate) {
-                        OcrDocxExporter.share(context, docxFile)
+                        onExportReady(docxFile, OcrDocxExporter.MIME_TYPE, docxFile.name)
                     }
                 } else {
                     val target = targetUri ?: throw IOException("The selected destination is missing.")
                     context.contentResolver.openOutputStream(target, "wt")?.bufferedWriter(Charsets.UTF_8)?.use {
                         it.write(allText)
                     } ?: throw IOException("The selected destination could not be opened.")
+                    val txtFile = File.createTempFile("VibeSync_OCR_", ".txt", context.cacheDir)
+                    txtFile.writeText(allText, Charsets.UTF_8)
+                    withContext(Dispatchers.Main.immediate) {
+                        onExportReady(txtFile, "text/plain", txtFile.name)
+                    }
                 }
             },
             onStart = { job -> activeJob = job; running = true },
