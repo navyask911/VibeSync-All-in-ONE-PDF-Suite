@@ -89,3 +89,13 @@
 
 -keep class org.apache.logging.log4j.** { *; }
 -dontwarn org.apache.logging.log4j.**
+
+# Keep Apache POI and OpenXML schemas (used via reflection)
+-keep class org.apache.poi.** { *; }
+-keep class org.openxmlformats.** { *; }
+-keep class org.apache.xmlbeans.** { *; }
+-keep class schemaorg_apache_xmlbeans.** { *; }
+-dontwarn org.apache.poi.**
+-dontwarn org.openxmlformats.**
+-dontwarn org.apache.xmlbeans.**
+-dontwarn schemaorg_apache_xmlbeans.**
