@@ -1,9 +1,12 @@
 package com.vibesync.toolkit.pdf.presentation.viewer
 
 import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
+import com.vibesync.toolkit.pdf.data.pdf.ResolutionProfile
+import com.vibesync.toolkit.pdf.data.pdf.ResolutionProfilePrefs
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Matrix
 import android.graphics.pdf.PdfRenderer
 import android.net.Uri
 import android.os.ParcelFileDescriptor
@@ -61,6 +64,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.util.Locale
+import kotlin.math.ceil
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
@@ -337,7 +341,10 @@ private fun startTextExport(
                     MlKitOcrEngine(context).use { engine ->
                         for (index in 0 until pageTotal) {
                             kotlinx.coroutines.currentCoroutineContext().ensureActive()
-                            val bitmap = withContext(Dispatchers.IO) { renderPage(source, index, passwordValue) }
+                            val renderedPage = withContext(Dispatchers.IO) {
+                                renderPage(source, index, passwordValue, ResolutionProfile.STANDARD)
+                            }
+                            val bitmap = renderedPage.bitmap
                             try {
                                 val result = engine.recognize(bitmap)
                                 if (isNotEmpty()) append("\n\n")
@@ -412,12 +419,16 @@ private suspend fun copyPdfToSaf(context: Context, sourceUri: Uri, targetUri: Ur
 private fun exportPageJpg(context: Context, sourceUri: Uri, targetUri: Uri, pageIndex: Int, password: String?) {
     val source = stagePdf(context, sourceUri)
     try {
-        val bitmap = renderPage(source, pageIndex, password)
+        val profile = ResolutionProfilePrefs(context).read()
+        val renderedPage = renderPage(source, pageIndex, password, profile)
+        val bitmap = renderedPage.bitmap
         try {
             val flattenedBitmap = PdfBitmapUtils.ensureWhiteBackgroundForJpeg(bitmap)
             try {
                 context.contentResolver.openOutputStream(targetUri, "wt")?.use { out ->
-                    if (!flattenedBitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)) throw IOException("Could not encode the page as JPG.")
+                    if (!flattenedBitmap.compress(Bitmap.CompressFormat.JPEG, renderedPage.jpegQuality, out)) {
+                        throw IOException("Could not encode the page as JPG.")
+                    }
                 } ?: throw IOException("The selected destination could not be opened.")
             } finally {
                 if (flattenedBitmap !== bitmap && !flattenedBitmap.isRecycled) flattenedBitmap.recycle()
@@ -455,18 +466,22 @@ internal suspend fun buildJpgPagesZip(
     onProgress: (Int, Int) -> Unit = { _, _ -> }
 ) {
     val exportCoroutineContext = currentCoroutineContext()
+    val profile = ResolutionProfilePrefs(context).read()
     val source = stagePdf(context, sourceUri)
     try {
         val count = pageCountFromFile(source, null)
         ZipOutputStream(FileOutputStream(targetFile)).use { zip ->
             for (index in 0 until count) {
                 exportCoroutineContext.ensureActive()
-                val bitmap = renderPage(source, index, null)
+                val renderedPage = renderPage(source, index, null, profile)
+                val bitmap = renderedPage.bitmap
                 try {
                     val flattenedBitmap = PdfBitmapUtils.ensureWhiteBackgroundForJpeg(bitmap)
                     try {
                         zip.putNextEntry(ZipEntry(String.format(Locale.ROOT, "page_%03d.jpg", index + 1)))
-                        if (!flattenedBitmap.compress(Bitmap.CompressFormat.JPEG, 92, zip)) throw IOException("Could not encode a page as JPG.")
+                        if (!flattenedBitmap.compress(Bitmap.CompressFormat.JPEG, renderedPage.jpegQuality, zip)) {
+                            throw IOException("Could not encode a page as JPG.")
+                        }
                         zip.closeEntry()
                     } finally {
                         if (flattenedBitmap !== bitmap && !flattenedBitmap.isRecycled) flattenedBitmap.recycle()
@@ -517,7 +532,17 @@ private fun pageCountFromFile(file: File, password: String?): Int {
     return document.use { it.numberOfPages }
 }
 
-private fun renderPage(file: File, pageIndex: Int, password: String?): Bitmap {
+private data class ProfiledPageBitmap(
+    val bitmap: Bitmap,
+    val jpegQuality: Int
+)
+
+private fun renderPage(
+    file: File,
+    pageIndex: Int,
+    password: String?,
+    profile: ResolutionProfile
+): ProfiledPageBitmap {
     var decryptedFile: File? = null
     val renderFile = if (password.isNullOrBlank()) {
         file
@@ -540,16 +565,46 @@ private fun renderPage(file: File, pageIndex: Int, password: String?): Bitmap {
         PdfRenderer(descriptor).use { renderer ->
             require(pageIndex in 0 until renderer.pageCount) { "The requested PDF page does not exist." }
             renderer.openPage(pageIndex).use { page ->
-                val scale = minOf(2.5, 2400.0 / page.width.coerceAtLeast(1), 3200.0 / page.height.coerceAtLeast(1))
-                val bitmap = createWhiteBackgroundBitmap(
-                    (page.width * scale).toInt().coerceAtLeast(1),
-                    (page.height * scale).toInt().coerceAtLeast(1)
-                )
+                val maxMemoryBytes = Runtime.getRuntime().maxMemory()
+                val referenceWidth = ceil(
+                    page.width.toDouble() * ResolutionProfile.STANDARD_OUTPUT_DPI.toDouble() / PDF_POINTS_PER_INCH
+                ).toInt().coerceAtLeast(1)
+                val referenceHeight = ceil(
+                    page.height.toDouble() * ResolutionProfile.STANDARD_OUTPUT_DPI.toDouble() / PDF_POINTS_PER_INCH
+                ).toInt().coerceAtLeast(1)
+                val profileSpec = profile.spec(maxMemoryBytes, referenceWidth, referenceHeight)
+                val outputDpi = profile.outputDpi(maxMemoryBytes, referenceWidth, referenceHeight)
+                val requestedScale = outputDpi.toFloat() / PDF_POINTS_PER_INCH.toFloat()
+                val maxBitmapBytes = (maxMemoryBytes / EXPORT_MEMORY_SAFETY_DIVISOR)
+                    .coerceAtLeast(EXPORT_MIN_BITMAP_BYTES)
+                    .coerceAtMost(EXPORT_MAX_BITMAP_BYTES)
+                val maxPixels = (maxBitmapBytes / EXPORT_BYTES_PER_PIXEL).coerceAtLeast(1L)
+                val requestedPixels = page.width.toDouble() * page.height.toDouble() *
+                    requestedScale.toDouble() * requestedScale.toDouble()
+                val boundedScale = if (requestedPixels > maxPixels.toDouble()) {
+                    requestedScale.toDouble() * kotlin.math.sqrt(maxPixels.toDouble() / requestedPixels)
+                } else {
+                    requestedScale.toDouble()
+                }
+                var width = ceil(page.width.toDouble() * boundedScale).toLong().coerceAtLeast(1L)
+                var height = ceil(page.height.toDouble() * boundedScale).toLong().coerceAtLeast(1L)
+                if (width * height > maxPixels) {
+                    if (width >= height) width = (maxPixels / height).coerceAtLeast(1L)
+                    else height = (maxPixels / width).coerceAtLeast(1L)
+                }
+                val targetWidth = width.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                val targetHeight = height.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
+                val renderScale = minOf(
+                    targetWidth.toDouble() / page.width.toDouble(),
+                    targetHeight.toDouble() / page.height.toDouble()
+                ).toFloat().coerceAtLeast(MIN_EXPORT_RENDER_SCALE)
+                val bitmap = createWhiteBackgroundBitmap(targetWidth, targetHeight)
                 try {
-                    page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
-                    return bitmap
-                } catch (error: Exception) {
-                    bitmap.recycle()
+                    val transform = Matrix().apply { setScale(renderScale, renderScale) }
+                    page.render(bitmap, null, transform, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
+                    return ProfiledPageBitmap(bitmap, profileSpec.jpegQuality)
+                } catch (error: Throwable) {
+                    if (!bitmap.isRecycled) bitmap.recycle()
                     throw error
                 }
             }
@@ -570,5 +625,12 @@ private fun renderPage(file: File, pageIndex: Int, password: String?): Bitmap {
         decryptedFile?.delete()
     }
 }
+
+private const val PDF_POINTS_PER_INCH = 72
+private const val EXPORT_MEMORY_SAFETY_DIVISOR = 8L
+private const val EXPORT_BYTES_PER_PIXEL = 4L
+private const val EXPORT_MIN_BITMAP_BYTES = 512L * 1024L
+private const val EXPORT_MAX_BITMAP_BYTES = 32L * 1024L * 1024L
+private const val MIN_EXPORT_RENDER_SCALE = 0.000001f
 
 private class ExportPasswordRequiredException(message: String, cause: Throwable) : IOException(message, cause)

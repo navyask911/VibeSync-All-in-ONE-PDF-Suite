@@ -87,21 +87,15 @@ class PdfCompressor(private val context: Context) {
                             val mediaBox = sourcePage.mediaBox
                             val pageWidthPt = mediaBox.width.toDouble().coerceAtLeast(1.0)
                             val pageHeightPt = mediaBox.height.toDouble().coerceAtLeast(1.0)
-                            val referenceWidth = ceil(pageWidthPt * STANDARD_DPI / 72.0).toInt().coerceAtLeast(1)
-                            val referenceHeight = ceil(pageHeightPt * STANDARD_DPI / 72.0).toInt().coerceAtLeast(1)
+                            val referenceWidth = ceil(
+                                pageWidthPt * ResolutionProfile.STANDARD_OUTPUT_DPI.toDouble() / PDF_POINTS_PER_INCH
+                            ).toInt().coerceAtLeast(1)
+                            val referenceHeight = ceil(
+                                pageHeightPt * ResolutionProfile.STANDARD_OUTPUT_DPI.toDouble() / PDF_POINTS_PER_INCH
+                            ).toInt().coerceAtLeast(1)
                             val profileSpec = profile.spec(maxMemoryBytes, referenceWidth, referenceHeight)
-                            val requestedDpi = when (profile) {
-                                ResolutionProfile.SMALLEST -> SMALLEST_DPI
-                                ResolutionProfile.STANDARD -> STANDARD_DPI
-                                ResolutionProfile.LARGEST -> if (profileSpec.fellBack) STANDARD_DPI else LARGEST_DPI
-                                ResolutionProfile.HD_AUTO -> if (profileSpec.fellBack) STANDARD_DPI
-                                    else if (profileSpec.targetWidthPx == null) LARGEST_DPI
-                                    else maxOf(
-                                        (profileSpec.targetWidthPx.toDouble() / pageWidthPt * 72.0).toInt(),
-                                        ((profileSpec.targetHeightPx ?: profileSpec.targetWidthPx).toDouble() / pageHeightPt * 72.0).toInt()
-                                    )
-                            }
-                            val dpi = boundedDpi(requestedDpi, pageWidthPt, pageHeightPt, maxMemoryBytes)
+                            val outputDpi = profile.outputDpi(maxMemoryBytes, referenceWidth, referenceHeight)
+                            val dpi = boundedDpi(outputDpi, pageWidthPt, pageHeightPt, maxMemoryBytes)
                             val bitmap = renderPage(androidRenderer, index, dpi, sourcePage.rotation)
                             try {
                                 val jpeg = encodeJpeg(bitmap, profileSpec.jpegQuality)
@@ -244,11 +238,9 @@ class PdfCompressor(private val context: Context) {
     private fun normalizeRotation(rotation: Int): Int = ((rotation % 360) + 360) % 360
 
     companion object {
-        const val SMALLEST_DPI = 150
-        const val STANDARD_DPI = 300
-        const val LARGEST_DPI = 600
+        private const val PDF_POINTS_PER_INCH = 72
         private const val MINIMUM_DPI = 72
-        private const val MAXIMUM_DPI = 600
+        private const val MAXIMUM_DPI = ResolutionProfile.LARGEST_OUTPUT_DPI
         private const val BYTES_PER_PIXEL = 4L
         private const val MEMORY_SAFETY_DIVISOR = 4L
     }
