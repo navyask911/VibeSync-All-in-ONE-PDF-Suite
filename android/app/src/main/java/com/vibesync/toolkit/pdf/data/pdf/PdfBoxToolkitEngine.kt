@@ -500,12 +500,22 @@ class PdfBoxToolkitEngine(
 
                 applyVibeSyncWatermark(document)
 
-                // Use PDFBox's strongest standard password protection supported by
-                // pdfbox-android 2.0.27.0: AES-256 (revision 6).
-                val policy = StandardProtectionPolicy(ownerPassword, userPassword, permissions)
-                policy.encryptionKeyLength = 256
-                policy.setPreferAES(true)
-                policy.permissions = permissions
+                // PDFBox's policy API accepts Strings. Round-trip through UTF-8 explicitly so
+                // credentials enter the security handler with deterministic UTF-8 text, including
+                // non-ASCII passwords, rather than relying on a platform-default charset.
+                val encodedUserPassword = normalizePasswordForPdfBox(userPassword)
+                val encodedOwnerPassword = normalizePasswordForPdfBox(ownerPassword)
+                val policy = StandardProtectionPolicy(
+                    encodedOwnerPassword,
+                    encodedUserPassword,
+                    permissions
+                ).apply {
+                    setOwnerPassword(encodedOwnerPassword)
+                    setUserPassword(encodedUserPassword)
+                    encryptionKeyLength = 256
+                    setPreferAES(true)
+                    this.permissions = permissions
+                }
 
                 document.protect(policy)
                 document.save(outputFile)
@@ -513,7 +523,7 @@ class PdfBoxToolkitEngine(
 
             // Fail the operation immediately if the produced file cannot be reopened
             // with both credentials. This prevents broken encrypted PDFs reaching users.
-            PDDocument.load(outputFile, userPassword).use { userDocument ->
+            PDDocument.load(outputFile, encodedUserPassword).use { userDocument ->
                 check(userDocument.isEncrypted) { "Encrypted output did not retain PDF security" }
                 check(userDocument.currentAccessPermission.canPrint() == allowPrinting) {
                     "Encrypted output printing permission does not match requested policy"
@@ -522,7 +532,7 @@ class PdfBoxToolkitEngine(
                     "Encrypted output extraction permission does not match requested policy"
                 }
             }
-            PDDocument.load(outputFile, ownerPassword).use { ownerDocument ->
+            PDDocument.load(outputFile, encodedOwnerPassword).use { ownerDocument ->
                 check(ownerDocument.isEncrypted) { "Encrypted output did not retain PDF security" }
                 check(ownerDocument.currentAccessPermission.isOwnerPermission) {
                     "Owner password did not grant owner access"
@@ -555,7 +565,8 @@ class PdfBoxToolkitEngine(
             ensureBouncyCastleProvider()
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "decrypt_src_")
             sourceFileToDelete = sourceFile
-            PDDocument.load(sourceFile, password).use { document ->
+            val encodedPassword = normalizePasswordForPdfBox(password)
+            PDDocument.load(sourceFile, encodedPassword).use { document ->
                 document.isAllSecurityToBeRemoved = true
                 applyVibeSyncWatermark(document)
                 document.save(outputFile)
@@ -858,6 +869,9 @@ class PdfBoxToolkitEngine(
             sourceFileToDelete?.delete()
         }
     }
+
+    private fun normalizePasswordForPdfBox(password: String): String =
+        String(password.toByteArray(Charsets.UTF_8), Charsets.UTF_8)
 
     private fun ensureBouncyCastleProvider() {
         val provider = Security.getProvider("BC")

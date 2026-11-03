@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
@@ -38,6 +40,9 @@ class BatchScanViewModel(application: Application) : AndroidViewModel(applicatio
     )
     val state: StateFlow<BatchScanState> = _state.asStateFlow()
     private var compileJob: Job? = null
+    // Scanner callbacks can overlap while the previous round's JPEGs are still being copied.
+    // Serialize persistence and state commits so every round appends to the latest page list.
+    private val captureMutex = Mutex()
 
     init { restorePersistedPages() }
 
@@ -118,23 +123,29 @@ class BatchScanViewModel(application: Application) : AndroidViewModel(applicatio
             return true
         }
         viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) { appendPageImages(pageUris) }
-            result.fold(
-                onSuccess = { pages ->
-                    val orderedPages = _state.value.pages + pages
-                    runCatching { persistPageManifest(orderedPages) }
-                        .onSuccess { _state.value = _state.value.copy(pages = orderedPages, messageRes = null) }
-                        .onFailure {
-                            pages.forEach { it.file.delete() }
-                            _state.value = _state.value.copy(messageRes = R.string.batch_capture_failed)
-                        }
-                },
-                onFailure = { error ->
-                    _state.value = _state.value.copy(
-                        messageRes = if (error is BatchMemoryLimitException) R.string.batch_memory_limit else R.string.batch_capture_failed
-                    )
-                }
-            )
+            captureMutex.withLock {
+                val result = withContext(Dispatchers.IO) { appendPageImages(pageUris) }
+                result.fold(
+                    onSuccess = { pages ->
+                        // Read the latest state only after this capture round owns the mutex.
+                        // Earlier scanner rounds are therefore never replaced by a stale snapshot.
+                        val orderedPages = _state.value.pages.toList() + pages
+                        runCatching { persistPageManifest(orderedPages) }
+                            .onSuccess {
+                                _state.value = _state.value.copy(pages = orderedPages, messageRes = null)
+                            }
+                            .onFailure {
+                                pages.forEach { it.file.delete() }
+                                _state.value = _state.value.copy(messageRes = R.string.batch_capture_failed)
+                            }
+                    },
+                    onFailure = { error ->
+                        _state.value = _state.value.copy(
+                            messageRes = if (error is BatchMemoryLimitException) R.string.batch_memory_limit else R.string.batch_capture_failed
+                        )
+                    }
+                )
+            }
         }
         return true
     }
