@@ -141,8 +141,8 @@ android {
         applicationId = "com.vibesync.toolkit.pdf"
         minSdk = 24
         targetSdk = 36
-        versionCode = 22
-        versionName = "1.0.19"
+        versionCode = 23
+        versionName = "1.0.20"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -200,19 +200,30 @@ android {
 
     packaging {
         resources {
-            // Keep the first occurrence of this file (required by POI)
-            pickFirsts += "Log4j-charsets.properties"
-
-            // Exclude redundant metadata files that cause merge conflicts
-            excludes += "META-INF/DEPENDENCIES"
-            excludes += "META-INF/LICENSE"
-            excludes += "META-INF/LICENSE.txt"
-            excludes += "META-INF/license.txt"
-            excludes += "META-INF/NOTICE"
-            excludes += "META-INF/NOTICE.txt"
-            excludes += "META-INF/notice.txt"
-            excludes += "META-INF/ASL2.0"
-            excludes += "META-INF/*.kotlin_module"
+            pickFirsts += setOf(
+                "Log4j-charsets.properties",
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/ASL2.0",
+                "META-INF/maven/**"
+            )
+            excludes += setOf(
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
+                "META-INF/LICENSE.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/INDEX.LIST"
+            )
+            // Preserve existing exclusions for case variants and Kotlin module metadata.
+            excludes += setOf(
+                "META-INF/license.txt",
+                "META-INF/notice.txt",
+                "META-INF/*.kotlin_module"
+            )
             merges += "META-INF/LICENSE.md"
             merges += "META-INF/LICENSE-notice.md"
         }
