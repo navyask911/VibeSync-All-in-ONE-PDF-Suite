@@ -51,6 +51,19 @@ class IdCardComposerScreenTest {
         }
     }
 
+    @Test
+    fun tappingFrontCardSlotOffersCameraAndGalleryActions() {
+        setTestContent {
+            IdCardComposerScreen(onNavigateBack = {}, previewFront = null, previewBack = null)
+        }
+
+        composeRule.onNodeWithTag("id_card_pick_front").performClick()
+        composeRule.onNodeWithTag("id_card_take_photo_option").assertIsDisplayed()
+        composeRule.onNodeWithTag("id_card_import_gallery_option").assertIsDisplayed()
+        composeRule.onNodeWithText("Take Photo").assertIsDisplayed()
+        composeRule.onNodeWithText("Import from Gallery").assertIsDisplayed()
+    }
+
     private fun setTestContent(content: @Composable () -> Unit) {
         composeRule.activity.runOnUiThread {
             val composeView = findComposeView(composeRule.activity.window.decorView)

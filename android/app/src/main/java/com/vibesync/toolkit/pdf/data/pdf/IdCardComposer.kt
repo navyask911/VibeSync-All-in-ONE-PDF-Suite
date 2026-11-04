@@ -16,6 +16,9 @@ import java.io.IOException
 
 /** Creates a one-page A4 ID card front/back layout with aspect-preserving image placement. */
 object IdCardComposer {
+    /** A4 page width at 300 DPI; decode inputs near the export target instead of full camera resolution. */
+    const val MAX_INPUT_DIMENSION_300_DPI = 2480
+
     private const val POINTS_PER_MM = 72f / 25.4f
     private const val MARGIN = 15f * POINTS_PER_MM
     private const val MIN_GAP = 10f * POINTS_PER_MM

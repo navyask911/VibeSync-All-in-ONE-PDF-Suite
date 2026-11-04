@@ -399,7 +399,7 @@
     <string name="watermark_custom_text_label">Custom Text</string>
     <string name="manual_crop_title">Manual Crop</string>
     <string name="manual_crop_subtitle">Crop and straighten captured images.</string>
-    <string name="manual_crop_instructions">Drag the four corner handles to fit the document.</string>
+    <string name="manual_crop_instructions">Drag a corner to resize the crop area, or drag inside it to move the whole box.</string>
     <string name="manual_crop_choose_image">Choose image</string>
     <string name="manual_crop_commit">Apply crop</string>
     <string name="manual_crop_cancel">Cancel</string>
@@ -435,4 +435,11 @@
     <string name="vault_biometric_subtitle">Authenticate with strong biometrics or your device PIN.</string>
     <string name="export_docx">OCR متن کو Word (.docx) کے طور پر برآمد کریں</string>
     <string name="export_saved_docx">Word دستاویز شیئر کرنے کے لیے تیار ہے۔</string>
+    <string name="id_card_front_slot">Front Card</string>
+    <string name="id_card_back_slot">Back Card</string>
+    <string name="id_card_take_photo">Take Photo</string>
+    <string name="id_card_import_gallery">Import from Gallery</string>
+    <string name="id_card_camera_permission">Allow camera access to take a photo.</string>
+    <string name="id_card_camera_error">Camera unavailable. You can import an image from Gallery instead.</string>
+    <string name="id_card_camera_capture">Capture</string>
 </resources>

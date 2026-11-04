@@ -14,6 +14,7 @@ plugins {
 
 val poiAndroidSourceJar = layout.buildDirectory.file("generated/poi/downloads/poishadow-all-5.2.5-4.jar")
 val poiAndroidShadowJar = layout.buildDirectory.file("generated/poi/poishadow-all-5.2.5-4-api24.jar")
+val cameraXVersion = "1.6.2"
 val downloadPoiAndroidShadowJar = tasks.register("downloadPoiAndroidShadowJar") {
     val sourceJar = poiAndroidSourceJar.get().asFile
     val outputJar = poiAndroidShadowJar.get().asFile
@@ -141,8 +142,8 @@ android {
         applicationId = "com.vibesync.toolkit.pdf"
         minSdk = 24
         targetSdk = 36
-        versionCode = 26
-        versionName = "1.0.23"
+        versionCode = 27
+        versionName = "1.0.24"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -272,9 +273,14 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("androidx.documentfile:documentfile:1.0.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.6")
     implementation("com.google.android.play:app-update:2.1.0")
     implementation("com.google.android.play:review:2.0.2")
     implementation("androidx.activity:activity-compose:1.9.3")
+    // CameraX is used only by the explicit ID Card Composer camera action.
+    implementation("androidx.camera:camera-camera2:$cameraXVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraXVersion")
+    implementation("androidx.camera:camera-view:$cameraXVersion")
     implementation("com.android.billingclient:billing-ktx:9.1.0")
 
     // Jetpack Compose BOM & UI
