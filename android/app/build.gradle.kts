@@ -142,8 +142,8 @@ android {
         applicationId = "com.vibesync.toolkit.pdf"
         minSdk = 24
         targetSdk = 36
-        versionCode = 27
-        versionName = "1.0.24"
+        versionCode = 28
+        versionName = "1.0.25"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
