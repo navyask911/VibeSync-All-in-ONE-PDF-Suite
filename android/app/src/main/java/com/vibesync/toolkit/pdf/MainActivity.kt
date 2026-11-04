@@ -202,6 +202,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var scannerLauncher: ActivityResultLauncher<IntentSenderRequest>
     private lateinit var saveScanLauncher: ActivityResultLauncher<String>
     private var pendingScanExportFile: File? = null
+    private var pendingTranslationScanResult: ((List<Uri>) -> Unit)? = null
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -236,6 +237,24 @@ class MainActivity : AppCompatActivity() {
             ActivityResultContracts.StartIntentSenderForResult()
         ) { result ->
             val scanResult = scannerManager.parseResult(result.resultCode, result.data)
+            val translationResultHandler = pendingTranslationScanResult
+            if (translationResultHandler != null) {
+                pendingTranslationScanResult = null
+                if (result.resultCode == Activity.RESULT_OK) {
+                    val scannedUris = scanResult?.pageImageUris.orEmpty()
+                        .ifEmpty { listOfNotNull(scanResult?.pdfUri) }
+                    if (scannedUris.isNotEmpty()) {
+                        translationResultHandler(scannedUris)
+                    } else {
+                        Toast.makeText(
+                            this,
+                            getString(R.string.batch_no_pages_captured),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+                return@registerForActivityResult
+            }
             if (batchScanViewModel.handleCaptureResult(result.resultCode, scanResult?.pageImageUris.orEmpty())) {
                 return@registerForActivityResult
             }
@@ -567,7 +586,20 @@ class MainActivity : AppCompatActivity() {
                         }
 
                         composable("translation_scan") {
-                            TranslationScanScreen(onNavigateBack = { navController.popBackStack() })
+                            TranslationScanScreen(
+                                onNavigateBack = { navController.popBackStack() },
+                                onStartNewScan = { onScannedUris ->
+                                    pendingTranslationScanResult = onScannedUris
+                                    scannerManager.startScan(scannerLauncher) { error ->
+                                        pendingTranslationScanResult = null
+                                        Toast.makeText(
+                                            this@MainActivity,
+                                            getString(R.string.error_scanner, error.message ?: ""),
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+                            )
                         }
 
                         composable("manual_crop") {

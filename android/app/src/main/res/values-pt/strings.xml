@@ -407,7 +407,7 @@
     <string name="manual_crop_error">Unable to load or crop this image.</string>
     <string name="signature_manager_title">Signature Manager</string>
     <string name="signature_manager_subtitle">Manage and place saved signatures.</string>
-    <string name="signature_manager_empty">No saved signatures yet.</string>
+    <string name="signature_manager_empty">Nenhuma assinatura salva. Criar uma?</string>
     <string name="signature_manager_rename">Rename</string>
     <string name="signature_manager_delete">Delete</string>
     <string name="signature_manager_select">Select signature</string>

@@ -123,7 +123,8 @@ private val translationLanguages = listOf(
 fun TranslationScanScreen(
     onNavigateBack: () -> Unit,
     processor: TranslationProcessor? = null,
-    initialText: String? = null
+    initialText: String? = null,
+    onStartNewScan: (((List<Uri>) -> Unit) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -149,6 +150,10 @@ fun TranslationScanScreen(
     var passwordDialog by remember { mutableStateOf(false) }
     var password by rememberSaveable { mutableStateOf("") }
     var pendingPdfUri by remember { mutableStateOf<Uri?>(null) }
+    var pendingTranslationText by remember { mutableStateOf(initialText.orEmpty()) }
+    var translationViewVisible by rememberSaveable(initialTextStateKey) {
+        mutableStateOf(!initialText.isNullOrBlank())
+    }
     var status by remember { mutableStateOf("") }
     var processing by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
@@ -159,35 +164,112 @@ fun TranslationScanScreen(
     var requestedTarget by remember { mutableStateOf("es") }
     var translatedExportText by remember { mutableStateOf("") }
 
-    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            pendingPdfUri = uri
-            activeJob = scope.launch {
-                processing = true
-                progress = 0f
-                completedPages = 0
-                totalPages = 0
-                status = ""
-                try {
-                    originalText = recognizeUri(context, uri, null) { completed, total ->
-                        completedPages = completed
-                        totalPages = total
-                        progress = if (total > 0) completed.toFloat() / total else 0f
-                    }
-                    translatedText = ""
-                    status = context.getString(R.string.translation_ocr_complete)
-                } catch (error: Throwable) {
-                    if (error is CancellationException) throw error
-                    if (error is PdfPasswordRequiredException || error is InvalidPasswordException) {
-                        passwordDialog = true
-                    } else {
-                        status = error.localizedMessage ?: context.getString(R.string.translation_failed)
-                    }
-                } finally {
-                    processing = false
+    fun beginTranslation(
+        afterConsent: Boolean,
+        textToTranslate: String = pendingTranslationText.ifBlank { originalText }
+    ) {
+        val translationInput = textToTranslate.trim()
+        if (translationInput.isBlank()) {
+            status = context.getString(R.string.translation_failed)
+            return
+        }
+        val source = if (sourceLanguage == "auto") detectSourceLanguage(translationInput) else sourceLanguage
+        requestedSource = source
+        requestedTarget = targetLanguage
+        pendingTranslationText = translationInput
+        activeJob = scope.launch {
+            processing = true
+            status = ""
+            try {
+                if (!afterConsent && !translator.isModelReady(source, targetLanguage)) {
+                    modelConsentDialog = true
+                    return@launch
                 }
+                translatedText = translator.translate(translationInput, source, targetLanguage)
+                translationViewVisible = true
+                status = context.getString(R.string.translation_complete)
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                status = error.localizedMessage ?: context.getString(R.string.translation_failed)
+            } finally {
+                processing = false
             }
         }
+    }
+
+    fun applyRecognizedText(text: String) {
+        val normalizedText = text.trim()
+        originalText = normalizedText
+        pendingTranslationText = normalizedText
+        translatedText = ""
+        translationViewVisible = normalizedText.isNotBlank()
+        if (normalizedText.isBlank()) {
+            status = context.getString(R.string.translation_failed)
+        } else {
+            status = context.getString(R.string.translation_ocr_complete)
+            beginTranslation(afterConsent = false, textToTranslate = normalizedText)
+        }
+    }
+
+    fun processUris(uris: List<Uri>, passwordValue: String? = null) {
+        if (uris.isEmpty()) {
+            status = context.getString(R.string.translation_failed)
+            return
+        }
+        pendingPdfUri = uris.singleOrNull()
+        activeJob = scope.launch {
+            processing = true
+            progress = 0f
+            completedPages = 0
+            totalPages = 0
+            status = ""
+            var recognizedText: String? = null
+            try {
+                val combinedText = StringBuilder()
+                uris.forEachIndexed { uriIndex, uri ->
+                    kotlinx.coroutines.currentCoroutineContext().ensureActive()
+                    val pageText = recognizeUri(context, uri, passwordValue) { completed, total ->
+                        val progressTotal = if (uris.size == 1) total else uris.size
+                        val progressCompleted = if (uris.size == 1) {
+                            completed
+                        } else {
+                            uriIndex + if (completed > 0) 1 else 0
+                        }
+                        totalPages = progressTotal
+                        completedPages = progressCompleted
+                        progress = if (progressTotal > 0) {
+                            (progressCompleted.toFloat() / progressTotal).coerceIn(0f, 1f)
+                        } else {
+                            0f
+                        }
+                    }
+                    if (pageText.isNotBlank()) {
+                        if (combinedText.isNotEmpty()) combinedText.append("\n\n")
+                        combinedText.append(pageText)
+                    }
+                }
+                recognizedText = combinedText.toString().trim()
+                pendingPdfUri = null
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                if (error is PdfPasswordRequiredException || error is InvalidPasswordException) {
+                    pendingPdfUri = uris.singleOrNull()
+                    passwordDialog = pendingPdfUri != null
+                    if (!passwordDialog) {
+                        status = error.localizedMessage ?: context.getString(R.string.translation_failed)
+                    }
+                } else {
+                    status = error.localizedMessage ?: context.getString(R.string.translation_failed)
+                }
+            } finally {
+                processing = false
+            }
+            recognizedText?.let(::applyRecognizedText)
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) processUris(listOf(uri))
     }
 
     val cameraLauncher = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { capturedBitmap ->
@@ -198,20 +280,21 @@ fun TranslationScanScreen(
                 completedPages = 0
                 totalPages = 1
                 status = ""
+                var recognizedText: String? = null
                 try {
-                    val result = MlKitOcrEngine(context.applicationContext).use { it.recognize(capturedBitmap) }
-                    originalText = result.text
-                    translatedText = ""
+                    recognizedText = withContext(Dispatchers.Default) {
+                        MlKitOcrEngine(context.applicationContext).use { it.recognize(capturedBitmap).text }
+                    }
                     completedPages = 1
                     progress = 1f
-                    status = context.getString(R.string.translation_ocr_complete)
                 } catch (error: Throwable) {
                     if (error is CancellationException) throw error
                     status = error.localizedMessage ?: context.getString(R.string.translation_failed)
                 } finally {
-                    capturedBitmap.recycle()
+                    if (!capturedBitmap.isRecycled) capturedBitmap.recycle()
                     processing = false
                 }
+                recognizedText?.let(::applyRecognizedText)
             }
         }
     }
@@ -237,29 +320,6 @@ fun TranslationScanScreen(
         }
     }
 
-    fun beginTranslation(afterConsent: Boolean) {
-        val source = if (sourceLanguage == "auto") detectSourceLanguage(originalText) else sourceLanguage
-        requestedSource = source
-        requestedTarget = targetLanguage
-        activeJob = scope.launch {
-            processing = true
-            status = ""
-            try {
-                if (!afterConsent && !translator.isModelReady(source, targetLanguage)) {
-                    modelConsentDialog = true
-                    return@launch
-                }
-                translatedText = translator.translate(originalText, source, targetLanguage)
-                status = context.getString(R.string.translation_complete)
-            } catch (error: Throwable) {
-                if (error is CancellationException) throw error
-                status = error.localizedMessage ?: context.getString(R.string.translation_failed)
-            } finally {
-                processing = false
-            }
-        }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -279,7 +339,14 @@ fun TranslationScanScreen(
             Text(stringResource(R.string.translation_scan_description), style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                 Button(
-                    onClick = { cameraLauncher.launch(null) },
+                    onClick = {
+                        val launchDocumentScanner = onStartNewScan
+                        if (launchDocumentScanner != null) {
+                            launchDocumentScanner { scannedUris -> processUris(scannedUris) }
+                        } else {
+                            cameraLauncher.launch(null)
+                        }
+                    },
                     enabled = !processing,
                     modifier = Modifier.weight(1f).testTag("translation_capture")
                 ) { Text(stringResource(R.string.scan_new)) }
@@ -343,7 +410,7 @@ fun TranslationScanScreen(
             }
             Button(
                 enabled = !processing && originalText.isNotBlank() && sourceLanguage != targetLanguage,
-                onClick = { beginTranslation(afterConsent = false) },
+                onClick = { beginTranslation(afterConsent = false, textToTranslate = originalText) },
                 modifier = Modifier.fillMaxWidth().testTag("translation_run")
             ) {
                 if (processing) CircularProgressIndicator()
@@ -352,22 +419,24 @@ fun TranslationScanScreen(
                     Text(stringResource(R.string.translation_translate_action), modifier = Modifier.padding(start = 8.dp))
                 }
             }
-            if (originalText.isNotBlank() || translatedText.isNotBlank()) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    Column(Modifier.weight(1f).heightIn(min = 120.dp)) {
-                        Text(stringResource(R.string.translation_original), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(originalText, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("translation_original_text"))
-                    }
-                    val rtl = targetLanguage == "ar" || targetLanguage == "iw" || targetLanguage == "fa" || targetLanguage == "ur"
-                    CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+            if (translationViewVisible && (originalText.isNotBlank() || translatedText.isNotBlank())) {
+                Column(modifier = Modifier.fillMaxWidth().testTag("translation_result_view")) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                         Column(Modifier.weight(1f).heightIn(min = 120.dp)) {
-                            Text(stringResource(R.string.translation_result), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text(
-                                translatedText,
-                                style = MaterialTheme.typography.bodyMedium.copy(textDirection = if (rtl) TextDirection.ContentOrRtl else TextDirection.Content),
-                                textAlign = if (rtl) TextAlign.Start else TextAlign.Start,
-                                modifier = Modifier.testTag("translation_result_text")
-                            )
+                            Text(stringResource(R.string.translation_original), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(originalText, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.testTag("translation_original_text"))
+                        }
+                        val rtl = targetLanguage == "ar" || targetLanguage == "iw" || targetLanguage == "fa" || targetLanguage == "ur"
+                        CompositionLocalProvider(LocalLayoutDirection provides if (rtl) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                            Column(Modifier.weight(1f).heightIn(min = 120.dp)) {
+                                Text(stringResource(R.string.translation_result), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                Text(
+                                    translatedText,
+                                    style = MaterialTheme.typography.bodyMedium.copy(textDirection = if (rtl) TextDirection.ContentOrRtl else TextDirection.Content),
+                                    textAlign = if (rtl) TextAlign.Start else TextAlign.Start,
+                                    modifier = Modifier.testTag("translation_result_text")
+                                )
+                            }
                         }
                     }
                 }
@@ -399,7 +468,7 @@ fun TranslationScanScreen(
                 TextButton(
                     onClick = {
                         modelConsentDialog = false
-                        beginTranslation(afterConsent = true)
+                        beginTranslation(afterConsent = true, textToTranslate = pendingTranslationText)
                     },
                     modifier = Modifier.testTag("translation_model_accept")
                 ) { Text(stringResource(R.string.continue_label)) }
@@ -438,24 +507,10 @@ fun TranslationScanScreen(
                     enabled = password.isNotBlank() && pendingPdfUri != null,
                     onClick = {
                         val uri = pendingPdfUri ?: return@TextButton
+                        val passwordValue = password
                         passwordDialog = false
-                        activeJob = scope.launch {
-                            processing = true
-                            try {
-                                originalText = recognizeUri(context, uri, password) { completed, total ->
-                                    completedPages = completed
-                                    totalPages = total
-                                    progress = if (total > 0) completed.toFloat() / total else 0f
-                                }
-                                status = context.getString(R.string.translation_ocr_complete)
-                                password = ""
-                            } catch (error: Throwable) {
-                                if (error is CancellationException) throw error
-                                status = error.localizedMessage ?: context.getString(R.string.translation_failed)
-                            } finally {
-                                processing = false
-                            }
-                        }
+                        password = ""
+                        processUris(listOf(uri), passwordValue)
                     },
                     modifier = Modifier.testTag("translation_password_submit")
                 ) { Text(stringResource(R.string.continue_label)) }

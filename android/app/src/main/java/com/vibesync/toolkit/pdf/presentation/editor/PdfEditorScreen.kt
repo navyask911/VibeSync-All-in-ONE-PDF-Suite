@@ -78,6 +78,20 @@ fun PdfEditorScreen(
     var offset by remember(documentUri) { mutableStateOf(Offset.Zero) }
     val snackbarHostState = remember { SnackbarHostState() }
 
+    fun placeSavedSignature(bitmap: Bitmap) {
+        val signatureWidthPx = SignatureStrokeMetrics.DEFAULT_TARGET_WIDTH_PX
+        val signatureHeightPx = SignatureStrokeMetrics.DEFAULT_TARGET_HEIGHT_PX
+        val pageHeightPx = screenWidthPx * 842f / 595f
+        viewModel.addSignature(
+            bitmap,
+            x = ((screenWidthPx - signatureWidthPx) / 2f).coerceAtLeast(0f),
+            y = ((pageHeightPx - signatureHeightPx) / 2f).coerceAtLeast(0f),
+            width = signatureWidthPx,
+            height = signatureHeightPx,
+            saveToVault = false
+        )
+    }
+
     LaunchedEffect(documentUri) {
         viewModel.initEditor(documentUri)
         AdMobManager.preloadInterstitial(context)
@@ -232,7 +246,7 @@ fun PdfEditorScreen(
                             isSelected = uiState.toolMode == ToolMode.SIGNATURE,
                             onClick = {
                                 viewModel.selectTool(ToolMode.SIGNATURE)
-                                showSignatureDialog = true
+                                showSignatureManagerDialog = true
                             }
                         )
                     }
@@ -537,15 +551,34 @@ fun PdfEditorScreen(
             Surface(
                 shape = RoundedCornerShape(16.dp),
                 color = MaterialTheme.colorScheme.surface,
-                modifier = Modifier.fillMaxWidth().heightIn(max = 680.dp)
+                modifier = Modifier.fillMaxWidth().heightIn(min = 360.dp, max = 680.dp)
             ) {
-                SignatureManagerScreen(
-                    onNavigateBack = { showSignatureManagerDialog = false },
-                    onSelectSignature = { bitmap, x, y, width, height, rotation ->
-                        viewModel.addSignature(bitmap, x, y, width, height, rotation, saveToVault = false)
-                        showSignatureManagerDialog = false
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    SignatureManagerScreen(
+                        modifier = Modifier.fillMaxWidth().weight(1f),
+                        onNavigateBack = { showSignatureManagerDialog = false },
+                        onSelectSignature = { bitmap, x, y, width, height, rotation ->
+                            viewModel.addSignature(bitmap, x, y, width, height, rotation, saveToVault = false)
+                            showSignatureManagerDialog = false
+                        },
+                        onImmediateSelect = { bitmap ->
+                            placeSavedSignature(bitmap)
+                            showSignatureManagerDialog = false
+                        },
+                        onCreateSignature = {
+                            showSignatureManagerDialog = false
+                            showSignatureDialog = true
+                        }
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(end = 12.dp, bottom = 4.dp),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { showSignatureManagerDialog = false }) {
+                            Text(stringResource(R.string.cancel))
+                        }
                     }
-                )
+                }
             }
         }
     }

@@ -66,7 +66,9 @@ fun SignatureManagerScreen(
     onNavigateBack: () -> Unit,
     onSelectSignature: (Bitmap, Float, Float, Float, Float, Float) -> Unit,
     modifier: Modifier = Modifier,
-    securityVault: SecurityVault? = null
+    securityVault: SecurityVault? = null,
+    onImmediateSelect: ((Bitmap) -> Unit)? = null,
+    onCreateSignature: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
@@ -95,8 +97,18 @@ fun SignatureManagerScreen(
     }
 
     fun selectSignature(id: String) {
+        val bitmap = vault.getSignature(id)
+        if (bitmap == null) {
+            errorMessage = context.getString(R.string.signature_manager_empty)
+            return
+        }
+        val immediateSelection = onImmediateSelect
+        if (immediateSelection != null) {
+            immediateSelection(bitmap)
+            return
+        }
         selectedId = id
-        previewBitmap = vault.getSignature(id)
+        previewBitmap = bitmap
         offsetX = 24f
         offsetY = 24f
         sizeScale = 1f
@@ -128,11 +140,27 @@ fun SignatureManagerScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (signatures.isEmpty()) {
-                Text(stringResource(R.string.signature_manager_empty), modifier = Modifier.testTag("signature_manager_empty"))
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(stringResource(R.string.signature_manager_empty), modifier = Modifier.testTag("signature_manager_empty"))
+                    onCreateSignature?.let { createSignature ->
+                        Button(
+                            onClick = createSignature,
+                            modifier = Modifier.fillMaxWidth().testTag("signature_manager_create")
+                        ) {
+                            Text(stringResource(R.string.signature_draw_title))
+                        }
+                    }
+                }
             }
             signatures.forEach { signature ->
                 Card(
-                    modifier = Modifier.fillMaxWidth().testTag("signature_item_${signature.id}"),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { selectSignature(signature.id) }
+                        .testTag("signature_item_${signature.id}"),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
                     Row(
