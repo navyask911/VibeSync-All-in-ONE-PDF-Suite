@@ -352,8 +352,7 @@ fun PdfViewerScreen(
                                 )
                             }
                         }
-                        val searchStatus = when {
-                            uiState.searchErrorMessage != null -> uiState.searchErrorMessage
+                        val searchStatus = uiState.searchErrorMessage ?: when {
                             uiState.isSearchOcrRunning -> stringResource(R.string.viewer_search_running_ocr)
                             uiState.isSearchRunning -> stringResource(R.string.viewer_searching)
                             searchQuery.isBlank() -> ""
