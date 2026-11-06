@@ -436,7 +436,7 @@
     <string name="vault_biometric_subtitle">Authenticate with strong biometrics or your device PIN.</string>
     <!-- PDF viewer search -->
     <string name="viewer_search">PDF içinde ara</string>
-    <string name="viewer_search_hint">Bu PDF'de metin bul</string>
+    <string name="viewer_search_hint">Bu PDF içinde metin bul</string>
     <string name="viewer_search_close">Aramayı kapat</string>
     <string name="viewer_search_previous">Önceki eşleşme</string>
     <string name="viewer_search_next">Sonraki eşleşme</string>
