@@ -2,6 +2,7 @@ package com.vibesync.toolkit.pdf.presentation.viewer
 
 import android.content.Context
 import android.net.Uri
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
@@ -32,8 +33,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -42,6 +45,7 @@ import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.presentation.common.launchSystemPdfPrint
 import com.vibesync.toolkit.pdf.R
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.sqrt
 
@@ -75,6 +79,8 @@ fun PdfViewerScreen(
     var showRenameScanDialog by remember(documentUri) { mutableStateOf(false) }
     var showDeleteScanDialog by remember(documentUri) { mutableStateOf(false) }
     var renamedScanName by rememberSaveable(documentUri) { mutableStateOf("") }
+    var searchExpanded by rememberSaveable(documentUri) { mutableStateOf(false) }
+    var searchQuery by rememberSaveable(documentUri) { mutableStateOf("") }
 
     LaunchedEffect(uiState.fileName, documentUri) {
         renamedScanName = uiState.fileName.removeSuffix(".pdf").removeSuffix(".PDF")
@@ -114,9 +120,28 @@ fun PdfViewerScreen(
         viewModel.onPageScrolled(firstVisibleIndex)
     }
 
+    LaunchedEffect(searchExpanded, searchQuery, documentUri, uiState.isLoading) {
+        if (searchExpanded && !uiState.isLoading && searchQuery.isNotBlank()) {
+            // Cancel stale work as soon as the query changes, not after the debounce interval.
+            viewModel.clearSearch()
+            delay(300)
+            viewModel.searchDocument(searchQuery)
+        } else {
+            viewModel.clearSearch()
+        }
+    }
+
+    LaunchedEffect(uiState.searchMatches, uiState.currentSearchMatchIndex) {
+        val targetPage = uiState.searchMatches.getOrNull(uiState.currentSearchMatchIndex)?.pageIndex
+        if (targetPage != null && targetPage in 0 until uiState.pageCount) {
+            listState.animateScrollToItem(targetPage)
+        }
+    }
+
     Scaffold(
         topBar = {
-            TopAppBar(
+            Column {
+                TopAppBar(
                 title = {
                     Column {
                         Text(
@@ -146,6 +171,24 @@ fun PdfViewerScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = {
+                            searchExpanded = !searchExpanded
+                            if (!searchExpanded) {
+                                searchQuery = ""
+                                viewModel.clearSearch()
+                            }
+                        },
+                        enabled = !uiState.isLoading && uiState.errorMessage == null,
+                        modifier = Modifier.testTag("viewer_search_toggle")
+                    ) {
+                        Icon(
+                            if (searchExpanded) Icons.Default.Close else Icons.Default.Search,
+                            contentDescription = stringResource(
+                                if (searchExpanded) R.string.viewer_search_close else R.string.viewer_search
+                            )
+                        )
+                    }
                     IconButton(
                         onClick = {
                             scale = (scale / 1.25f).coerceAtLeast(1f)
@@ -245,7 +288,93 @@ fun PdfViewerScreen(
                         }
                     }
                 }
-            )
+                )
+                if (searchExpanded) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                modifier = Modifier.weight(1f).testTag("viewer_search_input"),
+                                singleLine = true,
+                                placeholder = { Text(stringResource(R.string.viewer_search_hint)) },
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(
+                                    onSearch = { viewModel.searchDocument(searchQuery) }
+                                ),
+                                trailingIcon = {
+                                    when {
+                                        uiState.isSearchRunning -> CircularProgressIndicator(
+                                            modifier = Modifier.size(18.dp),
+                                            strokeWidth = 2.dp
+                                        )
+                                        searchQuery.isNotEmpty() -> IconButton(
+                                            onClick = {
+                                                searchQuery = ""
+                                                viewModel.clearSearch()
+                                            }
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Close,
+                                                contentDescription = stringResource(R.string.close)
+                                            )
+                                        }
+                                    }
+                                }
+                            )
+                            IconButton(
+                                onClick = viewModel::showPreviousSearchMatch,
+                                enabled = uiState.searchMatches.isNotEmpty(),
+                                modifier = Modifier.testTag("viewer_search_previous")
+                            ) {
+                                Icon(
+                                    Icons.Default.KeyboardArrowUp,
+                                    contentDescription = stringResource(R.string.viewer_search_previous)
+                                )
+                            }
+                            IconButton(
+                                onClick = viewModel::showNextSearchMatch,
+                                enabled = uiState.searchMatches.isNotEmpty(),
+                                modifier = Modifier.testTag("viewer_search_next")
+                            ) {
+                                Icon(
+                                    Icons.Default.KeyboardArrowDown,
+                                    contentDescription = stringResource(R.string.viewer_search_next)
+                                )
+                            }
+                        }
+                        val searchStatus = when {
+                            uiState.searchErrorMessage != null -> uiState.searchErrorMessage
+                            uiState.isSearchOcrRunning -> stringResource(R.string.viewer_search_running_ocr)
+                            uiState.isSearchRunning -> stringResource(R.string.viewer_searching)
+                            searchQuery.isBlank() -> ""
+                            uiState.searchMatches.isEmpty() -> stringResource(R.string.viewer_search_no_matches)
+                            else -> stringResource(
+                                R.string.viewer_search_position,
+                                uiState.currentSearchMatchIndex + 1,
+                                uiState.searchMatches.size
+                            )
+                        }
+                        if (searchStatus.isNotBlank()) {
+                            Text(
+                                searchStatus,
+                                modifier = Modifier.padding(start = 12.dp, top = 2.dp, bottom = 2.dp),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+                }
+            }
         },
         bottomBar = {
             if (uiState.pageCount > 1) {
@@ -419,11 +548,17 @@ fun PdfViewerScreen(
                         val metadata = uiState.pagesMetadata.getOrNull(pageIndex)
                         val aspectRatio = metadata?.aspectRatio ?: (595f / 842f)
 
+                        val highlights = uiState.searchMatches.mapIndexedNotNull { matchIndex, match ->
+                            if (match.pageIndex == pageIndex && match.highlight != null) {
+                                SearchHighlightOverlay(match.highlight, matchIndex == uiState.currentSearchMatchIndex)
+                            } else null
+                        }
                         PdfPageItem(
                             pageIndex = pageIndex,
                             aspectRatio = aspectRatio,
                             viewModel = viewModel,
-                            documentKey = documentUri.toString()
+                            documentKey = documentUri.toString(),
+                            highlightOverlays = highlights
                         )
                     }
                 }
@@ -584,7 +719,8 @@ fun PdfPageItem(
     pageIndex: Int,
     aspectRatio: Float,
     viewModel: PdfViewerViewModel,
-    documentKey: String
+    documentKey: String,
+    highlightOverlays: List<SearchHighlightOverlay> = emptyList()
 ) {
     // LazyColumn item identity + explicit effect keys make scrolling/recomposition alone unable
     // to restart a render. The retry counter changes only after a user presses Retry.
@@ -673,6 +809,29 @@ fun PdfPageItem(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
+                if (highlightOverlays.isNotEmpty()) {
+                    Canvas(modifier = Modifier.fillMaxSize().testTag("viewer_search_highlights")) {
+                        val sourceBitmap = bitmapForCompose
+                        if (sourceBitmap != null && sourceBitmap.width > 0 && sourceBitmap.height > 0) {
+                            val scaleX = size.width / sourceBitmap.width.toFloat()
+                            val scaleY = size.height / sourceBitmap.height.toFloat()
+                            highlightOverlays.forEach { overlay ->
+                                val left = overlay.bounds.left.coerceIn(0, sourceBitmap.width)
+                                val top = overlay.bounds.top.coerceIn(0, sourceBitmap.height)
+                                val right = overlay.bounds.right.coerceIn(left, sourceBitmap.width)
+                                val bottom = overlay.bounds.bottom.coerceIn(top, sourceBitmap.height)
+                                drawRect(
+                                    color = Color(0xFFFFEB3B).copy(alpha = if (overlay.isCurrent) 0.50f else 0.26f),
+                                    topLeft = Offset(left * scaleX, top * scaleY),
+                                    size = androidx.compose.ui.geometry.Size(
+                                        ((right - left).coerceAtLeast(2)) * scaleX,
+                                        ((bottom - top).coerceAtLeast(2)) * scaleY
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
             }
             renderFailed -> {
                 Column(
@@ -715,3 +874,8 @@ fun PdfPageItem(
 }
 
 private const val PAGE_RENDER_SCALE = 2.0f
+
+data class SearchHighlightOverlay(
+    val bounds: com.vibesync.toolkit.pdf.data.pdf.PdfSearchHighlight,
+    val isCurrent: Boolean
+)

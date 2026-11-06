@@ -10,7 +10,12 @@ import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.PageMetadata
+import com.vibesync.toolkit.pdf.data.ocr.MlKitOcrEngine
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
+import com.vibesync.toolkit.pdf.data.pdf.PdfSearchHighlight
+import com.vibesync.toolkit.pdf.data.pdf.PdfSearchMatch
+import com.vibesync.toolkit.pdf.data.pdf.PdfTextExtractor
+import com.vibesync.toolkit.pdf.data.pdf.PdfUnicodeSearch
 import com.vibesync.toolkit.pdf.data.pdf.PdfRendererEngine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -37,13 +42,19 @@ data class ViewerUiState(
     val isLoading: Boolean = true,
     val isPasswordRequired: Boolean = false,
     val errorMessage: String? = null,
-    val pagesMetadata: List<PageMetadata> = emptyList()
+    val pagesMetadata: List<PageMetadata> = emptyList(),
+    val isSearchRunning: Boolean = false,
+    val isSearchOcrRunning: Boolean = false,
+    val searchMatches: List<PdfSearchMatch> = emptyList(),
+    val currentSearchMatchIndex: Int = -1,
+    val searchErrorMessage: String? = null
 )
 
 class PdfViewerViewModel(application: Application) : AndroidViewModel(application) {
 
     private val rendererEngine = PdfRendererEngine(application)
     private val toolkitEngine = PdfBoxToolkitEngine(application)
+    private val textExtractor = PdfTextExtractor(application.applicationContext)
     private val _uiState = MutableStateFlow(ViewerUiState())
     val uiState: StateFlow<ViewerUiState> = _uiState.asStateFlow()
 
@@ -52,12 +63,15 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
     private var closeJob: Job? = null
     private var loadSequence: Long = 0L
     private var unlockedDocumentFile: File? = null
+    private var searchJob: Job? = null
+    private var searchSequence: Long = 0L
 
     /**
      * Every request owns one sequence number. Only the newest request may publish UI state;
      * cancellation and a request's finally block must never overwrite a later document.
      */
     fun loadDocument(uri: Uri, password: String? = null) {
+        cancelSearch()
         val requestId = ++loadSequence
         val previousLoad = loadJob
         previousLoad?.cancel()
@@ -77,7 +91,12 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
             pageCount = 0,
             pagesMetadata = emptyList(),
             currentPageIndex = 0,
-            zoomScale = 1.0f
+            zoomScale = 1.0f,
+            isSearchRunning = false,
+            isSearchOcrRunning = false,
+            searchMatches = emptyList(),
+            currentSearchMatchIndex = -1,
+            searchErrorMessage = null
         )
 
         loadJob = viewModelScope.launch {
@@ -227,6 +246,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** Called when the viewer leaves composition; cleanup runs off the main thread. */
     fun closeDocument() {
+        cancelSearch()
         loadSequence += 1
         val previousLoad = loadJob
         previousLoad?.cancel()
@@ -257,6 +277,161 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
         if (_uiState.value.currentPageIndex != pageIndex) {
             _uiState.value = _uiState.value.copy(currentPageIndex = pageIndex)
         }
+    }
+
+    /**
+     * Searches every page with PDFBox first. Pages with no usable text layer are rendered through
+     * the existing PdfRenderer and passed to ML Kit OCR. Only one page bitmap is leased at a time.
+     */
+    fun searchDocument(query: String) {
+        val normalizedQuery = query.trim()
+        val uri = activeUri
+        val requestId = ++searchSequence
+        searchJob?.cancel()
+        searchJob = null
+
+        if (normalizedQuery.isBlank() || uri == null) {
+            _uiState.value = _uiState.value.copy(
+                isSearchRunning = false,
+                isSearchOcrRunning = false,
+                searchMatches = emptyList(),
+                currentSearchMatchIndex = -1,
+                searchErrorMessage = null
+            )
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(
+            isSearchRunning = true,
+            isSearchOcrRunning = false,
+            searchMatches = emptyList(),
+            currentSearchMatchIndex = -1,
+            searchErrorMessage = null
+        )
+
+        searchJob = viewModelScope.launch {
+            val app = getApplication<Application>()
+            var ocrEngine: MlKitOcrEngine? = null
+            try {
+                // Password-protected documents are searched through the same decrypted cache file
+                // already opened by PdfRenderer, never by reopening the encrypted source URI.
+                val searchableUri = unlockedDocumentFile?.let { Uri.fromFile(it) } ?: uri
+                val pages = textExtractor.extractPages(searchableUri)
+                val matches = mutableListOf<PdfSearchMatch>()
+
+                for (page in pages) {
+                    currentCoroutineContext().ensureActive()
+                    val nonWhitespaceCharacters = page.text.count { !it.isWhitespace() }
+
+                    if (nonWhitespaceCharacters < MIN_NATIVE_TEXT_CHARACTERS_PER_PAGE) {
+                        if (requestId == searchSequence) {
+                            _uiState.value = _uiState.value.copy(isSearchOcrRunning = true)
+                        }
+                        val lease = rendererEngine.renderPageLease(
+                            page.pageIndex,
+                            scale = SEARCH_OCR_RENDER_SCALE
+                        )
+                        if (lease != null) {
+                            try {
+                                val bitmap = lease.bitmap
+                                if (!bitmap.isRecycled) {
+                                    if (ocrEngine == null) {
+                                        ocrEngine = MlKitOcrEngine(app.applicationContext)
+                                    }
+                                    val recognized = ocrEngine.recognize(bitmap)
+                                    if (recognized.blocks.isEmpty()) {
+                                        matches += PdfUnicodeSearch.findMatches(
+                                            pageIndex = page.pageIndex,
+                                            text = recognized.text,
+                                            query = normalizedQuery
+                                        )
+                                    } else {
+                                        recognized.blocks.forEach { block ->
+                                            val box = block.boundingBox?.let {
+                                                PdfSearchHighlight(it.left, it.top, it.right, it.bottom)
+                                            }
+                                            matches += PdfUnicodeSearch.findMatches(
+                                                pageIndex = page.pageIndex,
+                                                text = block.text,
+                                                query = normalizedQuery,
+                                                highlight = box
+                                            )
+                                        }
+                                    }
+                                }
+                            } finally {
+                                lease.close()
+                            }
+                        }
+                    } else {
+                        matches += PdfUnicodeSearch.findMatches(
+                            pageIndex = page.pageIndex,
+                            text = page.text,
+                            query = normalizedQuery
+                        )
+                    }
+                }
+
+                if (requestId == searchSequence) {
+                    val orderedMatches = matches.sortedWith(
+                        compareBy<PdfSearchMatch> { it.pageIndex }.thenBy { it.startOffset }
+                    )
+                    _uiState.value = _uiState.value.copy(
+                        searchMatches = orderedMatches,
+                        currentSearchMatchIndex = if (orderedMatches.isEmpty()) -1 else 0,
+                        searchErrorMessage = null
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.w(TAG, "search.failed category=" + error.javaClass.simpleName, error)
+                if (requestId == searchSequence) {
+                    _uiState.value = _uiState.value.copy(
+                        searchMatches = emptyList(),
+                        currentSearchMatchIndex = -1,
+                        searchErrorMessage = app.getString(R.string.viewer_search_failed)
+                    )
+                }
+            } finally {
+                ocrEngine?.close()
+                if (requestId == searchSequence) {
+                    _uiState.value = _uiState.value.copy(
+                        isSearchRunning = false,
+                        isSearchOcrRunning = false
+                    )
+                }
+            }
+        }
+    }
+
+    fun clearSearch() {
+        cancelSearch()
+        _uiState.value = _uiState.value.copy(
+            isSearchRunning = false,
+            isSearchOcrRunning = false,
+            searchMatches = emptyList(),
+            currentSearchMatchIndex = -1,
+            searchErrorMessage = null
+        )
+    }
+
+    fun showNextSearchMatch() = moveSearchMatch(1)
+
+    fun showPreviousSearchMatch() = moveSearchMatch(-1)
+
+    private fun moveSearchMatch(delta: Int) {
+        val count = _uiState.value.searchMatches.size
+        if (count == 0) return
+        val current = _uiState.value.currentSearchMatchIndex.coerceIn(0, count - 1)
+        val next = (current + delta + count) % count
+        _uiState.value = _uiState.value.copy(currentSearchMatchIndex = next)
+    }
+
+    private fun cancelSearch() {
+        searchSequence += 1L
+        searchJob?.cancel()
+        searchJob = null
     }
 
     fun setZoom(scale: Float) {
@@ -323,6 +498,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
     override fun onCleared() {
         loadSequence += 1
         loadJob?.cancel()
+        searchJob?.cancel()
         val fileToDelete = unlockedDocumentFile
         unlockedDocumentFile = null
         super.onCleared()
@@ -343,5 +519,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
 
     companion object {
         private const val TAG = "PdfViewerViewModel"
+        private const val MIN_NATIVE_TEXT_CHARACTERS_PER_PAGE = 32
+        private const val SEARCH_OCR_RENDER_SCALE = 2.0f
     }
 }
