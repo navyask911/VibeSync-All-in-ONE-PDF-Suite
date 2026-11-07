@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">Eenmalige aankoop · 1 jaar Pro-toegang</string>
+    <string name="pro_pass_restore_description">Herstel je Pro Pass na opnieuw installeren met hetzelfde Google Play-account. De toegang is gekoppeld aan dit apparaat.</string>
+    <string name="pro_pass_restore_action">Pro Pass herstellen</string>
+    <string name="pro_pass_restore_success">Je Pro Pass is actief op dit apparaat.</string>
+    <string name="pro_pass_restore_not_found">Geen actieve Pro Pass gevonden voor dit Google Play-account.</string>
+    <string name="pro_pass_device_mismatch">Deze Pro Pass is geregistreerd op een ander apparaat.</string>
+    <string name="pro_pass_expired_owned">Deze eenmalige Pro Pass is verlopen. Google Play bewaart de aankoop, dus deze kan niet opnieuw met dit account worden gekocht.</string>
+</resources>

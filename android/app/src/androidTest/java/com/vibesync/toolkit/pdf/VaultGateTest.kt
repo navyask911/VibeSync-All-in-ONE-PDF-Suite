@@ -73,6 +73,14 @@ class VaultGateTest {
         assertTrue(moved.isFile)
         assertFalse(storage.listMovableScans().any { it.name == source.name })
         assertTrue(storage.listVaultFiles().any { it.name == moved.name })
+        assertEquals("vault_move_test.pdf", storage.displayName(moved))
+        val ciphertextText = String(moved.readBytes(), Charsets.ISO_8859_1)
+        assertFalse("Vault contents must not remain plaintext at rest.", ciphertextText.contains("sample-pdf-placeholder"))
+
+        val decrypted = storage.decryptToCache(moved)
+        assertEquals("sample-pdf-placeholder", decrypted.readText())
+        decrypted.delete()
+        storage.clearDecryptedCache()
         moved.delete()
     }
 }

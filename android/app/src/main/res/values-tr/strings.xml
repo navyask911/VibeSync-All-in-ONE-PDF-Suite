@@ -92,7 +92,6 @@
     <string name="failed_to_open_pdf">PDF açılamadı</string>
     <string name="pdf_page_description">PDF sayfa %1$d</string>
     <string name="admob_app_id">ca-app-pub-4783826505860771~4377815936</string>
-    <string name="admob_banner_unit_id">ca-app-pub-4783826505860771/3755922842</string>
     <string name="selected_file_name">Seçildi: %1$s</string>
     <string name="tool_select_pdf_to_split">Bölünecek PDF\'yi Seç</string>
     <string name="tool_choose_pdf_document">PDF Belgesi Seç</string>
@@ -434,7 +433,7 @@
     <string name="vault_lock_action">Lock vault</string>
     <string name="vault_biometric_title">Unlock VibeSync Vault</string>
     <string name="vault_biometric_subtitle">Authenticate with strong biometrics or your device PIN.</string>
-    <!-- PDF viewer search -->
+    <!-- On-device PDF text search -->
     <string name="viewer_search">PDF içinde ara</string>
     <string name="viewer_search_hint">Bu PDF içinde metin bul</string>
     <string name="viewer_search_close">Aramayı kapat</string>

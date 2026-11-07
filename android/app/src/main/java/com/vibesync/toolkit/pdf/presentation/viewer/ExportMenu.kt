@@ -1,5 +1,7 @@
 package com.vibesync.toolkit.pdf.presentation.viewer
 
+import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
+import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.pdf.PdfRenderer
@@ -41,8 +43,12 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.util.UriUtils
+import com.vibesync.toolkit.pdf.core.util.generateSmartFileName
+import com.vibesync.toolkit.pdf.data.pdf.createWhiteBackgroundBitmap
 import com.vibesync.toolkit.pdf.data.ocr.MlKitOcrEngine
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -69,7 +75,7 @@ fun ExportMenu(
     onSafLaunch: ((mimeType: String, displayName: String) -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
+    val coroutineScope = rememberCoroutineScope()
     var expanded by remember { mutableStateOf(false) }
     var running by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
@@ -94,7 +100,7 @@ fun ExportMenu(
     }
 
     val pdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { target ->
-        if (target != null) scope.launch {
+        if (target != null) coroutineScope.launch {
             runExport(context, { copyPdfToSaf(context, sourceUri, target) }, onDone = {
                 Toast.makeText(context, context.getString(R.string.export_saved_pdf), Toast.LENGTH_LONG).show()
             }, onError = { showExportError(context, it) })
@@ -106,7 +112,7 @@ fun ExportMenu(
         if (target == null || pageIndex == null) {
             queuedJpgPages = emptyList()
         } else {
-            scope.launch {
+            coroutineScope.launch {
                 runExport(context, { exportPageJpg(context, sourceUri, target, pageIndex, null) }, onDone = {
                     queuedJpgPages = queuedJpgPages.drop(1)
                     val nextPage = queuedJpgPages.firstOrNull()
@@ -126,7 +132,7 @@ fun ExportMenu(
     jpgLaunchRef[0] = { name -> jpgLauncher.launch(name) }
     val zipLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { target ->
         if (target != null) {
-            activeJob = scope.launch {
+            activeJob = coroutineScope.launch {
                 running = true
                 progress = 0f
                 completedPages = 0
@@ -152,6 +158,7 @@ fun ExportMenu(
         if (target != null) {
             pendingTextTarget = target
             startTextExport(
+                scope = coroutineScope,
                 context = context,
                 sourceUri = sourceUri,
                 targetUri = target,
@@ -185,7 +192,7 @@ fun ExportMenu(
                     modifier = Modifier.testTag("export_pdf"),
                     onClick = {
                         expanded = false
-                        val name = "$baseName.pdf"
+                        val name = generateSmartFileName("VibeSync_Export", "pdf")
                         requestSaf("application/pdf", name) { pdfLauncher.launch(name) }
                     }
                 )
@@ -196,7 +203,7 @@ fun ExportMenu(
                         expanded = false
                         val page = currentPageIndex.coerceAtLeast(0)
                         queuedJpgPages = listOf(page)
-                        val name = "${baseName}_page_${page + 1}.jpg"
+                        val name = generateSmartFileName("VibeSync_Export_Page${page + 1}", "jpg")
                         requestSaf("image/jpeg", name) { jpgLauncher.launch(name) }
                     }
                 )
@@ -205,12 +212,12 @@ fun ExportMenu(
                     modifier = Modifier.testTag("export_jpg_separate"),
                     onClick = {
                         expanded = false
-                        scope.launch {
+                        coroutineScope.launch {
                             try {
                                 val count = withContext(Dispatchers.IO) { pageCount(context, sourceUri, null) }
                                 queuedJpgPages = (0 until count).toList()
                                 val firstPage = queuedJpgPages.firstOrNull() ?: return@launch
-                                val name = "${baseName}_page_${firstPage + 1}.jpg"
+                                val name = generateSmartFileName("VibeSync_Export_Page${firstPage + 1}", "jpg")
                                 requestSaf("image/jpeg", name) { jpgLauncher.launch(name) }
                             } catch (error: Throwable) {
                                 showExportError(context, error)
@@ -274,7 +281,11 @@ fun ExportMenu(
                         val target = pendingTextTarget ?: return@TextButton
                         passwordDialog = false
                         startTextExport(
-                            context, sourceUri, target, password,
+                            scope = coroutineScope,
+                            context = context,
+                            sourceUri = sourceUri,
+                            targetUri = target,
+                            passwordValue = password,
                             onStart = { job -> activeJob = job; running = true },
                             onProgress = { complete, total ->
                                 completedPages = complete
@@ -304,6 +315,7 @@ fun ExportMenu(
 }
 
 private fun startTextExport(
+    scope: CoroutineScope,
     context: Context,
     sourceUri: Uri,
     targetUri: Uri,
@@ -314,13 +326,13 @@ private fun startTextExport(
     onDone: () -> Unit,
     onError: (Throwable) -> Unit
 ) {
-    val scope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main)
-    val job = scope.launch {
+    // This caller-owned scope is cancelled when ExportMenu leaves composition.
+    val job = scope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
         try {
             val source = withContext(Dispatchers.IO) { stagePdf(context, sourceUri) }
             try {
                 val pageTotal = withContext(Dispatchers.IO) { pageCountFromFile(source, passwordValue) }
-                onProgress(0, pageTotal)
+                withContext(Dispatchers.Main.immediate) { onProgress(0, pageTotal) }
                 val allText = buildString {
                     MlKitOcrEngine(context).use { engine ->
                         for (index in 0 until pageTotal) {
@@ -333,7 +345,7 @@ private fun startTextExport(
                             } finally {
                                 bitmap.recycle()
                             }
-                            onProgress(index + 1, pageTotal)
+                            withContext(Dispatchers.Main.immediate) { onProgress(index + 1, pageTotal) }
                         }
                     }
                 }
@@ -342,17 +354,23 @@ private fun startTextExport(
                         it.write(allText)
                     } ?: throw IOException("The selected destination could not be opened.")
                 }
-                onDone()
+                withContext(Dispatchers.Main.immediate) { onDone() }
             } finally {
                 source.delete()
             }
         } catch (error: Throwable) {
             if (error is CancellationException) throw error
-            if (error is ExportPasswordRequiredException || error is InvalidPasswordException) onPasswordRequired()
-            else onError(error)
+            withContext(Dispatchers.Main.immediate) {
+                if (error is ExportPasswordRequiredException || error is InvalidPasswordException) {
+                    onPasswordRequired()
+                } else {
+                    onError(error)
+                }
+            }
         }
     }
     onStart(job)
+    job.start()
 }
 
 private suspend fun runExport(
@@ -374,15 +392,20 @@ private fun showExportError(context: Context, error: Throwable) {
     Toast.makeText(context, error.localizedMessage ?: context.getString(R.string.export_failed), Toast.LENGTH_LONG).show()
 }
 
-private fun copyPdfToSaf(context: Context, sourceUri: Uri, targetUri: Uri) {
-    val input = if (sourceUri.scheme == "file") {
-        File(sourceUri.path ?: throw IOException("The selected file path is missing.")).inputStream()
-    } else {
-        context.contentResolver.openInputStream(sourceUri) ?: throw IOException("Unable to open the selected PDF.")
-    }
-    input.use { source ->
-        context.contentResolver.openOutputStream(targetUri, "wt")?.use { target -> source.copyTo(target) }
-            ?: throw IOException("The selected destination could not be opened.")
+private suspend fun copyPdfToSaf(context: Context, sourceUri: Uri, targetUri: Uri) {
+    val watermarked = UriUtils.createExportCacheFile(context, "VibeSync_Export")
+    try {
+        PdfBoxToolkitEngine(context).watermarkPdf(
+            sourceUri = sourceUri,
+            watermarkText = PdfBoxToolkitEngine.DEFAULT_FOOTER_WATERMARK_TEXT,
+            outputFile = watermarked
+        ).getOrThrow()
+        watermarked.inputStream().use { source ->
+            context.contentResolver.openOutputStream(targetUri, "wt")?.use { target -> source.copyTo(target) }
+                ?: throw IOException("The selected destination could not be opened.")
+        }
+    } finally {
+        watermarked.delete()
     }
 }
 
@@ -391,11 +414,16 @@ private fun exportPageJpg(context: Context, sourceUri: Uri, targetUri: Uri, page
     try {
         val bitmap = renderPage(source, pageIndex, password)
         try {
-            context.contentResolver.openOutputStream(targetUri, "wt")?.use { out ->
-                if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)) throw IOException("Could not encode the page as JPG.")
-            } ?: throw IOException("The selected destination could not be opened.")
+            val flattenedBitmap = PdfBitmapUtils.ensureWhiteBackgroundForJpeg(bitmap)
+            try {
+                context.contentResolver.openOutputStream(targetUri, "wt")?.use { out ->
+                    if (!flattenedBitmap.compress(Bitmap.CompressFormat.JPEG, 92, out)) throw IOException("Could not encode the page as JPG.")
+                } ?: throw IOException("The selected destination could not be opened.")
+            } finally {
+                if (flattenedBitmap !== bitmap && !flattenedBitmap.isRecycled) flattenedBitmap.recycle()
+            }
         } finally {
-            bitmap.recycle()
+            if (!bitmap.isRecycled) bitmap.recycle()
         }
     } finally {
         source.delete()
@@ -435,11 +463,16 @@ internal suspend fun buildJpgPagesZip(
                 exportCoroutineContext.ensureActive()
                 val bitmap = renderPage(source, index, null)
                 try {
-                    zip.putNextEntry(ZipEntry(String.format(Locale.ROOT, "page_%03d.jpg", index + 1)))
-                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 92, zip)) throw IOException("Could not encode a page as JPG.")
-                    zip.closeEntry()
+                    val flattenedBitmap = PdfBitmapUtils.ensureWhiteBackgroundForJpeg(bitmap)
+                    try {
+                        zip.putNextEntry(ZipEntry(String.format(Locale.ROOT, "page_%03d.jpg", index + 1)))
+                        if (!flattenedBitmap.compress(Bitmap.CompressFormat.JPEG, 92, zip)) throw IOException("Could not encode a page as JPG.")
+                        zip.closeEntry()
+                    } finally {
+                        if (flattenedBitmap !== bitmap && !flattenedBitmap.isRecycled) flattenedBitmap.recycle()
+                    }
                 } finally {
-                    bitmap.recycle()
+                    if (!bitmap.isRecycled) bitmap.recycle()
                 }
                 onProgress(index + 1, count)
             }
@@ -508,10 +541,9 @@ private fun renderPage(file: File, pageIndex: Int, password: String?): Bitmap {
             require(pageIndex in 0 until renderer.pageCount) { "The requested PDF page does not exist." }
             renderer.openPage(pageIndex).use { page ->
                 val scale = minOf(2.5, 2400.0 / page.width.coerceAtLeast(1), 3200.0 / page.height.coerceAtLeast(1))
-                val bitmap = Bitmap.createBitmap(
+                val bitmap = createWhiteBackgroundBitmap(
                     (page.width * scale).toInt().coerceAtLeast(1),
-                    (page.height * scale).toInt().coerceAtLeast(1),
-                    Bitmap.Config.ARGB_8888
+                    (page.height * scale).toInt().coerceAtLeast(1)
                 )
                 try {
                     page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)

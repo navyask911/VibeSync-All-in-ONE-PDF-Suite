@@ -2,7 +2,7 @@ package com.vibesync.toolkit.pdf.presentation.tools
 
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -59,6 +59,7 @@ import androidx.compose.ui.layout.ContentScale
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.data.pdf.IdPhotoExporter
 import com.vibesync.toolkit.pdf.data.pdf.IdPhotoPresets
+import com.vibesync.toolkit.pdf.data.pdf.ResolutionProfilePrefs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -82,7 +83,7 @@ fun IdPhotoMakerScreen(
     val source by produceState<Bitmap?>(initialValue = previewBitmap, key1 = pickedUri, key2 = previewBitmap) {
         if (previewBitmap != null) value = previewBitmap
         else value = withContext(Dispatchers.IO) {
-            pickedUri?.let { uri -> runCatching { context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } }.getOrNull() }
+            pickedUri?.let { uri -> runCatching { PdfBitmapUtils.decodeStreamDownsampled(openInputStream = { context.contentResolver.openInputStream(uri) }) }.getOrNull() }
         }
     }
     val cropAspect = selected.widthPx.toFloat() / selected.heightPx.toFloat()
@@ -90,7 +91,7 @@ fun IdPhotoMakerScreen(
     val savedPreview by produceState<Bitmap?>(initialValue = null, key1 = savedUri) {
         value = withContext(Dispatchers.IO) {
             savedUri?.let { uri ->
-                runCatching { context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } }.getOrNull()
+                runCatching { PdfBitmapUtils.decodeStreamDownsampled(openInputStream = { context.contentResolver.openInputStream(uri) }) }.getOrNull()
             }
         }
     }
@@ -215,8 +216,21 @@ fun IdPhotoMakerScreen(
                     scope.launch {
                         val result = withContext(Dispatchers.IO) {
                             runCatching {
-                                val cropped = IdPhotoExporter.cropForPreset(bitmap, selected, zoom, panX, panY)
-                                try { IdPhotoExporter.save(context, cropped, selected).getOrThrow() }
+                                val profile = ResolutionProfilePrefs(context).read()
+                                val outputDpi = profile.outputDpi(
+                                    Runtime.getRuntime().maxMemory(),
+                                    bitmap.width,
+                                    bitmap.height
+                                )
+                                val cropped = IdPhotoExporter.cropForPreset(
+                                    bitmap,
+                                    selected,
+                                    zoom,
+                                    panX,
+                                    panY,
+                                    outputDpi
+                                )
+                                try { IdPhotoExporter.save(context, cropped, selected, outputDpi).getOrThrow() }
                                 finally { if (!cropped.isRecycled && cropped !== bitmap) cropped.recycle() }
                             }
                         }

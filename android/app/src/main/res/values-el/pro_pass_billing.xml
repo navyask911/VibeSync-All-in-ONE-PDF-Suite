@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">Εφάπαξ αγορά · 1 έτος πρόσβασης Pro</string>
+    <string name="pro_pass_restore_description">Επαναφέρετε το Pro Pass μετά την επανεγκατάσταση με τον ίδιο λογαριασμό Google Play. Η πρόσβαση είναι συνδεδεμένη με αυτήν τη συσκευή.</string>
+    <string name="pro_pass_restore_action">Επαναφορά Pro Pass</string>
+    <string name="pro_pass_restore_success">Το Pro Pass είναι ενεργό σε αυτήν τη συσκευή.</string>
+    <string name="pro_pass_restore_not_found">Δεν βρέθηκε ενεργό Pro Pass για αυτόν τον λογαριασμό Google Play.</string>
+    <string name="pro_pass_device_mismatch">Αυτό το Pro Pass έχει καταχωριστεί σε άλλη συσκευή.</string>
+    <string name="pro_pass_expired_owned">Αυτό το εφάπαξ Pro Pass έληξε. Το Google Play εξακολουθεί να καταγράφει την αγορά, επομένως δεν μπορεί να αγοραστεί ξανά με αυτόν τον λογαριασμό.</string>
+</resources>

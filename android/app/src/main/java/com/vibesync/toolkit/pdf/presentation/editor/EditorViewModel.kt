@@ -1,5 +1,7 @@
 package com.vibesync.toolkit.pdf.presentation.editor
 
+import com.vibesync.toolkit.pdf.core.util.generateSmartFileName
+
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.Matrix
@@ -22,19 +24,22 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
 import java.util.UUID
 
 data class EditorUiState(
+    val fileName: String = "document.pdf",
     val currentPageIndex: Int = 0,
     val totalPages: Int = 1,
+    val documentLoadedRevision: Int = 0,
     val toolMode: ToolMode = ToolMode.PEN,
     val selectedColor: Color = Color(0xFF1A237E),
-    val strokeWidth: Float = 6f,
+    val strokeWidth: Float = 8f,
     val currentStrokes: List<VectorStroke> = emptyList(),
     val currentTextAnnotations: List<TextAnnotation> = emptyList(),
     val currentSignatures: List<SignatureAnnotation> = emptyList(),
-    val isDocumentReady: Boolean = false,
     val isSaving: Boolean = false,
     val exportSuccessFile: File? = null,
     val errorMessage: String? = null,
@@ -53,6 +58,8 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private val toolkitEngine = PdfBoxToolkitEngine(application)
     private val securityVault by lazy { SecurityVault(getApplication<Application>()) }
     private val temporarySignatureBitmaps = mutableSetOf<Bitmap>()
+    private var penStrokeWidth = 8f
+    private var highlighterStrokeWidth = 24f
 
     private val _uiState = MutableStateFlow(EditorUiState())
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
@@ -67,57 +74,38 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     fun initEditor(uri: Uri) {
         activeDocumentUri = uri
-
-        // This ViewModel is Activity-scoped and can be reused for another PDF. Clear stale
-        // annotations/signature images before starting a new document load.
-        temporarySignatureBitmaps.forEach { bitmap ->
-            if (!bitmap.isRecycled) bitmap.recycle()
-        }
-        temporarySignatureBitmaps.clear()
-        pageAnnotationsMap.clear()
-        undoStack.clear()
-        redoStack.clear()
-        _uiState.value = _uiState.value.copy(
-            currentPageIndex = 0,
-            totalPages = 0,
-            currentStrokes = emptyList(),
-            currentTextAnnotations = emptyList(),
-            currentSignatures = emptyList(),
-            isDocumentReady = false,
-            isSaving = false,
-            exportSuccessFile = null,
-            errorMessage = null,
-            canUndo = false,
-            canRedo = false
-        )
-
         viewModelScope.launch {
-            rendererEngine.openDocument(uri)
-                .onSuccess { count ->
-                    _uiState.value = _uiState.value.copy(
-                        totalPages = count,
-                        isDocumentReady = true,
-                        errorMessage = null
-                    )
-                    loadPageAnnotations(0)
-                }
-                .onFailure { error ->
-                    _uiState.value = _uiState.value.copy(
-                        isDocumentReady = false,
-                        errorMessage = error.localizedMessage
-                            ?: getApplication<Application>().getString(R.string.document_load_error)
-                    )
-                }
+            val app = getApplication<Application>()
+            val fileName = withContext(Dispatchers.IO) {
+                runCatching { UriUtils.getFileName(app, uri) }
+                    .getOrNull()
+                    ?.takeIf { it.isNotBlank() }
+            } ?: uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
+                ?: app.getString(R.string.default_pdf_filename)
+
+            rendererEngine.openDocument(uri).onSuccess { count ->
+                _uiState.value = _uiState.value.copy(
+                    fileName = fileName,
+                    totalPages = count,
+                    documentLoadedRevision = _uiState.value.documentLoadedRevision + 1
+                )
+                loadPageAnnotations(0)
+            }
         }
     }
 
     suspend fun getPageBitmap(pageIndex: Int): Bitmap? {
-        if (!_uiState.value.isDocumentReady) return null
         return rendererEngine.renderPage(pageIndex, scale = 1.5f)
     }
 
     fun selectTool(mode: ToolMode) {
-        _uiState.value = _uiState.value.copy(toolMode = mode)
+        val current = _uiState.value
+        val width = when (mode) {
+            ToolMode.PEN -> penStrokeWidth
+            ToolMode.HIGHLIGHTER -> highlighterStrokeWidth
+            else -> current.strokeWidth
+        }
+        _uiState.value = current.copy(toolMode = mode, strokeWidth = width)
     }
 
     fun selectColor(color: Color) {
@@ -125,7 +113,19 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun setStrokeWidth(width: Float) {
-        _uiState.value = _uiState.value.copy(strokeWidth = width)
+        if (!width.isFinite() || width <= 0f) return
+        val safeWidth = width.coerceIn(1f, 64f)
+        when (_uiState.value.toolMode) {
+            ToolMode.PEN -> penStrokeWidth = safeWidth
+            ToolMode.HIGHLIGHTER -> highlighterStrokeWidth = safeWidth
+            else -> Unit
+        }
+        _uiState.value = _uiState.value.copy(strokeWidth = safeWidth)
+    }
+
+    fun updateFileName(fileName: String) {
+        if (fileName.isBlank()) return
+        _uiState.value = _uiState.value.copy(fileName = fileName)
     }
 
     fun addStroke(stroke: VectorStroke) {
@@ -225,7 +225,8 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         width: Float = 160f,
         height: Float = 80f,
         rotationDegrees: Float = 0f,
-        saveToVault: Boolean = true
+        saveToVault: Boolean = true,
+        relativeStrokeWidth: Float = 0.025f
     ) {
         // Keep captured signatures discoverable by their stable encrypted identifiers.
         if (saveToVault) {
@@ -253,10 +254,33 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             y = y,
             width = width.coerceAtLeast(1f),
             height = height.coerceAtLeast(1f),
-            bitmap = placedBitmap
+            bitmap = placedBitmap,
+            relativeStrokeWidth = relativeStrokeWidth.coerceIn(0f, 1f)
         )
         val updated = _uiState.value.currentSignatures + sig
         _uiState.value = _uiState.value.copy(
+            currentSignatures = updated,
+            canUndo = undoStack.isNotEmpty(),
+            canRedo = redoStack.isNotEmpty()
+        )
+        persistCurrentPageAnnotations()
+    }
+
+    fun moveSignature(signatureId: String, deltaX: Float, deltaY: Float) {
+        if (!deltaX.isFinite() || !deltaY.isFinite() || (deltaX == 0f && deltaY == 0f)) return
+        val current = _uiState.value
+        val targetIndex = current.currentSignatures.indexOfFirst { it.id == signatureId }
+        if (targetIndex < 0) return
+
+        undoStack.add(currentPageAnnotations())
+        redoStack.clear()
+        val updated = current.currentSignatures.toMutableList()
+        val signature = updated[targetIndex]
+        updated[targetIndex] = signature.copy(
+            x = (signature.x + deltaX).coerceAtLeast(0f),
+            y = (signature.y + deltaY).coerceAtLeast(0f)
+        )
+        _uiState.value = current.copy(
             currentSignatures = updated,
             canUndo = undoStack.isNotEmpty(),
             canRedo = redoStack.isNotEmpty()
@@ -362,69 +386,40 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
      * using PdfBox at 72 DPI.
      */
     fun saveFlattenedDocument(screenWidthPx: Float, onComplete: (File) -> Unit) {
-        if (!_uiState.value.isDocumentReady || _uiState.value.isSaving) return
         persistCurrentPageAnnotations()
         val sourceUri = activeDocumentUri ?: return
         _uiState.value = _uiState.value.copy(isSaving = true)
 
-        // Freeze the full annotation state before dispatching the PDF work. The live map may
-        // continue changing while the user is editing, but a save must have one consistent snapshot.
-        val annotationSnapshot = pageAnnotationsMap.mapValues { (_, annotations) ->
-            annotations.copy(
-                strokes = annotations.strokes.toList(),
-                textAnnotations = annotations.textAnnotations.toList(),
-                signatures = annotations.signatures.toList()
-            )
-        }
-
         viewModelScope.launch {
-            val outputFile = try {
-                UriUtils.createExportCacheFile(getApplication(), "signed_annotated")
-            } catch (error: Exception) {
-                _uiState.value = _uiState.value.copy(
-                    isSaving = false,
-                    errorMessage = error.localizedMessage
-                        ?: getApplication<Application>().getString(R.string.editor_failed_flatten)
-                )
-                return@launch
+            val exportDirectory = File(getApplication<Application>().cacheDir, "pdf_cache").apply {
+                if (!exists() && !mkdirs()) throw IOException("Unable to prepare the edited PDF export folder.")
             }
+            val smartName = generateSmartFileName("VibeSync_Edited", "pdf")
+            var outputFile = File(exportDirectory, smartName)
+            var suffix = 1
+            while (outputFile.exists()) {
+                outputFile = File(exportDirectory, smartName.removeSuffix(".pdf") + "_${suffix++}.pdf")
+            }
+            val result = toolkitEngine.flattenAnnotations(
+                sourceUri = sourceUri,
+                pageAnnotationsMap = pageAnnotationsMap,
+                screenWidthPx = screenWidthPx,
+                outputFile = outputFile
+            )
 
-            try {
-                val result = toolkitEngine.flattenAnnotations(
-                    sourceUri = sourceUri,
-                    pageAnnotationsMap = annotationSnapshot,
-                    screenWidthPx = screenWidthPx,
-                    outputFile = outputFile
-                )
-                result.fold(
-                    onSuccess = { file ->
-                        if (!file.isFile || file.length() <= 0L) {
-                            _uiState.value = _uiState.value.copy(
-                                isSaving = false,
-                                errorMessage = getApplication<Application>().getString(R.string.editor_failed_flatten)
-                            )
-                        } else {
-                            releaseSignatureBitmapsAfterFlatten()
-                            _uiState.value = _uiState.value.copy(isSaving = false, exportSuccessFile = file)
-                            onComplete(file)
-                        }
-                    },
-                    onFailure = { error ->
-                        _uiState.value = _uiState.value.copy(
-                            isSaving = false,
-                            errorMessage = error.localizedMessage
-                                ?: getApplication<Application>().getString(R.string.editor_failed_flatten)
-                        )
-                    }
-                )
-            } catch (error: Exception) {
-                outputFile.delete()
-                _uiState.value = _uiState.value.copy(
-                    isSaving = false,
-                    errorMessage = error.localizedMessage
-                        ?: getApplication<Application>().getString(R.string.editor_failed_flatten)
-                )
-            }
+            result.fold(
+                onSuccess = { file ->
+                    releaseSignatureBitmapsAfterFlatten()
+                    _uiState.value = _uiState.value.copy(isSaving = false, exportSuccessFile = file)
+                    onComplete(file)
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isSaving = false,
+                        errorMessage = error.localizedMessage ?: getApplication<Application>().getString(R.string.editor_failed_flatten)
+                    )
+                }
+            )
         }
     }
 

@@ -1,7 +1,9 @@
 package com.vibesync.toolkit.pdf.presentation.viewer
 
+import android.app.Activity
 import android.app.Application
 import android.net.Uri
+import android.print.PrintAttributes
 import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
@@ -11,11 +13,14 @@ import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.PageMetadata
 import com.vibesync.toolkit.pdf.data.ocr.MlKitOcrEngine
-import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.data.pdf.PdfSearchHighlight
 import com.vibesync.toolkit.pdf.data.pdf.PdfSearchMatch
 import com.vibesync.toolkit.pdf.data.pdf.PdfTextExtractor
 import com.vibesync.toolkit.pdf.data.pdf.PdfUnicodeSearch
+import com.vibesync.toolkit.pdf.presentation.common.AndroidPrintTrigger
+import com.vibesync.toolkit.pdf.data.print.PdfPrintDocumentAdapter
+import com.vibesync.toolkit.pdf.presentation.common.PrintTrigger
+import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.data.pdf.PdfRendererEngine
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -50,7 +55,10 @@ data class ViewerUiState(
     val searchErrorMessage: String? = null
 )
 
-class PdfViewerViewModel(application: Application) : AndroidViewModel(application) {
+class PdfViewerViewModel @JvmOverloads constructor(
+    application: Application,
+    private val printTrigger: PrintTrigger = AndroidPrintTrigger()
+) : AndroidViewModel(application) {
 
     private val rendererEngine = PdfRendererEngine(application)
     private val toolkitEngine = PdfBoxToolkitEngine(application)
@@ -63,15 +71,33 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
     private var closeJob: Job? = null
     private var loadSequence: Long = 0L
     private var unlockedDocumentFile: File? = null
+    private var preparedPrintFile: File? = null
     private var searchJob: Job? = null
     private var searchSequence: Long = 0L
+
+    fun setPreparedPrintFile(file: File?) {
+        preparedPrintFile = file
+    }
+
+    fun printDocument(activity: Activity, fileName: String, attributes: PrintAttributes) {
+        val file = preparedPrintFile ?: return
+        if (!file.exists() || !file.isFile || !file.canRead() || file.length() == 0L) return
+        val adapter = PdfPrintDocumentAdapter(activity, Uri.fromFile(file), fileName, file)
+        printTrigger.triggerPrint(activity, fileName, adapter, attributes)
+        preparedPrintFile = null
+    }
+
+    fun updateFileName(fileName: String) {
+        if (fileName.isBlank()) return
+        _uiState.value = _uiState.value.copy(fileName = fileName)
+    }
 
     /**
      * Every request owns one sequence number. Only the newest request may publish UI state;
      * cancellation and a request's finally block must never overwrite a later document.
      */
     fun loadDocument(uri: Uri, password: String? = null) {
-        cancelSearch()
+        clearSearch()
         val requestId = ++loadSequence
         val previousLoad = loadJob
         previousLoad?.cancel()
@@ -91,12 +117,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
             pageCount = 0,
             pagesMetadata = emptyList(),
             currentPageIndex = 0,
-            zoomScale = 1.0f,
-            isSearchRunning = false,
-            isSearchOcrRunning = false,
-            searchMatches = emptyList(),
-            currentSearchMatchIndex = -1,
-            searchErrorMessage = null
+            zoomScale = 1.0f
         )
 
         loadJob = viewModelScope.launch {
@@ -246,7 +267,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
 
     /** Called when the viewer leaves composition; cleanup runs off the main thread. */
     fun closeDocument() {
-        cancelSearch()
+        clearSearch()
         loadSequence += 1
         val previousLoad = loadJob
         previousLoad?.cancel()
@@ -273,15 +294,9 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
     fun cacheKeyForPage(pageIndex: Int, scale: Float): String? =
         rendererEngine.cacheKeyForPage(pageIndex, scale)
 
-    fun onPageScrolled(pageIndex: Int) {
-        if (_uiState.value.currentPageIndex != pageIndex) {
-            _uiState.value = _uiState.value.copy(currentPageIndex = pageIndex)
-        }
-    }
-
     /**
-     * Searches every page with PDFBox first. Pages with no usable text layer are rendered through
-     * the existing PdfRenderer and passed to ML Kit OCR. Only one page bitmap is leased at a time.
+     * Searches digital PDF text first. Pages without a positioned text layer are rendered with the
+     * existing page renderer and recognized locally by the bundled ML Kit script model.
      */
     fun searchDocument(query: String) {
         val normalizedQuery = query.trim()
@@ -313,8 +328,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
             val app = getApplication<Application>()
             var ocrEngine: MlKitOcrEngine? = null
             try {
-                // Password-protected documents are searched through the same decrypted cache file
-                // already opened by PdfRenderer, never by reopening the encrypted source URI.
+                // Reuse the decrypted local PDF after a password-protected document is unlocked.
                 val searchableUri = unlockedDocumentFile?.let { Uri.fromFile(it) } ?: uri
                 val pages = textExtractor.extractPages(searchableUri)
                 val matches = mutableListOf<PdfSearchMatch>()
@@ -325,10 +339,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                         if (requestId == searchSequence) {
                             _uiState.value = _uiState.value.copy(isSearchOcrRunning = true)
                         }
-                        val lease = rendererEngine.renderPageLease(
-                            page.pageIndex,
-                            scale = SEARCH_OCR_RENDER_SCALE
-                        )
+                        val lease = rendererEngine.renderPageLease(page.pageIndex, scale = SEARCH_OCR_RENDER_SCALE)
                         if (lease != null) {
                             try {
                                 val bitmap = lease.bitmap
@@ -347,13 +358,17 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                                         recognized.blocks.forEach { block ->
                                             val box = block.boundingBox?.let {
                                                 PdfSearchHighlight(
-                                                    left = (it.left.toFloat() / bitmap.width * PdfSearchHighlight.COORDINATE_SCALE)
+                                                    left = (it.left.toFloat() / bitmap.width *
+                                                        PdfSearchHighlight.COORDINATE_SCALE)
                                                         .toInt().coerceIn(0, PdfSearchHighlight.COORDINATE_SCALE),
-                                                    top = (it.top.toFloat() / bitmap.height * PdfSearchHighlight.COORDINATE_SCALE)
+                                                    top = (it.top.toFloat() / bitmap.height *
+                                                        PdfSearchHighlight.COORDINATE_SCALE)
                                                         .toInt().coerceIn(0, PdfSearchHighlight.COORDINATE_SCALE),
-                                                    right = (it.right.toFloat() / bitmap.width * PdfSearchHighlight.COORDINATE_SCALE)
+                                                    right = (it.right.toFloat() / bitmap.width *
+                                                        PdfSearchHighlight.COORDINATE_SCALE)
                                                         .toInt().coerceIn(0, PdfSearchHighlight.COORDINATE_SCALE),
-                                                    bottom = (it.bottom.toFloat() / bitmap.height * PdfSearchHighlight.COORDINATE_SCALE)
+                                                    bottom = (it.bottom.toFloat() / bitmap.height *
+                                                        PdfSearchHighlight.COORDINATE_SCALE)
                                                         .toInt().coerceIn(0, PdfSearchHighlight.COORDINATE_SCALE)
                                                 )
                                             }
@@ -414,7 +429,9 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun clearSearch() {
-        cancelSearch()
+        searchSequence += 1L
+        searchJob?.cancel()
+        searchJob = null
         _uiState.value = _uiState.value.copy(
             isSearchRunning = false,
             isSearchOcrRunning = false,
@@ -432,14 +449,15 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
         val count = _uiState.value.searchMatches.size
         if (count == 0) return
         val current = _uiState.value.currentSearchMatchIndex.coerceIn(0, count - 1)
-        val next = (current + delta + count) % count
-        _uiState.value = _uiState.value.copy(currentSearchMatchIndex = next)
+        _uiState.value = _uiState.value.copy(
+            currentSearchMatchIndex = (current + delta + count) % count
+        )
     }
 
-    private fun cancelSearch() {
-        searchSequence += 1L
-        searchJob?.cancel()
-        searchJob = null
+    fun onPageScrolled(pageIndex: Int) {
+        if (_uiState.value.currentPageIndex != pageIndex) {
+            _uiState.value = _uiState.value.copy(currentPageIndex = pageIndex)
+        }
     }
 
     fun setZoom(scale: Float) {
@@ -527,7 +545,6 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
 
     companion object {
         private const val TAG = "PdfViewerViewModel"
-        private const val MIN_NATIVE_TEXT_CHARACTERS_PER_PAGE = 32
         private const val SEARCH_OCR_RENDER_SCALE = 2.0f
     }
 }

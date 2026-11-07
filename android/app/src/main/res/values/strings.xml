@@ -99,7 +99,6 @@
 
     <!-- Google AdMob Configuration -->
     <string name="admob_app_id">ca-app-pub-4783826505860771~4377815936</string>
-    <string name="admob_banner_unit_id">ca-app-pub-4783826505860771/3755922842</string>
 
     <!-- PDF toolkit screens -->
     <string name="selected_file_name">Selected: %1$s</string>
@@ -453,8 +452,8 @@
     <string name="vault_lock_action">Lock vault</string>
     <string name="vault_biometric_title">Unlock VibeSync Vault</string>
     <string name="vault_biometric_subtitle">Authenticate with strong biometrics or your device PIN.</string>
-    <!-- PDF viewer search -->
-    <string name="viewer_search">Search in PDF</string>
+    <!-- On-device PDF text search -->
+        <string name="viewer_search">Search in PDF</string>
     <string name="viewer_search_hint">Find text in this PDF</string>
     <string name="viewer_search_close">Close search</string>
     <string name="viewer_search_previous">Previous match</string>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">Jednorázový nákup · 1 rok přístupu Pro</string>
+    <string name="pro_pass_restore_description">Po opětovné instalaci obnovte Pro Pass pomocí stejného účtu Google Play. Přístup je svázán s tímto zařízením.</string>
+    <string name="pro_pass_restore_action">Obnovit Pro Pass</string>
+    <string name="pro_pass_restore_success">Pro Pass je na tomto zařízení aktivní.</string>
+    <string name="pro_pass_restore_not_found">Pro tento účet Google Play nebyl nalezen aktivní Pro Pass.</string>
+    <string name="pro_pass_device_mismatch">Tento Pro Pass je registrován na jiném zařízení.</string>
+    <string name="pro_pass_expired_owned">Platnost jednorázového Pro Passu skončila. Google Play nákup stále eviduje, takže jej s tímto účtem nelze koupit znovu.</string>
+</resources>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">ایک بار کی خریداری · 1 سال کی Pro رسائی</string>
+    <string name="pro_pass_restore_description">اسی Google Play اکاؤنٹ سے دوبارہ انسٹال کرنے کے بعد اپنا Pro Pass بحال کریں۔ رسائی اس ڈیوائس سے منسلک ہے۔</string>
+    <string name="pro_pass_restore_action">Pro Pass بحال کریں</string>
+    <string name="pro_pass_restore_success">اس ڈیوائس پر آپ کا Pro Pass فعال ہے۔</string>
+    <string name="pro_pass_restore_not_found">اس Google Play اکاؤنٹ کے لیے کوئی فعال Pro Pass نہیں ملا۔</string>
+    <string name="pro_pass_device_mismatch">یہ Pro Pass کسی دوسری ڈیوائس پر رجسٹرڈ ہے۔</string>
+    <string name="pro_pass_expired_owned">اس ایک بار خریدے گئے Pro Pass کی مدت ختم ہو گئی ہے۔ Google Play خریداری کا ریکارڈ رکھتا ہے، اس لیے اسے اس اکاؤنٹ سے دوبارہ نہیں خریدا جا سکتا۔</string>
+</resources>

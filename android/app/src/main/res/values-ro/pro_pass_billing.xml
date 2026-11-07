@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">Achiziție unică · 1 an de acces Pro</string>
+    <string name="pro_pass_restore_description">Restabilește Pro Pass după reinstalare folosind același cont Google Play. Accesul este asociat acestui dispozitiv.</string>
+    <string name="pro_pass_restore_action">Restabilește Pro Pass</string>
+    <string name="pro_pass_restore_success">Pro Pass este activ pe acest dispozitiv.</string>
+    <string name="pro_pass_restore_not_found">Nu a fost găsit niciun Pro Pass activ pentru acest cont Google Play.</string>
+    <string name="pro_pass_device_mismatch">Acest Pro Pass este înregistrat pe alt dispozitiv.</string>
+    <string name="pro_pass_expired_owned">Acest Pro Pass cu achiziție unică a expirat. Google Play păstrează în continuare achiziția, deci nu poate fi cumpărat din nou cu acest cont.</string>
+</resources>

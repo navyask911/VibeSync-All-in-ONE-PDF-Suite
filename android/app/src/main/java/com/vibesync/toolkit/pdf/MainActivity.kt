@@ -1,5 +1,6 @@
 package com.vibesync.toolkit.pdf
 
+import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.ClipData
@@ -21,30 +22,37 @@ import android.graphics.pdf.PdfRenderer
 import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.os.Bundle
-import android.widget.EditText
-import android.widget.LinearLayout
 import android.widget.Toast
 import java.io.File
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.FragmentActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.activity.compose.setContent
-import androidx.compose.ui.platform.ComposeView
-import androidx.lifecycle.setViewTreeLifecycleOwner
-import androidx.lifecycle.setViewTreeViewModelStoreOwner
-import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.ui.unit.dp
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -53,6 +61,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.core.os.LocaleListCompat
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -71,10 +80,15 @@ import com.google.android.play.core.install.model.UpdateAvailability
 import com.google.android.play.core.review.ReviewManagerFactory
 import com.vibesync.toolkit.pdf.BuildConfig
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
+import com.vibesync.toolkit.pdf.core.security.EncryptedBillingPreferences
+import com.vibesync.toolkit.pdf.data.billing.LocalAdBillingManager
+import com.vibesync.toolkit.pdf.presentation.billing.ProBenefitsPaywallScreen
 import com.vibesync.toolkit.pdf.core.util.EngagementPolicy
 import com.vibesync.toolkit.pdf.core.util.ReviewEligibilityTracker
 import com.vibesync.toolkit.pdf.core.util.UriUtils
+import com.vibesync.toolkit.pdf.core.util.generateSmartFileName
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
+import com.vibesync.toolkit.pdf.data.pdf.createWhiteBackgroundBitmap
 import com.vibesync.toolkit.pdf.presentation.dashboard.DashboardScreen
 import com.vibesync.toolkit.pdf.presentation.dashboard.DashboardViewModel
 import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
@@ -92,8 +106,8 @@ import com.vibesync.toolkit.pdf.presentation.scanner.BookSplitEntryScreen
 import com.vibesync.toolkit.pdf.presentation.scanner.BookSplitScreen
 import com.vibesync.toolkit.pdf.presentation.tools.IdCardComposerScreen
 import com.vibesync.toolkit.pdf.presentation.tools.IdPhotoMakerScreen
-import com.vibesync.toolkit.pdf.presentation.settings.ResolutionProfilePreferencePanel
 import com.vibesync.toolkit.pdf.presentation.scanner.ScanHistoryScreen
+import com.vibesync.toolkit.pdf.presentation.settings.ResolutionProfilePreferencePanel
 import com.vibesync.toolkit.pdf.presentation.scanner.ScannerHistoryRepository
 import com.vibesync.toolkit.pdf.presentation.scanner.ScannerHistoryViewModel
 import com.vibesync.toolkit.pdf.presentation.tools.ConvertImagesScreen
@@ -117,6 +131,7 @@ class MainActivity : AppCompatActivity() {
     private val engagementPreferences by lazy { getSharedPreferences("vibesync_engagement", MODE_PRIVATE) }
     private val reviewEligibilityTracker by lazy { ReviewEligibilityTracker(this) }
     private lateinit var appUpdateManager: AppUpdateManager
+    private lateinit var billingManager: LocalAdBillingManager
     private lateinit var updateFlowLauncher: ActivityResultLauncher<IntentSenderRequest>
     private var pendingUpdateInfo: AppUpdateInfo? = null
     private var updatePromptVisible by mutableStateOf(false)
@@ -125,6 +140,16 @@ class MainActivity : AppCompatActivity() {
     private var offlinePromptVisible by mutableStateOf(false)
     private var internetAvailable by mutableStateOf(false)
     private var activeRoute by mutableStateOf("dashboard")
+    private var pendingShareFiles by mutableStateOf<List<File>>(emptyList())
+    private var showRenameDialog by mutableStateOf(false)
+    private var showDocumentRenameDialog by mutableStateOf(false)
+    private var pendingDocumentRenameUri by mutableStateOf<Uri?>(null)
+    private var pendingDocumentRenameRoute by mutableStateOf("viewer")
+    private var pendingDocumentRenameName by mutableStateOf("")
+    private var pendingShareMimeType by mutableStateOf("application/pdf")
+    private var pendingShareExtension by mutableStateOf(".pdf")
+    private var pendingShareDefaultBaseName by mutableStateOf("document")
+    private var pendingShareForceMultiple by mutableStateOf(false)
     private var reviewEligibilityRevision by mutableStateOf(0)
     private var updateCheckInProgress = false
     private var updateFlowStarted = false
@@ -166,7 +191,7 @@ class MainActivity : AppCompatActivity() {
     private val scannerHistoryViewModel: ScannerHistoryViewModel by viewModels()
     private val batchScanViewModel: BatchScanViewModel by viewModels()
     private val scannerHistoryRepository by lazy { ScannerHistoryRepository(File(filesDir, "scans")) }
-    private val toolkitEngine by lazy { PdfBoxToolkitEngine(applicationContext) }
+    private val toolkitEngine by lazy { PdfBoxToolkitEngine(applicationContext, billingManager) }
 
     private lateinit var scannerManager: DocumentScannerManager
     private lateinit var scannerLauncher: ActivityResultLauncher<IntentSenderRequest>
@@ -175,7 +200,13 @@ class MainActivity : AppCompatActivity() {
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        billingManager = LocalAdBillingManager(
+            context = applicationContext,
+            prefs = EncryptedBillingPreferences(applicationContext)
+        )
+        AdMobManager.injectBillingManager(billingManager)
 
         updateFlowLauncher = registerForActivityResult(
             ActivityResultContracts.StartIntentSenderForResult()
@@ -219,7 +250,7 @@ class MainActivity : AppCompatActivity() {
                         }
 
                         val timestamp = System.currentTimeMillis()
-                        val requestedBaseName = "Scan_$timestamp"
+                        val requestedBaseName = generateSmartFileName("VibeSync_Scan", "pdf").removeSuffix(".pdf")
                         var finalFile = File(scanDirectory, "$requestedBaseName.pdf")
                         var suffix = 1
                         while (finalFile.exists() || scanDirectory.listFiles { _, name ->
@@ -397,7 +428,11 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
 
-                    NavHost(navController = navController, startDestination = "dashboard") {
+                    NavHost(
+                        navController = navController,
+                        startDestination = "dashboard",
+                        modifier = Modifier.windowInsetsPadding(WindowInsets.systemBars)
+                    ) {
                         // Dashboard Tool Hub
                         composable("dashboard") {
                             DashboardScreen(
@@ -433,7 +468,16 @@ class MainActivity : AppCompatActivity() {
                                 onNavigateToPdfTool = { route, uri ->
                                     if (route == "watermark") getSharedPreferences("pdf_watermark_options", MODE_PRIVATE).edit().putBoolean("watermark_custom_enabled", true).apply()
                                     navController.navigate("$route/${encodeUriRoute(uri)}")
-                                }
+                                },
+                                onNavigateToPro = { navController.navigate("pro") }
+                            )
+                        }
+
+                        composable("pro") {
+                            ProBenefitsPaywallScreen(
+                                billingManager = billingManager,
+                                activity = this@MainActivity,
+                                onNavigateBack = { navController.popBackStack() }
                             )
                         }
 
@@ -609,6 +653,12 @@ class MainActivity : AppCompatActivity() {
                                 documentUri = decodedUri,
                                 viewModel = viewerViewModel,
                                 onNavigateBack = { navController.popBackStack() },
+                                onRenameClick = { currentName ->
+                                    pendingDocumentRenameUri = decodedUri
+                                    pendingDocumentRenameRoute = "viewer"
+                                    pendingDocumentRenameName = currentName
+                                    showDocumentRenameDialog = true
+                                },
                                 onNavigateToEditor = { uri ->
                                     val enc = encodeUriRoute(uri)
                                     navController.navigate("editor/$enc")
@@ -672,9 +722,15 @@ class MainActivity : AppCompatActivity() {
                                 documentUri = decodedUri,
                                 viewModel = editorViewModel,
                                 onNavigateBack = { navController.popBackStack() },
+                                onRenameClick = { currentName ->
+                                    pendingDocumentRenameUri = decodedUri
+                                    pendingDocumentRenameRoute = "editor"
+                                    pendingDocumentRenameName = currentName
+                                    showDocumentRenameDialog = true
+                                },
                                 onExportComplete = { savedFile ->
                                     recordSuccessfulPdfOperation()
-                                    shareFiles(listOf(savedFile), "application/pdf", "VibeSync_Edit_Signed")
+                                    shareFiles(listOf(savedFile), "application/pdf", "VibeSync_Edited")
                                     navController.popBackStack()
                                 }
                             )
@@ -836,6 +892,117 @@ class MainActivity : AppCompatActivity() {
                             dismissButton = { TextButton(onClick = { dismissOfflinePrompt() }) { Text(getString(R.string.not_now)) } }
                         )
                     }
+                    if (showDocumentRenameDialog) {
+                        var newDocumentName by remember(pendingDocumentRenameUri, pendingDocumentRenameName) {
+                            mutableStateOf(pendingDocumentRenameName.removeSuffix(".pdf").removeSuffix(".PDF"))
+                        }
+                        AlertDialog(
+                            onDismissRequest = { showDocumentRenameDialog = false },
+                            title = { Text("Rename document") },
+                            text = {
+                                OutlinedTextField(
+                                    value = newDocumentName,
+                                    onValueChange = { newDocumentName = it },
+                                    label = { Text("File name") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth().testTag("document_rename_field")
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    enabled = newDocumentName.isNotBlank(),
+                                    onClick = {
+                                        val sourceUri = pendingDocumentRenameUri
+                                        val route = pendingDocumentRenameRoute
+                                        showDocumentRenameDialog = false
+                                        if (sourceUri != null) {
+                                            renamePdfDocument(sourceUri, newDocumentName.trim()) { renamedUri, displayName ->
+                                                if (renamedUri != sourceUri) {
+                                                    val encoded = encodeUriRoute(renamedUri)
+                                                    if (route == "editor") {
+                                                        navController.navigate("viewer/$encoded") {
+                                                            popUpTo("viewer/{encodedUri}") { inclusive = true }
+                                                            launchSingleTop = true
+                                                        }
+                                                        navController.navigate("editor/$encoded") { launchSingleTop = true }
+                                                    } else {
+                                                        navController.navigate("viewer/$encoded") {
+                                                            popUpTo("viewer/{encodedUri}") { inclusive = true }
+                                                            launchSingleTop = true
+                                                        }
+                                                    }
+                                                } else {
+                                                    viewerViewModel.updateFileName(displayName)
+                                                    editorViewModel.updateFileName(displayName)
+                                                }
+                                            }
+                                        }
+                                    }
+                                ) { Text("Save") }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showDocumentRenameDialog = false }) { Text("Cancel") }
+                            }
+                        )
+                    }
+
+                    if (showRenameDialog) {
+                        var newName by remember { mutableStateOf(pendingShareDefaultBaseName) }
+                        AlertDialog(
+                            onDismissRequest = { showRenameDialog = false },
+                            title = { Text("Name your output file") },
+                            text = {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .verticalScroll(rememberScrollState())
+                                        .padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    OutlinedTextField(
+                                        value = newName,
+                                        onValueChange = { newName = it },
+                                        label = { Text("File name") },
+                                        singleLine = true
+                                    )
+                                    if (pendingShareMimeType == "application/pdf") {
+                                        ResolutionProfilePreferencePanel(
+                                            modifier = Modifier.fillMaxWidth().height(156.dp),
+                                            testTag = "resolution_profile_export_selector"
+                                        )
+                                    }
+                                }
+                            },
+                            confirmButton = {
+                                TextButton(onClick = {
+                                    showRenameDialog = false
+                                    val requested = sanitizeOutputBaseName(newName, pendingShareDefaultBaseName)
+                                    val filesToRename = pendingShareFiles
+                                    val extension = pendingShareExtension
+                                    val mimeType = pendingShareMimeType
+                                    val forceMultiple = pendingShareForceMultiple
+                                    lifecycleScope.launch(Dispatchers.IO) {
+                                        val renamedFiles = renameOutputFiles(filesToRename, requested, extension)
+                                        withContext(Dispatchers.Main) {
+                                            if (isFinishing || isDestroyed) return@withContext
+                                            if (renamedFiles.isEmpty()) {
+                                                Toast.makeText(
+                                                    this@MainActivity,
+                                                    getString(R.string.error_rename_output_files),
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                                return@withContext
+                                            }
+                                            shareRenamedFiles(renamedFiles, mimeType, forceMultiple)
+                                        }
+                                    }
+                                }) { Text("Continue") }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showRenameDialog = false }) { Text("Cancel") }
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -886,16 +1053,20 @@ class MainActivity : AppCompatActivity() {
                                 )
                                 val width = (page.width * scale).toInt().coerceAtLeast(1)
                                 val height = (page.height * scale).toInt().coerceAtLeast(1)
-                                val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                                val bitmap = createWhiteBackgroundBitmap(width, height)
                                 try {
-                                    bitmap.eraseColor(android.graphics.Color.WHITE)
                                     val matrix = Matrix().apply {
                                         postScale(width.toFloat() / page.width.toFloat().coerceAtLeast(1f), height.toFloat() / page.height.toFloat().coerceAtLeast(1f))
                                     }
                                     page.render(bitmap, Rect(0, 0, width, height), matrix, PdfRenderer.Page.RENDER_MODE_FOR_PRINT)
                                     val output = UriUtils.createExportCacheFile(this@MainActivity, "document_page_${pageIndex + 1}", ".jpg")
-                                    java.io.FileOutputStream(output).use { stream ->
-                                        if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)) throw java.io.IOException("Could not encode page JPEG.")
+                                    val flattenedBitmap = PdfBitmapUtils.ensureWhiteBackgroundForJpeg(bitmap)
+                                    try {
+                                        java.io.FileOutputStream(output).use { stream ->
+                                            if (!flattenedBitmap.compress(Bitmap.CompressFormat.JPEG, 95, stream)) throw java.io.IOException("Could not encode page JPEG.")
+                                        }
+                                    } finally {
+                                        if (flattenedBitmap !== bitmap && !flattenedBitmap.isRecycled) flattenedBitmap.recycle()
                                     }
                                     generated += output
                                 } finally {
@@ -919,7 +1090,11 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun renamePdfDocument(uri: Uri, requestedName: String) {
+    private fun renamePdfDocument(
+        uri: Uri,
+        requestedName: String,
+        onRenamed: (Uri, String) -> Unit = { _, _ -> }
+    ) {
         if (scannerHistoryViewModel.isManagedScanUri(uri)) {
             val file = scannerHistoryRepository.fileFromUri(uri)
             if (file == null) {
@@ -928,10 +1103,11 @@ class MainActivity : AppCompatActivity() {
             }
             scannerHistoryViewModel.renameScan(file, requestedName) { result ->
                 runOnUiThread {
-                    result.onSuccess {
+                    result.onSuccess { renamedFile ->
                         Toast.makeText(this, getString(R.string.document_rename_success), Toast.LENGTH_SHORT).show()
                         dashboardViewModel.refreshCurrentSource()
                         dashboardViewModel.refreshRecentDocuments()
+                        onRenamed(Uri.fromFile(renamedFile), renamedFile.name)
                     }.onFailure { error ->
                         Toast.makeText(this, error.localizedMessage ?: getString(R.string.document_action_failed), Toast.LENGTH_LONG).show()
                     }
@@ -979,6 +1155,7 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this@MainActivity, getString(R.string.document_rename_success), Toast.LENGTH_SHORT).show()
                     dashboardViewModel.updateRecentDocument(uri, renamedUri, newName)
                     dashboardViewModel.refreshCurrentSource()
+                    onRenamed(renamedUri, newName)
                 }.onFailure { error ->
                     Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.document_action_failed), Toast.LENGTH_LONG).show()
                 }
@@ -1121,62 +1298,63 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, getString(R.string.error_no_output_files), Toast.LENGTH_LONG).show()
             return
         }
-
-        val extension = when (mimeType) { "image/png" -> ".png"; "image/jpeg" -> ".jpg"; else -> ".pdf" }
-        val defaultName = defaultBaseName.removeSuffix(".pdf").removeSuffix(".png")
-        val input = EditText(this).apply {
-            setText(defaultName)
-            selectAll()
-            hint = getString(R.string.file_name)
-            setSingleLine(true)
-        }
-
-        val dialogContent = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            addView(input, LinearLayout.LayoutParams(
-                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                android.view.ViewGroup.LayoutParams.WRAP_CONTENT
-            ))
-            if (mimeType == "application/pdf") {
-                val profileSelector = ComposeView(this@MainActivity).apply {
-                    setViewTreeLifecycleOwner(this@MainActivity)
-                    setViewTreeViewModelStoreOwner(this@MainActivity)
-                    setViewTreeSavedStateRegistryOwner(this@MainActivity)
-                    setContent {
-                        VibeSyncPdfTheme {
-                            ResolutionProfilePreferencePanel(
-                                modifier = androidx.compose.ui.Modifier.fillMaxSize(),
-                                testTag = "resolution_profile_export_selector"
-                            )
+        if (mimeType == "application/pdf") {
+            lifecycleScope.launch {
+                val preparedResult = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val prepared = mutableListOf<File>()
+                        try {
+                            validFiles.forEach { source ->
+                                val output = UriUtils.createExportCacheFile(this@MainActivity, "VibeSync_Shared")
+                                toolkitEngine.watermarkPdf(
+                                    sourceUri = Uri.fromFile(source),
+                                    watermarkText = getString(R.string.pdf_watermark_text),
+                                    outputFile = output
+                                ).getOrThrow()
+                                prepared.add(output)
+                            }
+                            prepared
+                        } catch (error: Exception) {
+                            prepared.forEach { it.delete() }
+                            throw error
                         }
                     }
                 }
-                addView(profileSelector, LinearLayout.LayoutParams(
-                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
-                    (156 * resources.displayMetrics.density).toInt()
-                ))
+                preparedResult.onSuccess { shareFilesPrepared(it, mimeType, defaultBaseName, forceMultiple) }
+                    .onFailure { error ->
+                        Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.error_prepare_pdf_sharing), Toast.LENGTH_LONG).show()
+                    }
             }
+            return
+        }
+        shareFilesPrepared(validFiles, mimeType, defaultBaseName, forceMultiple)
+    }
+
+    private fun shareFilesPrepared(
+        validFiles: List<File>,
+        mimeType: String,
+        defaultBaseName: String,
+        forceMultiple: Boolean
+    ) {
+        if (validFiles.isEmpty()) {
+            Toast.makeText(this, getString(R.string.error_no_output_files), Toast.LENGTH_LONG).show()
+            return
         }
 
-        android.app.AlertDialog.Builder(this)
-            .setTitle(getString(R.string.output_name_dialog_title))
-            .setMessage(getString(R.string.output_name_dialog_message))
-            .setView(dialogContent)
-            .setNegativeButton(getString(R.string.cancel), null)
-            .setPositiveButton(getString(R.string.continue_label)) { _, _ ->
-                val requested = sanitizeOutputBaseName(input.text?.toString().orEmpty(), defaultName)
-                lifecycleScope.launch(Dispatchers.IO) {
-                    val renamedFiles = renameOutputFiles(validFiles, requested, extension)
-                    launch(Dispatchers.Main) {
-                        if (renamedFiles.isEmpty()) {
-                            Toast.makeText(this@MainActivity, getString(R.string.error_rename_output_files), Toast.LENGTH_LONG).show()
-                            return@launch
-                        }
-                        shareRenamedFiles(renamedFiles, mimeType, forceMultiple)
-                    }
-                }
-            }
-            .show()
+        pendingShareFiles = validFiles
+        pendingShareMimeType = mimeType
+        pendingShareExtension = when (mimeType) {
+            "image/png" -> ".png"
+            "image/jpeg" -> ".jpg"
+            else -> ".pdf"
+        }
+        pendingShareDefaultBaseName = defaultBaseName
+            .removeSuffix(".pdf")
+            .removeSuffix(".png")
+            .removeSuffix(".jpg")
+            .removeSuffix(".jpeg")
+        pendingShareForceMultiple = forceMultiple
+        showRenameDialog = true
     }
 
     private fun shareRenamedFiles(
@@ -1184,6 +1362,7 @@ class MainActivity : AppCompatActivity() {
         mimeType: String,
         forceMultiple: Boolean = false
     ) {
+        if (isFinishing || isDestroyed || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
         val uris = files.map { UriUtils.getShareableUri(this, it) }
         val clipData = ClipData.newUri(contentResolver, "VibeSync output", uris.first())
         uris.drop(1).forEach { clipData.addItem(ClipData.Item(it)) }
@@ -1236,6 +1415,8 @@ class MainActivity : AppCompatActivity() {
             .trim()
             .removeSuffix(".pdf")
             .removeSuffix(".png")
+            .removeSuffix(".jpg")
+            .removeSuffix(".jpeg")
         return cleaned.ifBlank { fallback }.take(80)
     }
 
@@ -1295,6 +1476,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+        billingManager.startConnection()
         registerConnectivityCallback()
     }
 
@@ -1314,6 +1496,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         if (::appUpdateManager.isInitialized) runCatching { appUpdateManager.unregisterListener(updateInstallStateListener) }
+        if (::billingManager.isInitialized) billingManager.endConnection()
         super.onDestroy()
     }
 

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">一度限りの購入 · Pro を1年間利用</string>
+    <string name="pro_pass_restore_description">再インストール後、同じ Google Play アカウントを使用して Pro Pass を復元できます。アクセスはこの端末に紐付けられます。</string>
+    <string name="pro_pass_restore_action">Pro Pass を復元</string>
+    <string name="pro_pass_restore_success">この端末では Pro Pass が有効です。</string>
+    <string name="pro_pass_restore_not_found">この Google Play アカウントに有効な Pro Pass は見つかりませんでした。</string>
+    <string name="pro_pass_device_mismatch">この Pro Pass は別の端末に登録されています。</string>
+    <string name="pro_pass_expired_owned">この一度限りの Pro Pass の有効期限は終了しました。Google Play に購入履歴が残るため、このアカウントでは再購入できません。</string>
+</resources>

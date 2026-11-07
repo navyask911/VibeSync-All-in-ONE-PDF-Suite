@@ -84,7 +84,7 @@ fun PdfDocumentActionsSheet(
     onPrint: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
-    val defaultWatermarkText = stringResource(R.string.watermark_default_seal)
+    val defaultWatermarkText = "VibeSync All in ONE PDF Suite"
     var showWatermarkSettings by remember(documentName) { mutableStateOf(false) }
     var watermarkText by remember(documentName) { mutableStateOf(defaultWatermarkText) }
     var watermarkOpacity by remember(documentName) { mutableStateOf(150f / 255f) }

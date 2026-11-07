@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">Tek seferlik satın alma · 1 yıl Pro erişimi</string>
+    <string name="pro_pass_restore_description">Aynı Google Play hesabını kullanarak yeniden yükledikten sonra Pro Pass ürününü geri yükleyin. Erişim bu cihaza bağlıdır.</string>
+    <string name="pro_pass_restore_action">Pro Pass ürününü geri yükle</string>
+    <string name="pro_pass_restore_success">Pro Pass bu cihazda etkin.</string>
+    <string name="pro_pass_restore_not_found">Bu Google Play hesabı için etkin bir Pro Pass bulunamadı.</string>
+    <string name="pro_pass_device_mismatch">Bu Pro Pass başka bir cihaza kaydedilmiş.</string>
+    <string name="pro_pass_expired_owned">Bu tek seferlik Pro Pass süresi doldu. Google Play satın alma kaydını tuttuğu için bu hesapla yeniden satın alınamaz.</string>
+</resources>

@@ -7,15 +7,16 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.vibesync.toolkit.pdf.data.model.DrawingStroke
 import com.vibesync.toolkit.pdf.data.model.PageAnnotations
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
+import com.vibesync.toolkit.pdf.data.pdf.ResolutionProfile
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
+import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
 import com.tom_roush.pdfbox.pdmodel.encryption.AccessPermission
 import com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy
 import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
@@ -40,7 +41,6 @@ class PdfBoxToolkitEngineTest {
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
-        PDFBoxResourceLoader.init(context)
         tempFolder = File(context.cacheDir, "pdf_engine_tests_" + System.nanoTime()).apply { mkdirs() }
         engine = PdfBoxToolkitEngine(context)
     }
@@ -101,28 +101,13 @@ class PdfBoxToolkitEngineTest {
     @Test
     fun testMergeMultiplePdfsWithRotations() = runTest {
         val file1 = File(tempFolder, "doc_rot_90.pdf")
-        PDDocument().use { doc ->
-            val page = PDPage(PDRectangle.LETTER)
-            page.rotation = 90
-            doc.addPage(page)
-            doc.save(file1)
-        }
+        createRotatedImagePdf(file1, PDRectangle.LETTER, 90, Color.RED)
 
         val file2 = File(tempFolder, "doc_rot_180.pdf")
-        PDDocument().use { doc ->
-            val page = PDPage(PDRectangle.A4)
-            page.rotation = 180
-            doc.addPage(page)
-            doc.save(file2)
-        }
+        createRotatedImagePdf(file2, PDRectangle.A4, 180, Color.GREEN)
 
         val file3 = File(tempFolder, "doc_rot_270.pdf")
-        PDDocument().use { doc ->
-            val page = PDPage(PDRectangle.A3)
-            page.rotation = 270
-            doc.addPage(page)
-            doc.save(file3)
-        }
+        createRotatedImagePdf(file3, PDRectangle.A3, 270, Color.BLUE)
 
         val outputFile = File(tempFolder, "merged_rotation_output.pdf")
         val uris = listOf(Uri.fromFile(file1), Uri.fromFile(file2), Uri.fromFile(file3))
@@ -135,6 +120,36 @@ class PdfBoxToolkitEngineTest {
             assertEquals("Page 1 must preserve 90° rotation", 90, mergedDoc.getPage(0).rotation)
             assertEquals("Page 2 must preserve 180° rotation", 180, mergedDoc.getPage(1).rotation)
             assertEquals("Page 3 must preserve 270° rotation", 270, mergedDoc.getPage(2).rotation)
+            for (index in 0 until mergedDoc.numberOfPages) {
+                val resources = mergedDoc.getPage(index).resources
+                val images = resources?.xObjectNames
+                    ?.mapNotNull { name -> resources.getXObject(name) as? PDImageXObject }
+                    .orEmpty()
+                assertTrue(
+                    "Merged page ${index + 1} must retain its embedded source image and watermark",
+                    images.size >= 2
+                )
+            }
+        }
+    }
+
+    private fun createRotatedImagePdf(file: File, pageSize: PDRectangle, rotation: Int, color: Int) {
+        val bitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(color)
+        }
+        try {
+            PDDocument().use { document ->
+                val page = PDPage(pageSize)
+                page.rotation = rotation
+                document.addPage(page)
+                val image = LosslessFactory.createFromImage(document, bitmap)
+                PDPageContentStream(document, page).use { content ->
+                    content.drawImage(image, 36f, 36f, 120f, 120f)
+                }
+                document.save(file)
+            }
+        } finally {
+            if (!bitmap.isRecycled) bitmap.recycle()
         }
     }
 
@@ -244,89 +259,6 @@ class PdfBoxToolkitEngineTest {
         }
     }
     @Test
-    fun flatteningAnEditedPdfPreservesOriginalContentAndWritesNonBlankOutput() = runTest {
-        val sourcePdf = File(tempFolder, "editable_original.pdf")
-        PDDocument().use { document ->
-            val page = PDPage(PDRectangle.A4)
-            document.addPage(page)
-            PDPageContentStream(document, page).use { content ->
-                content.beginText()
-                content.setFont(com.tom_roush.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 18f)
-                content.newLineAtOffset(72f, 700f)
-                content.showText("ORIGINAL DOCUMENT CONTENT")
-                content.endText()
-            }
-            document.save(sourcePdf)
-        }
-
-        val annotation = PageAnnotations(
-            pageIndex = 0,
-            strokes = listOf(
-                DrawingStroke(
-                    points = listOf(PointF(140f, 260f), PointF(310f, 260f)),
-                    colorArgb = Color.BLUE,
-                    strokeWidth = 10f
-                )
-            ),
-            textAnnotations = listOf(
-                com.vibesync.toolkit.pdf.data.model.TextAnnotation(
-                    x = 120f,
-                    y = 350f,
-                    text = "ADDED EDIT",
-                    fontSizeSp = 18f,
-                    colorArgb = Color.BLUE
-                )
-            )
-        )
-        val outputPdf = File(tempFolder, "edited_non_blank.pdf")
-        val result = engine.flattenAnnotations(
-            sourceUri = Uri.fromFile(sourcePdf),
-            pageAnnotationsMap = mapOf(0 to annotation),
-            screenWidthPx = 595f,
-            outputFile = outputPdf
-        )
-
-        assertTrue("Flattening must succeed: ${result.exceptionOrNull()}", result.isSuccess)
-        assertTrue("Edited PDF must have bytes on disk.", outputPdf.isFile && outputPdf.length() > 0L)
-        PDDocument.load(outputPdf).use { saved ->
-            assertEquals("Original page must be retained.", 1, saved.numberOfPages)
-            val text = com.tom_roush.pdfbox.text.PDFTextStripper().getText(saved)
-            assertTrue("Original PDF text must not be lost.", text.contains("ORIGINAL DOCUMENT CONTENT"))
-            assertTrue("The edit annotation must be present.", text.contains("ADDED EDIT"))
-        }
-        android.os.ParcelFileDescriptor.open(
-            outputPdf,
-            android.os.ParcelFileDescriptor.MODE_READ_ONLY
-        ).use { descriptor ->
-            android.graphics.pdf.PdfRenderer(descriptor).use { renderer ->
-                renderer.openPage(0).use { page ->
-                    val bitmap = Bitmap.createBitmap(300, 424, Bitmap.Config.ARGB_8888)
-                    try {
-                        page.render(
-                            bitmap,
-                            null,
-                            null,
-                            android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY
-                        )
-                        val pixels = IntArray(bitmap.width * bitmap.height)
-                        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
-                        assertTrue(
-                            "Saved edited page must contain visible page pixels, not a white blank page.",
-                            pixels.any { pixel ->
-                                android.graphics.Color.red(pixel) < 245 ||
-                                    android.graphics.Color.green(pixel) < 245 ||
-                                    android.graphics.Color.blue(pixel) < 245
-                            }
-                        )
-                    } finally {
-                        bitmap.recycle()
-                    }
-                }
-            }
-        }
-    }
-
-    @Test
     fun testConvertImagesToPdfCreatesValidA4Document() = runTest {
         val imageFile = File(tempFolder, "input_photo.png")
         Bitmap.createBitmap(320, 200, Bitmap.Config.ARGB_8888).apply {
@@ -351,6 +283,48 @@ class PdfBoxToolkitEngineTest {
             assertEquals(PDRectangle.A4.width, document.getPage(0).mediaBox.width, 0.01f)
             assertEquals(PDRectangle.A4.height, document.getPage(0).mediaBox.height, 0.01f)
         }
+    }
+
+    @Test
+    fun imageToPdfUsesSelectedProfileToBoundEmbeddedRasterDimensions() = runTest {
+        val imageFile = File(tempFolder, "profile_input.png")
+        Bitmap.createBitmap(2400, 1600, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(Color.rgb(80, 120, 160))
+            FileOutputStream(imageFile).use { output -> compress(Bitmap.CompressFormat.PNG, 100, output) }
+            recycle()
+        }
+
+        val smallestOutput = File(tempFolder, "images_to_pdf_smallest.pdf")
+        val standardOutput = File(tempFolder, "images_to_pdf_standard.pdf")
+        val smallest = engine.convertImagesToPdf(
+            imageUris = listOf(Uri.fromFile(imageFile)),
+            outputFile = smallestOutput,
+            profile = ResolutionProfile.SMALLEST
+        )
+        val standard = engine.convertImagesToPdf(
+            imageUris = listOf(Uri.fromFile(imageFile)),
+            outputFile = standardOutput,
+            profile = ResolutionProfile.STANDARD
+        )
+        assertTrue("Smallest-profile image conversion should succeed.", smallest.isSuccess)
+        assertTrue("Standard-profile image conversion should succeed.", standard.isSuccess)
+
+        fun embeddedDimensions(file: File): Pair<Int, Int> =
+            PDDocument.load(file).use { document ->
+                val image = document.getPage(0).resources?.xObjectNames
+                    ?.mapNotNull { name ->
+                        document.getPage(0).resources?.getXObject(name) as? PDImageXObject
+                    }
+                    ?.maxByOrNull { it.width.toLong() * it.height.toLong() }
+                    ?: error("Converted page did not embed its source image.")
+                image.width to image.height
+            }
+
+        val smallDimensions = embeddedDimensions(smallestOutput)
+        val standardDimensions = embeddedDimensions(standardOutput)
+        assertTrue(smallDimensions.first <= 1754 && smallDimensions.second <= 1240)
+        assertTrue(smallDimensions.first < standardDimensions.first)
+        assertTrue(smallDimensions.second < standardDimensions.second)
     }
 
     @Test

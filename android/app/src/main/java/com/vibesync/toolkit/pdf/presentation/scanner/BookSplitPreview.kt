@@ -1,7 +1,7 @@
 package com.vibesync.toolkit.pdf.presentation.scanner
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import android.net.Uri
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.PickVisualMediaRequest
@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -78,10 +79,10 @@ fun BookSplitPreview(
     modifier: Modifier = Modifier
 ) {
     var gutter by remember(source) { mutableStateOf(initialGutterPx.coerceIn(1, source.width.coerceAtLeast(2) - 1)) }
-    Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(modifier = modifier.fillMaxWidth().fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(R.string.book_split_preview_title), style = MaterialTheme.typography.titleMedium)
         Box(
-            modifier = Modifier.fillMaxWidth().height(260.dp).testTag("book_split_preview"),
+            modifier = Modifier.fillMaxWidth().weight(1f).testTag("book_split_preview"),
             contentAlignment = Alignment.Center
         ) {
             Image(
@@ -162,8 +163,8 @@ fun BookSplitScreen(
     val source by produceState<Bitmap?>(initialValue = null, key1 = imageUri) {
         value = withContext(Dispatchers.IO) {
             runCatching {
-                if (imageUri.scheme == "file") BitmapFactory.decodeFile(imageUri.path)
-                else context.contentResolver.openInputStream(imageUri)?.use { BitmapFactory.decodeStream(it) }
+                if (imageUri.scheme == "file") imageUri.path?.let { PdfBitmapUtils.decodeFileDownsampled(it) }
+                else PdfBitmapUtils.decodeStreamDownsampled(openInputStream = { context.contentResolver.openInputStream(imageUri) })
             }.getOrNull()
         }
     }
@@ -179,12 +180,12 @@ fun BookSplitScreen(
             }
         )
     }) { padding ->
-        Column(Modifier.padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.padding(padding).fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             val bitmap = source
             when {
                 bitmap == null -> CircularProgressIndicator()
                 bitmap.width <= bitmap.height -> Text(stringResource(R.string.book_split_portrait_error), color = MaterialTheme.colorScheme.error)
-                else -> BookSplitPreview(source = bitmap, onCommit = { gutter ->
+                else -> BookSplitPreview(source = bitmap, modifier = Modifier.weight(1f), onCommit = { gutter ->
                     if (busy) return@BookSplitPreview
                     busy = true
                     error = null
@@ -196,11 +197,19 @@ fun BookSplitScreen(
                             try {
                                 split.pages.forEachIndexed { index, page ->
                                     val file = File(work, "half_${index + 1}.jpg")
-                                    FileOutputStream(file).use { output ->
-                                        if (!page.compress(Bitmap.CompressFormat.JPEG, 95, output)) throw java.io.IOException("Could not encode split page.")
+                                    try {
+                                        val flattenedBitmap = PdfBitmapUtils.ensureWhiteBackgroundForJpeg(page)
+                                        try {
+                                            FileOutputStream(file).use { output ->
+                                                if (!flattenedBitmap.compress(Bitmap.CompressFormat.JPEG, 95, output)) throw java.io.IOException("Could not encode split page.")
+                                            }
+                                        } finally {
+                                            if (flattenedBitmap !== page && !flattenedBitmap.isRecycled) flattenedBitmap.recycle()
+                                        }
+                                        inputFiles.add(file)
+                                    } finally {
+                                        if (!page.isRecycled) page.recycle()
                                     }
-                                    inputFiles.add(file)
-                                    page.recycle()
                                 }
                                 val scans = File(context.filesDir, "scans").apply { mkdirs() }
                                 val output = File(scans, "BookSplit_${System.currentTimeMillis()}.pdf")
