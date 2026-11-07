@@ -795,14 +795,18 @@ fun PdfPageItem(
         shape = RoundedCornerShape(4.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
-        when {
+        // A single full-size Box is essential here: the page bitmap, watermark and search
+        // highlights must be layered over the same measured page area, not measured as
+        // independent siblings by the Card's content slot.
+        Box(modifier = Modifier.fillMaxSize()) {
+            when {
             bitmapReady -> {
                 val bitmapForCompose = bitmap?.takeUnless { it.isRecycled }
                 if (bitmapForCompose != null && !bitmapForCompose.isRecycled) {
                     Image(
                         bitmap = bitmapForCompose.asImageBitmap(),
                         contentDescription = stringResource(R.string.pdf_page_description, pageIndex + 1),
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.matchParentSize(),
                         contentScale = ContentScale.Fit
                     )
                 } else {
@@ -817,7 +821,7 @@ fun PdfPageItem(
                 }
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .matchParentSize()
                         .padding(bottom = 2.dp),
                     contentAlignment = Alignment.BottomCenter
                 ) {
@@ -830,7 +834,7 @@ fun PdfPageItem(
                     )
                 }
                 if (highlightOverlays.isNotEmpty()) {
-                    Canvas(modifier = Modifier.fillMaxSize().testTag("viewer_search_highlights")) {
+                    Canvas(modifier = Modifier.matchParentSize().testTag("viewer_search_highlights")) {
                         val sourceBitmap = bitmapForCompose
                         if (sourceBitmap != null && sourceBitmap.width > 0 && sourceBitmap.height > 0) {
                             val scaleX = size.width / sourceBitmap.width.toFloat()
@@ -893,6 +897,7 @@ fun PdfPageItem(
                     )
                 }
             }
+        }
         }
     }
 }
