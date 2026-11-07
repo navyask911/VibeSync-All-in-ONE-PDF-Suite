@@ -3,6 +3,10 @@ package com.vibesync.toolkit.pdf
 import android.app.Application
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
@@ -12,6 +16,11 @@ import com.vibesync.toolkit.pdf.data.model.PageMetadata
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfPageItem
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
+import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
+import com.vibesync.toolkit.pdf.data.model.ToolMode
+import com.vibesync.toolkit.pdf.presentation.editor.EditorUiState
+import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
+import com.vibesync.toolkit.pdf.presentation.editor.PdfEditorScreen
 import io.mockk.*
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.junit.Before
@@ -246,6 +255,56 @@ class PdfViewerScreenTest {
         every { lease.key } returns "ui-test-${System.identityHashCode(bitmap)}"
         every { lease.bitmap } returns bitmap
         return lease
+    }
+
+    @Test
+    fun searchOpensAndEditSignKeepsVibgyorPenSizeAndHighlighterControls() {
+        val viewerState = MutableStateFlow(
+            com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(
+                fileName = "v1.0.15-baseline.pdf",
+                pageCount = 1,
+                isLoading = false,
+                pagesMetadata = listOf(PageMetadata(pageIndex = 0, widthPt = 595f, heightPt = 842f))
+            )
+        )
+        every { mockViewModel.uiState } returns viewerState
+        coEvery { mockViewModel.acquirePageBitmap(0, 2.0f) } returns null
+
+        val editorViewModel = mockk<EditorViewModel>(relaxed = true)
+        every { editorViewModel.uiState } returns MutableStateFlow(
+            EditorUiState(toolMode = ToolMode.PEN)
+        )
+        coEvery { editorViewModel.getPageBitmap(any()) } returns null
+
+        composeTestRule.setContent {
+            var editing by remember { mutableStateOf(false) }
+            VibeSyncPdfTheme {
+                if (editing) {
+                    PdfEditorScreen(
+                        documentUri = testUri,
+                        viewModel = editorViewModel,
+                        onNavigateBack = { editing = false },
+                        onExportComplete = {}
+                    )
+                } else {
+                    PdfViewerScreen(
+                        documentUri = testUri,
+                        viewModel = mockViewModel,
+                        onNavigateBack = {},
+                        onNavigateToEditor = { editing = true },
+                        onShareDocument = {}
+                    )
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithTag("viewer_search").assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithTag("viewer_search_field").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Cancel").performClick()
+
+        composeTestRule.onNodeWithTag("viewer_edit").assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithTag("editor_stroke_size_surface").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("editor_tool_Highlighter").assertIsDisplayed()
     }
 
 }

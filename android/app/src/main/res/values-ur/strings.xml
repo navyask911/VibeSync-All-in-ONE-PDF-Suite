@@ -433,4 +433,15 @@
     <string name="vault_lock_action">Lock vault</string>
     <string name="vault_biometric_title">Unlock VibeSync Vault</string>
     <string name="vault_biometric_subtitle">Authenticate with strong biometrics or your device PIN.</string>
+    <!-- On-device PDF text search -->
+    <string name="viewer_search">PDF میں تلاش کریں</string>
+    <string name="viewer_search_hint">اس PDF میں متن تلاش کریں</string>
+    <string name="viewer_search_close">تلاش بند کریں</string>
+    <string name="viewer_search_previous">پچھلا نتیجہ</string>
+    <string name="viewer_search_next">اگلا نتیجہ</string>
+    <string name="viewer_search_position">%2$d میں سے %1$d نتائج</string>
+    <string name="viewer_search_no_matches">کوئی نتیجہ نہیں ملا</string>
+    <string name="viewer_searching">PDF میں تلاش جاری ہے…</string>
+    <string name="viewer_search_running_ocr">OCR چل رہا ہے…</string>
+    <string name="viewer_search_failed">تلاش ناکام ہوگئی۔ دوبارہ کوشش کریں۔</string>
 </resources>

@@ -433,4 +433,15 @@
     <string name="vault_lock_action">Lock vault</string>
     <string name="vault_biometric_title">Unlock VibeSync Vault</string>
     <string name="vault_biometric_subtitle">Authenticate with strong biometrics or your device PIN.</string>
+    <!-- On-device PDF text search -->
+    <string name="viewer_search">PDF에서 검색</string>
+    <string name="viewer_search_hint">이 PDF에서 텍스트 찾기</string>
+    <string name="viewer_search_close">검색 닫기</string>
+    <string name="viewer_search_previous">이전 일치 항목</string>
+    <string name="viewer_search_next">다음 일치 항목</string>
+    <string name="viewer_search_position">총 %2$d개 중 %1$d개 일치</string>
+    <string name="viewer_search_no_matches">일치 항목 없음</string>
+    <string name="viewer_searching">PDF 검색 중…</string>
+    <string name="viewer_search_running_ocr">OCR 실행 중…</string>
+    <string name="viewer_search_failed">검색에 실패했습니다. 다시 시도하세요.</string>
 </resources>

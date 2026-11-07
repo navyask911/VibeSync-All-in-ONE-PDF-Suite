@@ -12,13 +12,16 @@ import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.PageMetadata
+import com.vibesync.toolkit.pdf.data.ocr.MlKitOcrEngine
+import com.vibesync.toolkit.pdf.data.pdf.PdfSearchHighlight
+import com.vibesync.toolkit.pdf.data.pdf.PdfSearchMatch
+import com.vibesync.toolkit.pdf.data.pdf.PdfTextExtractor
+import com.vibesync.toolkit.pdf.data.pdf.PdfUnicodeSearch
 import com.vibesync.toolkit.pdf.presentation.common.AndroidPrintTrigger
 import com.vibesync.toolkit.pdf.data.print.PdfPrintDocumentAdapter
 import com.vibesync.toolkit.pdf.presentation.common.PrintTrigger
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.data.pdf.PdfRendererEngine
-import com.tom_roush.pdfbox.pdmodel.PDDocument
-import com.tom_roush.pdfbox.text.PDFTextStripper
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,7 +47,12 @@ data class ViewerUiState(
     val isLoading: Boolean = true,
     val isPasswordRequired: Boolean = false,
     val errorMessage: String? = null,
-    val pagesMetadata: List<PageMetadata> = emptyList()
+    val pagesMetadata: List<PageMetadata> = emptyList(),
+    val isSearchRunning: Boolean = false,
+    val isSearchOcrRunning: Boolean = false,
+    val searchMatches: List<PdfSearchMatch> = emptyList(),
+    val currentSearchMatchIndex: Int = -1,
+    val searchErrorMessage: String? = null
 )
 
 class PdfViewerViewModel @JvmOverloads constructor(
@@ -54,6 +62,7 @@ class PdfViewerViewModel @JvmOverloads constructor(
 
     private val rendererEngine = PdfRendererEngine(application)
     private val toolkitEngine = PdfBoxToolkitEngine(application)
+    private val textExtractor = PdfTextExtractor(application.applicationContext)
     private val _uiState = MutableStateFlow(ViewerUiState())
     val uiState: StateFlow<ViewerUiState> = _uiState.asStateFlow()
 
@@ -63,6 +72,8 @@ class PdfViewerViewModel @JvmOverloads constructor(
     private var loadSequence: Long = 0L
     private var unlockedDocumentFile: File? = null
     private var preparedPrintFile: File? = null
+    private var searchJob: Job? = null
+    private var searchSequence: Long = 0L
 
     fun setPreparedPrintFile(file: File?) {
         preparedPrintFile = file
@@ -86,6 +97,7 @@ class PdfViewerViewModel @JvmOverloads constructor(
      * cancellation and a request's finally block must never overwrite a later document.
      */
     fun loadDocument(uri: Uri, password: String? = null) {
+        clearSearch()
         val requestId = ++loadSequence
         val previousLoad = loadJob
         previousLoad?.cancel()
@@ -255,6 +267,7 @@ class PdfViewerViewModel @JvmOverloads constructor(
 
     /** Called when the viewer leaves composition; cleanup runs off the main thread. */
     fun closeDocument() {
+        clearSearch()
         loadSequence += 1
         val previousLoad = loadJob
         previousLoad?.cancel()
@@ -281,29 +294,164 @@ class PdfViewerViewModel @JvmOverloads constructor(
     fun cacheKeyForPage(pageIndex: Int, scale: Float): String? =
         rendererEngine.cacheKeyForPage(pageIndex, scale)
 
-    fun searchText(query: String, onResult: (Int?) -> Unit) {
-        val value = query.trim()
+    /**
+     * Searches digital PDF text first. Pages without a positioned text layer are rendered with the
+     * existing page renderer and recognized locally by the bundled ML Kit script model.
+     */
+    fun searchDocument(query: String) {
+        val normalizedQuery = query.trim()
         val uri = activeUri
-        if (value.isEmpty() || uri == null) { onResult(null); return }
-        val app = getApplication<Application>()
-        viewModelScope.launch {
-            val result = runCatching {
-                withContext(Dispatchers.IO) {
-                    val localFile = UriUtils.copyUriToCacheFile(app, uri, "viewer_search")
-                    try {
-                        PDDocument.load(localFile).use { document ->
-                            val stripper = PDFTextStripper()
-                            (0 until document.numberOfPages).firstOrNull { index ->
-                                stripper.startPage = index + 1
-                                stripper.endPage = index + 1
-                                stripper.getText(document).contains(value, ignoreCase = true)
+        val requestId = ++searchSequence
+        searchJob?.cancel()
+        searchJob = null
+
+        if (normalizedQuery.isBlank() || uri == null) {
+            _uiState.value = _uiState.value.copy(
+                isSearchRunning = false,
+                isSearchOcrRunning = false,
+                searchMatches = emptyList(),
+                currentSearchMatchIndex = -1,
+                searchErrorMessage = null
+            )
+            return
+        }
+
+        _uiState.value = _uiState.value.copy(
+            isSearchRunning = true,
+            isSearchOcrRunning = false,
+            searchMatches = emptyList(),
+            currentSearchMatchIndex = -1,
+            searchErrorMessage = null
+        )
+
+        searchJob = viewModelScope.launch {
+            val app = getApplication<Application>()
+            var ocrEngine: MlKitOcrEngine? = null
+            try {
+                // Reuse the decrypted local PDF after a password-protected document is unlocked.
+                val searchableUri = unlockedDocumentFile?.let { Uri.fromFile(it) } ?: uri
+                val pages = textExtractor.extractPages(searchableUri)
+                val matches = mutableListOf<PdfSearchMatch>()
+
+                for (page in pages) {
+                    currentCoroutineContext().ensureActive()
+                    if (page.characterBounds.isEmpty()) {
+                        if (requestId == searchSequence) {
+                            _uiState.value = _uiState.value.copy(isSearchOcrRunning = true)
+                        }
+                        val lease = rendererEngine.renderPageLease(page.pageIndex, scale = SEARCH_OCR_RENDER_SCALE)
+                        if (lease != null) {
+                            try {
+                                val bitmap = lease.bitmap
+                                if (!bitmap.isRecycled) {
+                                    if (ocrEngine == null) {
+                                        ocrEngine = MlKitOcrEngine(app.applicationContext)
+                                    }
+                                    val recognized = ocrEngine.recognize(bitmap)
+                                    if (recognized.blocks.isEmpty()) {
+                                        matches += PdfUnicodeSearch.findMatches(
+                                            pageIndex = page.pageIndex,
+                                            text = recognized.text,
+                                            query = normalizedQuery
+                                        )
+                                    } else {
+                                        recognized.blocks.forEach { block ->
+                                            val box = block.boundingBox?.let {
+                                                PdfSearchHighlight(
+                                                    left = (it.left.toFloat() / bitmap.width *
+                                                        PdfSearchHighlight.COORDINATE_SCALE)
+                                                        .toInt().coerceIn(0, PdfSearchHighlight.COORDINATE_SCALE),
+                                                    top = (it.top.toFloat() / bitmap.height *
+                                                        PdfSearchHighlight.COORDINATE_SCALE)
+                                                        .toInt().coerceIn(0, PdfSearchHighlight.COORDINATE_SCALE),
+                                                    right = (it.right.toFloat() / bitmap.width *
+                                                        PdfSearchHighlight.COORDINATE_SCALE)
+                                                        .toInt().coerceIn(0, PdfSearchHighlight.COORDINATE_SCALE),
+                                                    bottom = (it.bottom.toFloat() / bitmap.height *
+                                                        PdfSearchHighlight.COORDINATE_SCALE)
+                                                        .toInt().coerceIn(0, PdfSearchHighlight.COORDINATE_SCALE)
+                                                )
+                                            }
+                                            matches += PdfUnicodeSearch.findMatches(
+                                                pageIndex = page.pageIndex,
+                                                text = block.text,
+                                                query = normalizedQuery,
+                                                highlight = box
+                                            )
+                                        }
+                                    }
+                                }
+                            } finally {
+                                lease.close()
                             }
                         }
-                    } finally { localFile.delete() }
+                    } else {
+                        matches += PdfUnicodeSearch.findMatches(
+                            pageIndex = page.pageIndex,
+                            text = page.text,
+                            query = normalizedQuery,
+                            characterBounds = page.characterBounds
+                        )
+                    }
                 }
-            }.getOrNull()
-            onResult(result)
+
+                if (requestId == searchSequence) {
+                    val orderedMatches = matches.sortedWith(
+                        compareBy<PdfSearchMatch> { it.pageIndex }.thenBy { it.startOffset }
+                    )
+                    _uiState.value = _uiState.value.copy(
+                        searchMatches = orderedMatches,
+                        currentSearchMatchIndex = if (orderedMatches.isEmpty()) -1 else 0,
+                        searchErrorMessage = null
+                    )
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                Log.w(TAG, "search.failed category=" + error.javaClass.simpleName, error)
+                if (requestId == searchSequence) {
+                    _uiState.value = _uiState.value.copy(
+                        searchMatches = emptyList(),
+                        currentSearchMatchIndex = -1,
+                        searchErrorMessage = app.getString(R.string.viewer_search_failed)
+                    )
+                }
+            } finally {
+                ocrEngine?.close()
+                if (requestId == searchSequence) {
+                    _uiState.value = _uiState.value.copy(
+                        isSearchRunning = false,
+                        isSearchOcrRunning = false
+                    )
+                }
+            }
         }
+    }
+
+    fun clearSearch() {
+        searchSequence += 1L
+        searchJob?.cancel()
+        searchJob = null
+        _uiState.value = _uiState.value.copy(
+            isSearchRunning = false,
+            isSearchOcrRunning = false,
+            searchMatches = emptyList(),
+            currentSearchMatchIndex = -1,
+            searchErrorMessage = null
+        )
+    }
+
+    fun showNextSearchMatch() = moveSearchMatch(1)
+
+    fun showPreviousSearchMatch() = moveSearchMatch(-1)
+
+    private fun moveSearchMatch(delta: Int) {
+        val count = _uiState.value.searchMatches.size
+        if (count == 0) return
+        val current = _uiState.value.currentSearchMatchIndex.coerceIn(0, count - 1)
+        _uiState.value = _uiState.value.copy(
+            currentSearchMatchIndex = (current + delta + count) % count
+        )
     }
 
     fun onPageScrolled(pageIndex: Int) {
@@ -376,6 +524,7 @@ class PdfViewerViewModel @JvmOverloads constructor(
     override fun onCleared() {
         loadSequence += 1
         loadJob?.cancel()
+        searchJob?.cancel()
         val fileToDelete = unlockedDocumentFile
         unlockedDocumentFile = null
         super.onCleared()
@@ -396,5 +545,6 @@ class PdfViewerViewModel @JvmOverloads constructor(
 
     companion object {
         private const val TAG = "PdfViewerViewModel"
+        private const val SEARCH_OCR_RENDER_SCALE = 2.0f
     }
 }

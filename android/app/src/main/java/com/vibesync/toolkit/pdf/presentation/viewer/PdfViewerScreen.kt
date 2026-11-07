@@ -7,6 +7,7 @@ import android.content.Context
 import android.print.PrintAttributes
 import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.horizontalScroll
@@ -44,13 +45,16 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
 import com.vibesync.toolkit.pdf.core.util.BitmapCache
+import com.vibesync.toolkit.pdf.data.pdf.PdfSearchHighlight
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.presentation.common.launchSystemPdfPrint
 import com.vibesync.toolkit.pdf.R
@@ -96,6 +100,7 @@ fun PdfViewerScreen(
     var showDeleteScanDialog by remember(documentUri) { mutableStateOf(false) }
     var showSearchDialog by remember(documentUri) { mutableStateOf(false) }
     var searchQuery by rememberSaveable(documentUri) { mutableStateOf("") }
+    var searchHasBeenRun by rememberSaveable(documentUri) { mutableStateOf(false) }
     var renamedScanName by rememberSaveable(documentUri) { mutableStateOf("") }
 
     LaunchedEffect(uiState.fileName, documentUri) {
@@ -134,6 +139,16 @@ fun PdfViewerScreen(
     }
     LaunchedEffect(firstVisibleIndex) {
         viewModel.onPageScrolled(firstVisibleIndex)
+    }
+
+    // Keep the selected match visible while preserving the existing v1.0.15 viewer toolbar.
+    LaunchedEffect(uiState.searchMatches, uiState.currentSearchMatchIndex, uiState.isLoading) {
+        val targetPage = uiState.searchMatches
+            .getOrNull(uiState.currentSearchMatchIndex)
+            ?.pageIndex
+        if (!uiState.isLoading && targetPage != null && targetPage in 0 until uiState.pageCount) {
+            listState.animateScrollToItem(targetPage)
+        }
     }
 
     Scaffold(
@@ -581,12 +596,26 @@ fun PdfViewerScreen(
                     ) { pageIndex ->
                         val metadata = uiState.pagesMetadata.getOrNull(pageIndex)
                         val aspectRatio = metadata?.aspectRatio ?: (595f / 842f)
+                        val highlights = uiState.searchMatches.flatMapIndexed { matchIndex, match ->
+                            if (match.pageIndex != pageIndex) {
+                                emptyList()
+                            } else {
+                                val rectangles = match.highlights.ifEmpty { listOfNotNull(match.highlight) }
+                                rectangles.map { rectangle ->
+                                    SearchHighlightOverlay(
+                                        bounds = rectangle,
+                                        isCurrent = matchIndex == uiState.currentSearchMatchIndex
+                                    )
+                                }
+                            }
+                        }
 
                         PdfPageItem(
                             pageIndex = pageIndex,
                             aspectRatio = aspectRatio,
                             viewModel = viewModel,
-                            documentKey = documentUri.toString()
+                            documentKey = documentUri.toString(),
+                            highlightOverlays = highlights
                         )
                     }
                 }
@@ -617,27 +646,99 @@ fun PdfViewerScreen(
     }
 
     if (showSearchDialog) {
+        val searchStatus = uiState.searchErrorMessage ?: when {
+            uiState.isSearchOcrRunning -> stringResource(R.string.viewer_search_running_ocr)
+            uiState.isSearchRunning -> stringResource(R.string.viewer_searching)
+            !searchHasBeenRun -> ""
+            uiState.searchMatches.isEmpty() -> stringResource(R.string.viewer_search_no_matches)
+            else -> stringResource(
+                R.string.viewer_search_position,
+                uiState.currentSearchMatchIndex + 1,
+                uiState.searchMatches.size
+            )
+        }
         AlertDialog(
-            onDismissRequest = { showSearchDialog = false },
-            title = { Text("Search in document") },
+            onDismissRequest = {
+                showSearchDialog = false
+                searchQuery = ""
+                searchHasBeenRun = false
+                viewModel.clearSearch()
+            },
+            title = { Text(stringResource(R.string.viewer_search)) },
             text = {
-                OutlinedTextField(value = searchQuery, onValueChange = { searchQuery = it },
-                    label = { Text("Text to find") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth().testTag("viewer_search_field"))
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = searchQuery,
+                        onValueChange = {
+                            searchQuery = it
+                            searchHasBeenRun = false
+                            viewModel.clearSearch()
+                        },
+                        label = { Text(stringResource(R.string.viewer_search_hint)) },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Text,
+                            imeAction = ImeAction.Search
+                        ),
+                        keyboardActions = KeyboardActions(onSearch = {
+                            searchHasBeenRun = true
+                            viewModel.searchDocument(searchQuery)
+                        }),
+                        modifier = Modifier.fillMaxWidth().testTag("viewer_search_field")
+                    )
+                    if (searchHasBeenRun) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Text(
+                                searchStatus,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            IconButton(
+                                onClick = viewModel::showPreviousSearchMatch,
+                                enabled = uiState.searchMatches.isNotEmpty(),
+                                modifier = Modifier.testTag("viewer_search_previous")
+                            ) {
+                                Icon(
+                                    Icons.Default.KeyboardArrowUp,
+                                    contentDescription = stringResource(R.string.viewer_search_previous)
+                                )
+                            }
+                            IconButton(
+                                onClick = viewModel::showNextSearchMatch,
+                                enabled = uiState.searchMatches.isNotEmpty(),
+                                modifier = Modifier.testTag("viewer_search_next")
+                            ) {
+                                Icon(
+                                    Icons.Default.KeyboardArrowDown,
+                                    contentDescription = stringResource(R.string.viewer_search_next)
+                                )
+                            }
+                        }
+                    }
+                }
             },
             confirmButton = {
-                TextButton(enabled = searchQuery.isNotBlank(), onClick = {
-                    val query = searchQuery.trim()
-                    showSearchDialog = false
-                    viewModel.searchText(query) { pageIndex ->
-                        if (pageIndex != null) {
-                            viewModel.onPageScrolled(pageIndex)
-                            coroutineScope.launch { listState.scrollToItem(pageIndex) }
-                        } else android.widget.Toast.makeText(context, "No matching text found.", android.widget.Toast.LENGTH_SHORT).show()
+                TextButton(
+                    enabled = searchQuery.isNotBlank() && !uiState.isSearchRunning,
+                    onClick = {
+                        searchHasBeenRun = true
+                        viewModel.searchDocument(searchQuery)
                     }
-                }) { Text("Search") }
+                ) { Text(stringResource(R.string.viewer_search)) }
             },
-            dismissButton = { TextButton(onClick = { showSearchDialog = false }) { Text("Cancel") } }
+            dismissButton = {
+                TextButton(onClick = {
+                    showSearchDialog = false
+                    searchQuery = ""
+                    searchHasBeenRun = false
+                    viewModel.clearSearch()
+                }) { Text(stringResource(R.string.cancel)) }
+            }
         )
     }
 
@@ -794,7 +895,8 @@ fun PdfPageItem(
     pageIndex: Int,
     aspectRatio: Float,
     viewModel: PdfViewerViewModel,
-    documentKey: String
+    documentKey: String,
+    highlightOverlays: List<SearchHighlightOverlay> = emptyList()
 ) {
     // LazyColumn item identity + explicit effect keys make scrolling/recomposition alone unable
     // to restart a render. The retry counter changes only after a user presses Retry.
@@ -849,6 +951,7 @@ fun PdfPageItem(
         shape = RoundedCornerShape(4.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White)
     ) {
+        Box(modifier = Modifier.fillMaxSize()) {
         when {
             bitmapReady -> {
                 val bitmapForCompose = bitmap?.takeUnless { it.isRecycled }
@@ -856,7 +959,7 @@ fun PdfPageItem(
                     Image(
                         bitmap = bitmapForCompose.asImageBitmap(),
                         contentDescription = stringResource(R.string.pdf_page_description, pageIndex + 1),
-                        modifier = Modifier.fillMaxSize(),
+                        modifier = Modifier.matchParentSize(),
                         contentScale = ContentScale.Fit
                     )
                 } else {
@@ -871,7 +974,7 @@ fun PdfPageItem(
                 }
                 Box(
                     modifier = Modifier
-                        .fillMaxSize()
+                        .matchParentSize()
                         .padding(end = 12.dp, bottom = 8.dp),
                     contentAlignment = Alignment.BottomEnd
                 ) {
@@ -882,6 +985,45 @@ fun PdfPageItem(
                         fontSize = 7.sp,
                         fontWeight = FontWeight.SemiBold
                     )
+                }
+                if (highlightOverlays.isNotEmpty()) {
+                    Canvas(
+                        modifier = Modifier.matchParentSize().testTag("viewer_search_highlights")
+                    ) {
+                        val sourceBitmap = bitmapForCompose
+                        if (sourceBitmap != null && sourceBitmap.width > 0 && sourceBitmap.height > 0) {
+                            val scaleX = size.width / sourceBitmap.width.toFloat()
+                            val scaleY = size.height / sourceBitmap.height.toFloat()
+                            highlightOverlays.forEach { overlay ->
+                                val left = (
+                                    overlay.bounds.left.toFloat() /
+                                        PdfSearchHighlight.COORDINATE_SCALE * sourceBitmap.width
+                                    ).toInt().coerceIn(0, sourceBitmap.width)
+                                val top = (
+                                    overlay.bounds.top.toFloat() /
+                                        PdfSearchHighlight.COORDINATE_SCALE * sourceBitmap.height
+                                    ).toInt().coerceIn(0, sourceBitmap.height)
+                                val right = (
+                                    overlay.bounds.right.toFloat() /
+                                        PdfSearchHighlight.COORDINATE_SCALE * sourceBitmap.width
+                                    ).toInt().coerceIn(left, sourceBitmap.width)
+                                val bottom = (
+                                    overlay.bounds.bottom.toFloat() /
+                                        PdfSearchHighlight.COORDINATE_SCALE * sourceBitmap.height
+                                    ).toInt().coerceIn(top, sourceBitmap.height)
+                                drawRect(
+                                    color = Color(0xFFFFEB3B).copy(
+                                        alpha = if (overlay.isCurrent) 0.50f else 0.26f
+                                    ),
+                                    topLeft = Offset(left * scaleX, top * scaleY),
+                                    size = androidx.compose.ui.geometry.Size(
+                                        (right - left).coerceAtLeast(2) * scaleX,
+                                        (bottom - top).coerceAtLeast(2) * scaleY
+                                    )
+                                )
+                            }
+                        }
+                    }
                 }
             }
             renderFailed -> {
@@ -921,7 +1063,13 @@ fun PdfPageItem(
                 }
             }
         }
+        }
     }
 }
 
 private const val PAGE_RENDER_SCALE = 2.0f
+
+data class SearchHighlightOverlay(
+    val bounds: PdfSearchHighlight,
+    val isCurrent: Boolean
+)
