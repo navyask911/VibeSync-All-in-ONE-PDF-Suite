@@ -212,8 +212,10 @@ class LocalAdBillingManager(
 
         grantMutex.withLock {
             val token = purchase.purchaseToken
-            // Acknowledge newly observed PURCHASED items before persisting the entitlement.
-            if (!purchase.isAcknowledged) {
+            // A token is recorded only after a successful acknowledgement and entitlement write.
+            // Do not acknowledge the same Play purchase again during restore/repeated callbacks.
+            val alreadyProcessed = token in prefs.getProcessedTokens()
+            if (!purchase.isAcknowledged && !alreadyProcessed) {
                 val ack = acknowledgeFn?.invoke(token) ?: suspendAcknowledgeDefault(token)
                 if (ack.responseCode != BillingClient.BillingResponseCode.OK) {
                     _events.tryEmit(BillingConstants.BILLING_UNAVAILABLE_MESSAGE)

@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicReference
 @Config(sdk = [35])
 class ProPassBillingEntitlementTest {
     private val now = 1_800_000_000_000L
+    private val subscriptionGraceBufferMs = 24L * 60L * 60L * 1000L
     private val context: Context get() = ApplicationProvider.getApplicationContext()
 
     private fun okResult() = BillingResult.newBuilder().setResponseCode(BillingClient.BillingResponseCode.OK).build()
@@ -66,7 +67,10 @@ class ProPassBillingEntitlementTest {
         val manager = manager(prefs, acknowledge = { acked += it; okResult() })
         manager.grantIfValid(purchase("token-first", purchaseTime))
         assertEquals(listOf("token-first"), acked)
-        assertEquals(purchaseTime + BillingConstants.PRO_PASS_DURATION_MS, prefs.getExpiry())
+        assertEquals(
+            purchaseTime + BillingConstants.PRO_PASS_DURATION_MS + subscriptionGraceBufferMs,
+            prefs.getExpiry()
+        )
         assertEquals("device-A", prefs.getFingerprint())
         assertNotNull(prefs.getHardwareBindingId())
         assertEquals(setOf("token-first"), prefs.getProcessedTokens())
@@ -78,7 +82,10 @@ class ProPassBillingEntitlementTest {
         val manager = manager(acknowledge = { acked += it; okResult() })
         manager.grantIfValid(purchase("token-acknowledged", acknowledged = true))
         assertTrue(acked.isEmpty())
-        assertEquals(now + BillingConstants.PRO_PASS_DURATION_MS, manager.state.value.expiryEpochMillis)
+        assertEquals(
+            now + BillingConstants.PRO_PASS_DURATION_MS + subscriptionGraceBufferMs,
+            manager.state.value.expiryEpochMillis
+        )
         assertTrue(manager.state.value.isProActive)
     }
 
@@ -109,7 +116,7 @@ class ProPassBillingEntitlementTest {
         val manager = manager(prefs)
         manager.grantIfValid(purchase(
             "token-expired",
-            purchaseTime = now - BillingConstants.PRO_PASS_DURATION_MS - 1L,
+            purchaseTime = now - BillingConstants.PRO_PASS_DURATION_MS - subscriptionGraceBufferMs - 1L,
             acknowledged = true
         ))
         assertEquals(now - 1L, prefs.getExpiry())
@@ -132,7 +139,10 @@ class ProPassBillingEntitlementTest {
         val manager = manager(prefs = prefs, billingClientForTest = client, acknowledge = { acked += it; okResult() })
         manager.restoreProLicenseFromPlayStore(context)
         assertEquals(listOf("token-restored"), acked)
-        assertEquals(now + BillingConstants.PRO_PASS_DURATION_MS, prefs.getExpiry())
+        assertEquals(
+            now + BillingConstants.PRO_PASS_DURATION_MS + subscriptionGraceBufferMs,
+            prefs.getExpiry()
+        )
         assertTrue(manager.state.value.isProActive)
         assertNotNull(queryThread.get())
         assertFalse(queryThread.get() === Thread.currentThread())
