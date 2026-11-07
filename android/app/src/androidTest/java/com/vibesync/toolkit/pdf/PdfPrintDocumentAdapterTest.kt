@@ -82,6 +82,51 @@ class PdfPrintDocumentAdapterTest {
         }
     }
 
+    @Test
+    fun printWriteSupportsPipeBackedDestinationWithoutSyncFailure() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        PDFBoxResourceLoader.init(context)
+        val work = File(context.cacheDir, "print-pipe-" + System.nanoTime()).apply { mkdirs() }
+        val input = File(work, "input.pdf")
+        val output = File(work, "pipe-output.pdf")
+        createPdf(input, 1)
+        val adapter = PdfPrintDocumentAdapter(context, Uri.fromFile(input), "VibeSync pipe print")
+        val attributes = PrintAttributes.Builder()
+            .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+            .setResolution(PrintAttributes.Resolution("pipe_300", "300 DPI", 300, 300))
+            .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
+            .build()
+        val pipe = ParcelFileDescriptor.createPipe()
+        val writeFailure = java.util.concurrent.atomic.AtomicReference<Throwable?>(null)
+        try {
+            adapter.onStart()
+            adapter.prepareLayout(attributes, CancellationSignal())
+            val writer = Thread {
+                try {
+                    adapter.writeDocument(arrayOf(PageRange.ALL_PAGES), pipe[1], CancellationSignal())
+                } catch (error: Throwable) {
+                    writeFailure.set(error)
+                } finally {
+                    runCatching { pipe[1].close() }
+                }
+            }
+            writer.start()
+            ParcelFileDescriptor.AutoCloseInputStream(pipe[0]).use { source ->
+                output.outputStream().use { destination -> source.copyTo(destination) }
+            }
+            writer.join(30_000)
+            assertTrue("Print writer should finish.", !writer.isAlive)
+            assertTrue("Print write should not fail: ${writeFailure.get()}", writeFailure.get() == null)
+            assertTrue("Pipe print output should be non-empty.", output.isFile && output.length() > 0L)
+            PDDocument.load(output).use { printed -> assertEquals(1, printed.numberOfPages) }
+        } finally {
+            runCatching { pipe[0].close() }
+            runCatching { pipe[1].close() }
+            adapter.onFinish()
+            work.deleteRecursively()
+        }
+    }
+
     private fun createPdf(file: File, count: Int) {
         PDDocument().use { document ->
             repeat(count) { document.addPage(PDPage(PDRectangle.A4)) }

@@ -33,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -41,6 +42,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
+import com.vibesync.toolkit.pdf.data.pdf.PdfSearchHighlight
 import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.presentation.common.launchSystemPdfPrint
 import com.vibesync.toolkit.pdf.R
@@ -140,28 +142,83 @@ fun PdfViewerScreen(
 
     Scaffold(
         topBar = {
-            Column {
-                TopAppBar(
+            TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            uiState.fileName,
-                            maxLines = 1,
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = if (isManagedScan) {
-                                Modifier.clickable {
-                                    renamedScanName = uiState.fileName.removeSuffix(".pdf").removeSuffix(".PDF")
-                                    showRenameScanDialog = true
-                                }.testTag("viewer_rename_title")
-                            } else Modifier
-                        )
-                        if (uiState.pageCount > 0) {
-                            Text(
-                                stringResource(R.string.page_position, uiState.currentPageIndex + 1, uiState.pageCount),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                    if (searchExpanded) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(2.dp)
+                        ) {
+                            BasicTextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(48.dp)
+                                    .background(
+                                        MaterialTheme.colorScheme.surfaceVariant,
+                                        RoundedCornerShape(10.dp)
+                                    )
+                                    .padding(horizontal = 12.dp, vertical = 12.dp)
+                                    .testTag("viewer_search_input"),
+                                singleLine = true,
+                                textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                    color = MaterialTheme.colorScheme.onSurface
+                                ),
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                keyboardActions = KeyboardActions(
+                                    onSearch = { viewModel.searchDocument(searchQuery) }
+                                ),
+                                decorationBox = { innerTextField ->
+                                    Box(contentAlignment = Alignment.CenterStart) {
+                                        if (searchQuery.isEmpty()) {
+                                            Text(
+                                                stringResource(R.string.viewer_search_hint),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                maxLines = 1
+                                            )
+                                        }
+                                        innerTextField()
+                                    }
+                                }
                             )
+                            IconButton(
+                                onClick = {
+                                    searchExpanded = false
+                                    searchQuery = ""
+                                    viewModel.clearSearch()
+                                },
+                                modifier = Modifier.testTag("viewer_search_toggle")
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.viewer_search_close)
+                                )
+                            }
+                        }
+                    } else {
+                        Column {
+                            Text(
+                                uiState.fileName,
+                                maxLines = 1,
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = if (isManagedScan) {
+                                    Modifier.clickable {
+                                        renamedScanName = uiState.fileName.removeSuffix(".pdf").removeSuffix(".PDF")
+                                        showRenameScanDialog = true
+                                    }.testTag("viewer_rename_title")
+                                } else Modifier
+                            )
+                            if (uiState.pageCount > 0) {
+                                Text(
+                                    stringResource(R.string.page_position, uiState.currentPageIndex + 1, uiState.pageCount),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                     }
                 },
@@ -171,60 +228,29 @@ fun PdfViewerScreen(
                     }
                 },
                 actions = {
-                    IconButton(
-                        onClick = {
-                            searchExpanded = !searchExpanded
-                            if (!searchExpanded) {
-                                searchQuery = ""
-                                viewModel.clearSearch()
-                            }
-                        },
-                        enabled = !uiState.isLoading && uiState.errorMessage == null,
-                        modifier = Modifier.testTag("viewer_search_toggle")
-                    ) {
-                        Icon(
-                            if (searchExpanded) Icons.Default.Close else Icons.Default.Search,
-                            contentDescription = stringResource(
-                                if (searchExpanded) R.string.viewer_search_close else R.string.viewer_search
-                            )
-                        )
-                    }
-                    // Do not spend toolbar width on a disabled control at the default zoom.
-                    if (scale > 1f) {
+                    if (!searchExpanded) {
                         IconButton(
                             onClick = {
-                                scale = (scale / 1.25f).coerceAtLeast(1f)
-                                if (scale <= 1f) {
-                                    offsetX = 0f
-                                    offsetY = 0f
-                                }
-                            }
+                                searchExpanded = true
+                            },
+                            enabled = !uiState.isLoading && uiState.errorMessage == null,
+                            modifier = Modifier.testTag("viewer_search_toggle")
                         ) {
-                            Icon(Icons.Default.ZoomOut, contentDescription = stringResource(R.string.reset_zoom))
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = stringResource(R.string.viewer_search)
+                            )
                         }
                     }
-                    IconButton(onClick = {
-                        scale = (scale * 1.25f).coerceAtMost(4f)
-                    }) {
-                        Icon(Icons.Default.ZoomIn, contentDescription = stringResource(R.string.reset_zoom))
-                    }
-                    if (scale > 1.05f) {
-                        IconButton(onClick = {
-                            scale = 1f
-                            offsetX = 0f
-                            offsetY = 0f
-                        }) {
-                            Icon(Icons.Default.ZoomOutMap, contentDescription = stringResource(R.string.reset_zoom))
-                        }
-                    }
-                    // Saved scans get dedicated export/manage actions; other documents keep standard sharing.
-                    if (!isManagedScan) {
-                        IconButton(onClick = onShareDocument) {
-                            Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share_pdf), tint = VibeSyncCrimsonPrimary)
-                        }
-                    }
-                    IconButton(onClick = { onNavigateToEditor(documentUri) }) {
-                        Icon(Icons.Default.Draw, contentDescription = stringResource(R.string.edit_sign_action), tint = VibeSyncCrimsonPrimary)
+                    IconButton(
+                        onClick = { onNavigateToEditor(documentUri) },
+                        modifier = Modifier.testTag("viewer_edit_sign")
+                    ) {
+                        Icon(
+                            Icons.Default.Draw,
+                            contentDescription = stringResource(R.string.edit_sign_action),
+                            tint = VibeSyncCrimsonPrimary
+                        )
                     }
                     IconButton(
                         onClick = {
@@ -246,17 +272,90 @@ fun PdfViewerScreen(
                     ) {
                         Icon(Icons.Default.Print, contentDescription = stringResource(R.string.print_action))
                     }
-                    ExportMenu(
-                        sourceUri = documentUri,
-                        currentPageIndex = uiState.currentPageIndex,
-                        testTag = "viewer_export_menu"
-                    )
-                    if (isManagedScan) {
-                        Box {
-                            IconButton(onClick = { scanMenuExpanded = true }) {
-                                Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.scan_action_menu))
+                    if (!searchExpanded) {
+                        ExportMenu(
+                            sourceUri = documentUri,
+                            currentPageIndex = uiState.currentPageIndex,
+                            testTag = "viewer_export_menu"
+                        )
+                    }
+                    Box {
+                        IconButton(
+                            onClick = { scanMenuExpanded = true },
+                            modifier = Modifier.testTag("viewer_more_actions")
+                        ) {
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.scan_action_menu))
+                        }
+                        DropdownMenu(
+                            expanded = scanMenuExpanded,
+                            onDismissRequest = { scanMenuExpanded = false }
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text("Zoom in") },
+                                leadingIcon = { Icon(Icons.Default.ZoomIn, contentDescription = null) },
+                                onClick = {
+                                    scanMenuExpanded = false
+                                    scale = (scale * 1.25f).coerceAtMost(4f)
+                                }
+                            )
+                            if (scale > 1f) {
+                                DropdownMenuItem(
+                                    text = { Text("Zoom out") },
+                                    leadingIcon = { Icon(Icons.Default.ZoomOut, contentDescription = null) },
+                                    onClick = {
+                                        scanMenuExpanded = false
+                                        scale = (scale / 1.25f).coerceAtLeast(1f)
+                                        if (scale <= 1f) {
+                                            offsetX = 0f
+                                            offsetY = 0f
+                                        }
+                                    }
+                                )
                             }
-                            DropdownMenu(expanded = scanMenuExpanded, onDismissRequest = { scanMenuExpanded = false }) {
+                            if (scale > 1.05f) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.reset_zoom)) },
+                                    leadingIcon = { Icon(Icons.Default.ZoomOutMap, contentDescription = null) },
+                                    onClick = {
+                                        scanMenuExpanded = false
+                                        scale = 1f
+                                        offsetX = 0f
+                                        offsetY = 0f
+                                    }
+                                )
+                            }
+                            if (!isManagedScan) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.share_pdf)) },
+                                    leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                                    onClick = {
+                                        scanMenuExpanded = false
+                                        onShareDocument()
+                                    }
+                                )
+                            }
+                            if (searchExpanded) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.viewer_search_previous)) },
+                                    leadingIcon = { Icon(Icons.Default.KeyboardArrowUp, contentDescription = null) },
+                                    enabled = uiState.searchMatches.isNotEmpty(),
+                                    onClick = {
+                                        scanMenuExpanded = false
+                                        viewModel.showPreviousSearchMatch()
+                                    }
+                                )
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.viewer_search_next)) },
+                                    leadingIcon = { Icon(Icons.Default.KeyboardArrowDown, contentDescription = null) },
+                                    enabled = uiState.searchMatches.isNotEmpty(),
+                                    onClick = {
+                                        scanMenuExpanded = false
+                                        viewModel.showNextSearchMatch()
+                                    }
+                                )
+                            }
+                            if (isManagedScan) {
+                                Divider()
                                 DropdownMenuItem(
                                     text = { Text(stringResource(R.string.share_pdf)) },
                                     leadingIcon = { Icon(Icons.Default.PictureAsPdf, contentDescription = null) },
@@ -290,92 +389,7 @@ fun PdfViewerScreen(
                         }
                     }
                 }
-                )
-                if (searchExpanded) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(MaterialTheme.colorScheme.surface)
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            OutlinedTextField(
-                                value = searchQuery,
-                                onValueChange = { searchQuery = it },
-                                modifier = Modifier.weight(1f).testTag("viewer_search_input"),
-                                singleLine = true,
-                                placeholder = { Text(stringResource(R.string.viewer_search_hint)) },
-                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                                keyboardActions = KeyboardActions(
-                                    onSearch = { viewModel.searchDocument(searchQuery) }
-                                ),
-                                trailingIcon = {
-                                    when {
-                                        uiState.isSearchRunning -> CircularProgressIndicator(
-                                            modifier = Modifier.size(18.dp),
-                                            strokeWidth = 2.dp
-                                        )
-                                        searchQuery.isNotEmpty() -> IconButton(
-                                            onClick = {
-                                                searchQuery = ""
-                                                viewModel.clearSearch()
-                                            }
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Close,
-                                                contentDescription = stringResource(R.string.close)
-                                            )
-                                        }
-                                    }
-                                }
-                            )
-                            IconButton(
-                                onClick = viewModel::showPreviousSearchMatch,
-                                enabled = uiState.searchMatches.isNotEmpty(),
-                                modifier = Modifier.testTag("viewer_search_previous")
-                            ) {
-                                Icon(
-                                    Icons.Default.KeyboardArrowUp,
-                                    contentDescription = stringResource(R.string.viewer_search_previous)
-                                )
-                            }
-                            IconButton(
-                                onClick = viewModel::showNextSearchMatch,
-                                enabled = uiState.searchMatches.isNotEmpty(),
-                                modifier = Modifier.testTag("viewer_search_next")
-                            ) {
-                                Icon(
-                                    Icons.Default.KeyboardArrowDown,
-                                    contentDescription = stringResource(R.string.viewer_search_next)
-                                )
-                            }
-                        }
-                        val searchStatus = uiState.searchErrorMessage ?: when {
-                            uiState.isSearchOcrRunning -> stringResource(R.string.viewer_search_running_ocr)
-                            uiState.isSearchRunning -> stringResource(R.string.viewer_searching)
-                            searchQuery.isBlank() -> ""
-                            uiState.searchMatches.isEmpty() -> stringResource(R.string.viewer_search_no_matches)
-                            else -> stringResource(
-                                R.string.viewer_search_position,
-                                uiState.currentSearchMatchIndex + 1,
-                                uiState.searchMatches.size
-                            )
-                        }
-                        if (searchStatus.isNotBlank()) {
-                            Text(
-                                searchStatus,
-                                modifier = Modifier.padding(start = 12.dp, top = 2.dp, bottom = 2.dp),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    }
-                }
-            }
+            )
         },
         bottomBar = {
             if (uiState.pageCount > 1) {
@@ -549,10 +563,15 @@ fun PdfViewerScreen(
                         val metadata = uiState.pagesMetadata.getOrNull(pageIndex)
                         val aspectRatio = metadata?.aspectRatio ?: (595f / 842f)
 
-                        val highlights = uiState.searchMatches.mapIndexedNotNull { matchIndex, match ->
-                            if (match.pageIndex == pageIndex && match.highlight != null) {
-                                SearchHighlightOverlay(match.highlight, matchIndex == uiState.currentSearchMatchIndex)
-                            } else null
+                        val highlights = uiState.searchMatches.flatMapIndexed { matchIndex, match ->
+                            if (match.pageIndex != pageIndex) {
+                                emptyList()
+                            } else {
+                                val rectangles = match.highlights.ifEmpty { listOfNotNull(match.highlight) }
+                                rectangles.map { rectangle ->
+                                    SearchHighlightOverlay(rectangle, matchIndex == uiState.currentSearchMatchIndex)
+                                }
+                            }
                         }
                         PdfPageItem(
                             pageIndex = pageIndex,
@@ -817,10 +836,14 @@ fun PdfPageItem(
                             val scaleX = size.width / sourceBitmap.width.toFloat()
                             val scaleY = size.height / sourceBitmap.height.toFloat()
                             highlightOverlays.forEach { overlay ->
-                                val left = overlay.bounds.left.coerceIn(0, sourceBitmap.width)
-                                val top = overlay.bounds.top.coerceIn(0, sourceBitmap.height)
-                                val right = overlay.bounds.right.coerceIn(left, sourceBitmap.width)
-                                val bottom = overlay.bounds.bottom.coerceIn(top, sourceBitmap.height)
+                                val left = (overlay.bounds.left.toFloat() / PdfSearchHighlight.COORDINATE_SCALE * sourceBitmap.width)
+                                .toInt().coerceIn(0, sourceBitmap.width)
+                                val top = (overlay.bounds.top.toFloat() / PdfSearchHighlight.COORDINATE_SCALE * sourceBitmap.height)
+                                    .toInt().coerceIn(0, sourceBitmap.height)
+                                val right = (overlay.bounds.right.toFloat() / PdfSearchHighlight.COORDINATE_SCALE * sourceBitmap.width)
+                                    .toInt().coerceIn(left, sourceBitmap.width)
+                                val bottom = (overlay.bounds.bottom.toFloat() / PdfSearchHighlight.COORDINATE_SCALE * sourceBitmap.height)
+                                    .toInt().coerceIn(top, sourceBitmap.height)
                                 drawRect(
                                     color = Color(0xFFFFEB3B).copy(alpha = if (overlay.isCurrent) 0.50f else 0.26f),
                                     topLeft = Offset(left * scaleX, top * scaleY),

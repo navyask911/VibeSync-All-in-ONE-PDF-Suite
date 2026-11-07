@@ -678,23 +678,25 @@ class PdfBoxToolkitEngine(private val context: Context) {
         outputFile: File
     ): Result<File> = withContext(Dispatchers.IO) {
         var sourceFileToDelete: File? = null
+        var stagedOutput: File? = null
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "flatten_src_")
             sourceFileToDelete = sourceFile
+            var expectedPageCount = 0
             PDDocument.load(sourceFile).use { document ->
+                expectedPageCount = document.numberOfPages
+                require(expectedPageCount > 0) { context.getString(R.string.document_load_error) }
 
                 pageAnnotationsMap.forEach { (pageIndex, annotations) ->
-                    if (pageIndex < document.numberOfPages && !annotations.isEmpty) {
+                    if (pageIndex in 0 until document.numberOfPages && !annotations.isEmpty) {
                         val page = document.getPage(pageIndex)
                         val mediaBox = page.mediaBox
-                        val pageWidthPt = mediaBox.width
                         val pageHeightPt = mediaBox.height
 
-                        // Calculate horizontal and vertical scale factor from screen pixels to 72 DPI PDF points
-                        val scaleFactor = pageWidthPt / screenWidthPx.coerceAtLeast(1f)
+                        // Convert the editor's screen-pixel coordinates to PDF points.
+                        val scaleFactor = mediaBox.width / screenWidthPx.coerceAtLeast(1f)
 
                         PDPageContentStream(document, page, PDPageContentStream.AppendMode.APPEND, true, true).use { cs ->
-
                             // 1. Highlighters (semi-transparent stroke with graphics state)
                             annotations.strokes.filter { it.isHighlighter }.forEach { stroke ->
                                 if (stroke.points.size >= 2) {
@@ -707,47 +709,35 @@ class PdfBoxToolkitEngine(private val context: Context) {
                                     val b = Color.blue(stroke.colorArgb) / 255f
                                     cs.setStrokingColor(r, g, b)
                                     cs.setLineWidth(stroke.strokeWidth * scaleFactor)
-
                                     val first = stroke.points.first()
-                                    val startPdfX = first.x * scaleFactor
-                                    val startPdfY = pageHeightPt - (first.y * scaleFactor)
-                                    cs.moveTo(startPdfX, startPdfY)
-
-                                    for (i in 1 until stroke.points.size) {
-                                        val pt = stroke.points[i]
-                                        cs.lineTo(pt.x * scaleFactor, pageHeightPt - (pt.y * scaleFactor))
+                                    cs.moveTo(first.x * scaleFactor, pageHeightPt - first.y * scaleFactor)
+                                    for (point in stroke.points.drop(1)) {
+                                        cs.lineTo(point.x * scaleFactor, pageHeightPt - point.y * scaleFactor)
                                     }
                                     cs.stroke()
                                 }
                             }
 
-                            // 2. Freehand Pen Vector Strokes (Opaque)
+                            // 2. Freehand pen strokes
                             annotations.strokes.filter { !it.isHighlighter }.forEach { stroke ->
                                 if (stroke.points.size >= 2) {
-                                    val gs = PDExtendedGraphicsState().apply {
-                                        strokingAlphaConstant = 1.0f
-                                    }
+                                    val gs = PDExtendedGraphicsState().apply { strokingAlphaConstant = 1.0f }
                                     cs.setGraphicsStateParameters(gs)
                                     val r = Color.red(stroke.colorArgb) / 255f
                                     val g = Color.green(stroke.colorArgb) / 255f
                                     val b = Color.blue(stroke.colorArgb) / 255f
                                     cs.setStrokingColor(r, g, b)
                                     cs.setLineWidth(stroke.strokeWidth * scaleFactor)
-
                                     val first = stroke.points.first()
-                                    val startPdfX = first.x * scaleFactor
-                                    val startPdfY = pageHeightPt - (first.y * scaleFactor)
-                                    cs.moveTo(startPdfX, startPdfY)
-
-                                    for (i in 1 until stroke.points.size) {
-                                        val pt = stroke.points[i]
-                                        cs.lineTo(pt.x * scaleFactor, pageHeightPt - (pt.y * scaleFactor))
+                                    cs.moveTo(first.x * scaleFactor, pageHeightPt - first.y * scaleFactor)
+                                    for (point in stroke.points.drop(1)) {
+                                        cs.lineTo(point.x * scaleFactor, pageHeightPt - point.y * scaleFactor)
                                     }
                                     cs.stroke()
                                 }
                             }
 
-                            // 3. Text Annotations
+                            // 3. Text annotations
                             annotations.textAnnotations.forEach { textItem ->
                                 cs.beginText()
                                 cs.setFont(PDType1Font.HELVETICA_BOLD, textItem.fontSizeSp * scaleFactor * 0.9f)
@@ -755,24 +745,26 @@ class PdfBoxToolkitEngine(private val context: Context) {
                                 val g = Color.green(textItem.colorArgb) / 255f
                                 val b = Color.blue(textItem.colorArgb) / 255f
                                 cs.setNonStrokingColor(r, g, b)
-
-                                val pdfX = textItem.x * scaleFactor
-                                val pdfY = pageHeightPt - (textItem.y * scaleFactor)
-                                cs.newLineAtOffset(pdfX, pdfY)
+                                cs.newLineAtOffset(
+                                    textItem.x * scaleFactor,
+                                    pageHeightPt - textItem.y * scaleFactor
+                                )
                                 cs.showText(textItem.text)
                                 cs.endText()
                             }
 
-                            // 4. Digital Signatures (Vector / Bitmap stamps)
-                            annotations.signatures.forEach { sig ->
-                                val bitmap = sig.bitmap
+                            // 4. Digital signature bitmaps
+                            annotations.signatures.forEach { signature ->
+                                val bitmap = signature.bitmap
                                 if (bitmap != null && !bitmap.isRecycled) {
-                                    val pdImage = LosslessFactory.createFromImage(document, bitmap)
-                                    val sigPdfX = sig.x * scaleFactor
-                                    val sigPdfY = pageHeightPt - ((sig.y + sig.height) * scaleFactor)
-                                    val sigWidthPt = sig.width * scaleFactor
-                                    val sigHeightPt = sig.height * scaleFactor
-                                    cs.drawImage(pdImage, sigPdfX, sigPdfY, sigWidthPt, sigHeightPt)
+                                    val image = LosslessFactory.createFromImage(document, bitmap)
+                                    cs.drawImage(
+                                        image,
+                                        signature.x * scaleFactor,
+                                        pageHeightPt - (signature.y + signature.height) * scaleFactor,
+                                        signature.width * scaleFactor,
+                                        signature.height * scaleFactor
+                                    )
                                 }
                             }
                         }
@@ -780,16 +772,50 @@ class PdfBoxToolkitEngine(private val context: Context) {
                 }
 
                 applyVibeSyncWatermark(document)
-                document.save(outputFile)
+                val parent = outputFile.parentFile ?: context.cacheDir
+                if (!parent.exists() && !parent.mkdirs()) {
+                    throw IOException("Could not create the PDF export directory.")
+                }
+                val outputStage = File.createTempFile("flatten_result_", ".pdf", parent)
+                stagedOutput = outputStage
+                document.save(outputStage)
+            }
+
+            val completedFile = requireNotNull(stagedOutput)
+            if (!completedFile.isFile || completedFile.length() <= 0L) {
+                throw IOException("The edited PDF was not written.")
+            }
+            val validatedPageCount = PDDocument.load(completedFile).use { saved ->
+                saved.numberOfPages
+            }
+            if (validatedPageCount != expectedPageCount || validatedPageCount <= 0) {
+                throw IOException("The edited PDF failed page validation.")
+            }
+
+            if (outputFile.exists() && !outputFile.delete()) {
+                throw IOException("Could not replace the previous PDF export.")
+            }
+            if (!completedFile.renameTo(outputFile)) {
+                completedFile.copyTo(outputFile, overwrite = true)
+                if (!completedFile.delete()) {
+                    Log.w(TAG, "Unable to remove staged edited PDF after copy.")
+                }
+            }
+            stagedOutput = null
+
+            if (!outputFile.isFile || outputFile.length() <= 0L) {
+                throw IOException("The edited PDF export is empty.")
             }
             Result.success(outputFile)
         } catch (cancelled: CancellationException) {
+            stagedOutput?.delete()
             outputFile.delete()
             throw cancelled
-        } catch (e: Exception) {
+        } catch (error: Exception) {
+            stagedOutput?.delete()
             outputFile.delete()
-            Log.e(TAG, "Failed to flatten annotations onto PDF", e)
-            Result.failure(e)
+            Log.e(TAG, "Failed to flatten annotations onto PDF", error)
+            Result.failure(error)
         } finally {
             sourceFileToDelete?.delete()
         }

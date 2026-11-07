@@ -14,6 +14,7 @@ import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
 import io.mockk.*
 import kotlinx.coroutines.flow.MutableStateFlow
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -104,6 +105,64 @@ class PdfViewerScreenTest {
         // Verify editor action button remains responsive
         composeTestRule.onNodeWithContentDescription("Edit & Sign").assertIsDisplayed().performClick()
     }
+
+    @Test
+    fun searchFieldPrintAndEditRemainOnOneHorizontalToolbarRow() {
+        val stateFlow = MutableStateFlow(
+            com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(
+                fileName = "HorizontalToolbar.pdf",
+                isLoading = false
+            )
+        )
+        every { mockViewModel.uiState } returns stateFlow
+        var editClicked = false
+
+        composeTestRule.setContent {
+            PdfViewerScreen(
+                documentUri = testUri,
+                viewModel = mockViewModel,
+                onNavigateBack = {},
+                onNavigateToEditor = { editClicked = true },
+                onShareDocument = {}
+            )
+        }
+
+        composeTestRule.onNodeWithTag("viewer_search_toggle").performClick()
+        val searchBounds = composeTestRule.onNodeWithTag("viewer_search_input")
+            .fetchSemanticsNode().boundsInRoot
+        val printBounds = composeTestRule.onNodeWithTag("viewer_print")
+            .fetchSemanticsNode().boundsInRoot
+        val editBounds = composeTestRule.onNodeWithTag("viewer_edit_sign")
+            .fetchSemanticsNode().boundsInRoot
+
+        assertTrue(kotlin.math.abs(searchBounds.center.y - printBounds.center.y) < 3f)
+        assertTrue(kotlin.math.abs(editBounds.center.y - printBounds.center.y) < 3f)
+        composeTestRule.onNodeWithTag("viewer_edit_sign").performClick()
+        assertTrue(editClicked)
+    }
+
+    @Test
+    fun searchMatchOverlayIsComposedOnTheRenderedPage() {
+        val bitmap = Bitmap.createBitmap(100, 140, Bitmap.Config.ARGB_8888)
+        coEvery { mockViewModel.acquirePageBitmap(0, 2.0f) } returns fakeLease(bitmap)
+
+        composeTestRule.setContent {
+            PdfPageItem(
+                pageIndex = 0,
+                aspectRatio = 595f / 842f,
+                viewModel = mockViewModel,
+                documentKey = "highlighted-page",
+                highlightOverlays = listOf(
+                    com.vibesync.toolkit.pdf.presentation.viewer.SearchHighlightOverlay(
+                        com.vibesync.toolkit.pdf.data.pdf.PdfSearchHighlight(1000, 2000, 5500, 2600),
+                        isCurrent = true
+                    )
+                )
+            )
+        }
+
+        composeTestRule.onNodeWithTag("viewer_search_highlights").assertIsDisplayed()
+            }
 
     @Test
     fun searchToolbarButtonOpensAndClosesSearchField() {

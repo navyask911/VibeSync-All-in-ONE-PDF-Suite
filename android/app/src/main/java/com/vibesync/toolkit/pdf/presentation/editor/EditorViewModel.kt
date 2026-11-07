@@ -328,28 +328,64 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         val sourceUri = activeDocumentUri ?: return
         _uiState.value = _uiState.value.copy(isSaving = true)
 
-        viewModelScope.launch {
-            val outputFile = UriUtils.createExportCacheFile(getApplication(), "signed_annotated")
-            val result = toolkitEngine.flattenAnnotations(
-                sourceUri = sourceUri,
-                pageAnnotationsMap = pageAnnotationsMap,
-                screenWidthPx = screenWidthPx,
-                outputFile = outputFile
+        // Freeze the full annotation state before dispatching the PDF work. The live map may
+        // continue changing while the user is editing, but a save must have one consistent snapshot.
+        val annotationSnapshot = pageAnnotationsMap.mapValues { (_, annotations) ->
+            annotations.copy(
+                strokes = annotations.strokes.toList(),
+                textAnnotations = annotations.textAnnotations.toList(),
+                signatures = annotations.signatures.toList()
             )
+        }
 
-            result.fold(
-                onSuccess = { file ->
-                    releaseSignatureBitmapsAfterFlatten()
-                    _uiState.value = _uiState.value.copy(isSaving = false, exportSuccessFile = file)
-                    onComplete(file)
-                },
-                onFailure = { error ->
-                    _uiState.value = _uiState.value.copy(
-                        isSaving = false,
-                        errorMessage = error.localizedMessage ?: getApplication<Application>().getString(R.string.editor_failed_flatten)
-                    )
-                }
-            )
+        viewModelScope.launch {
+            val outputFile = try {
+                UriUtils.createExportCacheFile(getApplication(), "signed_annotated")
+            } catch (error: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isSaving = false,
+                    errorMessage = error.localizedMessage
+                        ?: getApplication<Application>().getString(R.string.editor_failed_flatten)
+                )
+                return@launch
+            }
+
+            try {
+                val result = toolkitEngine.flattenAnnotations(
+                    sourceUri = sourceUri,
+                    pageAnnotationsMap = annotationSnapshot,
+                    screenWidthPx = screenWidthPx,
+                    outputFile = outputFile
+                )
+                result.fold(
+                    onSuccess = { file ->
+                        if (!file.isFile || file.length() <= 0L) {
+                            _uiState.value = _uiState.value.copy(
+                                isSaving = false,
+                                errorMessage = getApplication<Application>().getString(R.string.editor_failed_flatten)
+                            )
+                        } else {
+                            releaseSignatureBitmapsAfterFlatten()
+                            _uiState.value = _uiState.value.copy(isSaving = false, exportSuccessFile = file)
+                            onComplete(file)
+                        }
+                    },
+                    onFailure = { error ->
+                        _uiState.value = _uiState.value.copy(
+                            isSaving = false,
+                            errorMessage = error.localizedMessage
+                                ?: getApplication<Application>().getString(R.string.editor_failed_flatten)
+                        )
+                    }
+                )
+            } catch (error: Exception) {
+                outputFile.delete()
+                _uiState.value = _uiState.value.copy(
+                    isSaving = false,
+                    errorMessage = error.localizedMessage
+                        ?: getApplication<Application>().getString(R.string.editor_failed_flatten)
+                )
+            }
         }
     }
 

@@ -321,9 +321,7 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
 
                 for (page in pages) {
                     currentCoroutineContext().ensureActive()
-                    val nonWhitespaceCharacters = page.text.count { !it.isWhitespace() }
-
-                    if (nonWhitespaceCharacters < MIN_NATIVE_TEXT_CHARACTERS_PER_PAGE) {
+                    if (page.characterBounds.isEmpty()) {
                         if (requestId == searchSequence) {
                             _uiState.value = _uiState.value.copy(isSearchOcrRunning = true)
                         }
@@ -348,7 +346,16 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                                     } else {
                                         recognized.blocks.forEach { block ->
                                             val box = block.boundingBox?.let {
-                                                PdfSearchHighlight(it.left, it.top, it.right, it.bottom)
+                                                PdfSearchHighlight(
+                                                    left = (it.left.toFloat() / bitmap.width * PdfSearchHighlight.COORDINATE_SCALE)
+                                                        .toInt().coerceIn(0, PdfSearchHighlight.COORDINATE_SCALE),
+                                                    top = (it.top.toFloat() / bitmap.height * PdfSearchHighlight.COORDINATE_SCALE)
+                                                        .toInt().coerceIn(0, PdfSearchHighlight.COORDINATE_SCALE),
+                                                    right = (it.right.toFloat() / bitmap.width * PdfSearchHighlight.COORDINATE_SCALE)
+                                                        .toInt().coerceIn(0, PdfSearchHighlight.COORDINATE_SCALE),
+                                                    bottom = (it.bottom.toFloat() / bitmap.height * PdfSearchHighlight.COORDINATE_SCALE)
+                                                        .toInt().coerceIn(0, PdfSearchHighlight.COORDINATE_SCALE)
+                                                )
                                             }
                                             matches += PdfUnicodeSearch.findMatches(
                                                 pageIndex = page.pageIndex,
@@ -367,7 +374,8 @@ class PdfViewerViewModel(application: Application) : AndroidViewModel(applicatio
                         matches += PdfUnicodeSearch.findMatches(
                             pageIndex = page.pageIndex,
                             text = page.text,
-                            query = normalizedQuery
+                            query = normalizedQuery,
+                            characterBounds = page.characterBounds
                         )
                     }
                 }

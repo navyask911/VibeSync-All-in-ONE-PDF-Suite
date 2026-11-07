@@ -169,8 +169,9 @@ class PdfPrintDocumentAdapter(
             }
             java.io.FileOutputStream(destination.fileDescriptor).use { stream ->
                 output.writeTo(stream)
+                // PrintManager may provide a pipe-backed descriptor; flushing and closing is
+                // supported, but fsync on a pipe throws SyncFailedException ("Sync failed").
                 stream.flush()
-                destination.fileDescriptor.sync()
             }
             return if (writtenPages == 0) emptyArray() else arrayOf(PageRange(0, writtenPages - 1))
         } finally {

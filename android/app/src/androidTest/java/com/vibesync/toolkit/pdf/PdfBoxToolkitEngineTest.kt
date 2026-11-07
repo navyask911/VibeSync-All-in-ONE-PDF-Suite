@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.vibesync.toolkit.pdf.data.model.DrawingStroke
 import com.vibesync.toolkit.pdf.data.model.PageAnnotations
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
@@ -39,6 +40,7 @@ class PdfBoxToolkitEngineTest {
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
+        PDFBoxResourceLoader.init(context)
         tempFolder = File(context.cacheDir, "pdf_engine_tests_" + System.nanoTime()).apply { mkdirs() }
         engine = PdfBoxToolkitEngine(context)
     }
@@ -241,6 +243,89 @@ class PdfBoxToolkitEngineTest {
             assertEquals(PDRectangle.A4.height, page.mediaBox.height, 0.01f)
         }
     }
+    @Test
+    fun flatteningAnEditedPdfPreservesOriginalContentAndWritesNonBlankOutput() = runTest {
+        val sourcePdf = File(tempFolder, "editable_original.pdf")
+        PDDocument().use { document ->
+            val page = PDPage(PDRectangle.A4)
+            document.addPage(page)
+            PDPageContentStream(document, page).use { content ->
+                content.beginText()
+                content.setFont(com.tom_roush.pdfbox.pdmodel.font.PDType1Font.HELVETICA, 18f)
+                content.newLineAtOffset(72f, 700f)
+                content.showText("ORIGINAL DOCUMENT CONTENT")
+                content.endText()
+            }
+            document.save(sourcePdf)
+        }
+
+        val annotation = PageAnnotations(
+            pageIndex = 0,
+            strokes = listOf(
+                DrawingStroke(
+                    points = listOf(PointF(140f, 260f), PointF(310f, 260f)),
+                    colorArgb = Color.BLUE,
+                    strokeWidth = 10f
+                )
+            ),
+            textAnnotations = listOf(
+                com.vibesync.toolkit.pdf.data.model.TextAnnotation(
+                    x = 120f,
+                    y = 350f,
+                    text = "ADDED EDIT",
+                    fontSizeSp = 18f,
+                    colorArgb = Color.BLUE
+                )
+            )
+        )
+        val outputPdf = File(tempFolder, "edited_non_blank.pdf")
+        val result = engine.flattenAnnotations(
+            sourceUri = Uri.fromFile(sourcePdf),
+            pageAnnotationsMap = mapOf(0 to annotation),
+            screenWidthPx = 595f,
+            outputFile = outputPdf
+        )
+
+        assertTrue("Flattening must succeed: ${result.exceptionOrNull()}", result.isSuccess)
+        assertTrue("Edited PDF must have bytes on disk.", outputPdf.isFile && outputPdf.length() > 0L)
+        PDDocument.load(outputPdf).use { saved ->
+            assertEquals("Original page must be retained.", 1, saved.numberOfPages)
+            val text = com.tom_roush.pdfbox.text.PDFTextStripper().getText(saved)
+            assertTrue("Original PDF text must not be lost.", text.contains("ORIGINAL DOCUMENT CONTENT"))
+            assertTrue("The edit annotation must be present.", text.contains("ADDED EDIT"))
+        }
+        android.os.ParcelFileDescriptor.open(
+            outputPdf,
+            android.os.ParcelFileDescriptor.MODE_READ_ONLY
+        ).use { descriptor ->
+            android.graphics.pdf.PdfRenderer(descriptor).use { renderer ->
+                renderer.openPage(0).use { page ->
+                    val bitmap = Bitmap.createBitmap(300, 424, Bitmap.Config.ARGB_8888)
+                    try {
+                        page.render(
+                            bitmap,
+                            null,
+                            null,
+                            android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY
+                        )
+                        val pixels = IntArray(bitmap.width * bitmap.height)
+                        bitmap.getPixels(pixels, 0, bitmap.width, 0, 0, bitmap.width, bitmap.height)
+                        assertTrue(
+                            "Saved edited page must contain visible page pixels, not a white blank page.",
+                            pixels.any { pixel ->
+                                android.graphics.Color.red(pixel) < 245 ||
+                                    android.graphics.Color.green(pixel) < 245 ||
+                                    android.graphics.Color.blue(pixel) < 245
+                            }
+                        )
+                    } finally {
+                        bitmap.recycle()
+                    }
+                }
+            }
+        }
+    }
+
     @Test
     fun testConvertImagesToPdfCreatesValidA4Document() = runTest {
         val imageFile = File(tempFolder, "input_photo.png")
