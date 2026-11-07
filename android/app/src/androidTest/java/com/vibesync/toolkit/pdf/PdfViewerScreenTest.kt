@@ -240,7 +240,7 @@ class PdfViewerScreenTest {
             .assertHasClickAction().performClick()
         composeTestRule.runOnIdle { assert(renameRequests == 1) }
         composeTestRule.onNodeWithTag("viewer_search").performClick()
-        composeTestRule.onNodeWithText("Search in document").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Search in PDF").assertIsDisplayed()
         composeTestRule.onNodeWithTag("viewer_search_field").assertIsDisplayed()
         composeTestRule.onNodeWithText("Cancel").performClick()
         composeTestRule.onNodeWithTag("viewer_more_actions").performClick()
