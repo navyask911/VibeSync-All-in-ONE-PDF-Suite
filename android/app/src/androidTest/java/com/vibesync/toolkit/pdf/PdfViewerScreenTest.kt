@@ -161,6 +161,11 @@ class PdfViewerScreenTest {
             )
         }
 
+        composeTestRule.waitUntil(5_000) {
+            composeTestRule.onAllNodesWithTag("viewer_search_highlights")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.waitForIdle()
         composeTestRule.onNodeWithTag("viewer_search_highlights").assertIsDisplayed()
             }
 
