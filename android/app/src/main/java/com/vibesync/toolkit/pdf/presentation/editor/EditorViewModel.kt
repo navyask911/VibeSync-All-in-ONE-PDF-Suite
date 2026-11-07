@@ -34,6 +34,7 @@ data class EditorUiState(
     val currentStrokes: List<VectorStroke> = emptyList(),
     val currentTextAnnotations: List<TextAnnotation> = emptyList(),
     val currentSignatures: List<SignatureAnnotation> = emptyList(),
+    val isDocumentReady: Boolean = false,
     val isSaving: Boolean = false,
     val exportSuccessFile: File? = null,
     val errorMessage: String? = null,
@@ -66,15 +67,52 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     fun initEditor(uri: Uri) {
         activeDocumentUri = uri
+
+        // This ViewModel is Activity-scoped and can be reused for another PDF. Clear stale
+        // annotations/signature images before starting a new document load.
+        temporarySignatureBitmaps.forEach { bitmap ->
+            if (!bitmap.isRecycled) bitmap.recycle()
+        }
+        temporarySignatureBitmaps.clear()
+        pageAnnotationsMap.clear()
+        undoStack.clear()
+        redoStack.clear()
+        _uiState.value = _uiState.value.copy(
+            currentPageIndex = 0,
+            totalPages = 0,
+            currentStrokes = emptyList(),
+            currentTextAnnotations = emptyList(),
+            currentSignatures = emptyList(),
+            isDocumentReady = false,
+            isSaving = false,
+            exportSuccessFile = null,
+            errorMessage = null,
+            canUndo = false,
+            canRedo = false
+        )
+
         viewModelScope.launch {
-            rendererEngine.openDocument(uri).onSuccess { count ->
-                _uiState.value = _uiState.value.copy(totalPages = count)
-                loadPageAnnotations(0)
-            }
+            rendererEngine.openDocument(uri)
+                .onSuccess { count ->
+                    _uiState.value = _uiState.value.copy(
+                        totalPages = count,
+                        isDocumentReady = true,
+                        errorMessage = null
+                    )
+                    loadPageAnnotations(0)
+                }
+                .onFailure { error ->
+                    _uiState.value = _uiState.value.copy(
+                        isDocumentReady = false,
+                        errorMessage = error.localizedMessage
+                            ?: getApplication<Application>().getString(R.string.document_load_error)
+                    )
+                }
         }
     }
 
     suspend fun getPageBitmap(pageIndex: Int): Bitmap? {
+        if (!_uiState.value.isDocumentReady) return null
         return rendererEngine.renderPage(pageIndex, scale = 1.5f)
     }
 
@@ -324,6 +362,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
      * using PdfBox at 72 DPI.
      */
     fun saveFlattenedDocument(screenWidthPx: Float, onComplete: (File) -> Unit) {
+        if (!_uiState.value.isDocumentReady || _uiState.value.isSaving) return
         persistCurrentPageAnnotations()
         val sourceUri = activeDocumentUri ?: return
         _uiState.value = _uiState.value.copy(isSaving = true)

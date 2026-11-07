@@ -102,7 +102,9 @@ fun PdfEditorScreen(
                                 } ?: onExportComplete(savedFile)
                             }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
+                        colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary),
+                        enabled = uiState.isDocumentReady && !uiState.isSaving,
+                        modifier = Modifier.testTag("editor_save")
                     ) {
                         if (uiState.isSaving) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
@@ -201,8 +203,17 @@ fun PdfEditorScreen(
                 .background(Color(0xFFCBD5E1)),
             contentAlignment = Alignment.Center
         ) {
-            val pageBitmapState = produceState<Bitmap?>(initialValue = null, key1 = uiState.currentPageIndex) {
-                value = viewModel.getPageBitmap(uiState.currentPageIndex)
+            val pageBitmapState = produceState<Bitmap?>(
+                initialValue = null,
+                key1 = documentUri,
+                key2 = uiState.currentPageIndex,
+                key3 = uiState.isDocumentReady
+            ) {
+                value = if (uiState.isDocumentReady) {
+                    viewModel.getPageBitmap(uiState.currentPageIndex)
+                } else {
+                    null
+                }
             }
 
             Box(
@@ -224,6 +235,14 @@ fun PdfEditorScreen(
                         contentDescription = stringResource(R.string.editor_page_canvas),
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
+                    )
+                } else if (!uiState.isDocumentReady) {
+                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                } else if (!uiState.errorMessage.isNullOrBlank()) {
+                    Text(
+                        text = uiState.errorMessage.orEmpty(),
+                        modifier = Modifier.align(Alignment.Center),
+                        color = MaterialTheme.colorScheme.error
                     )
                 }
 

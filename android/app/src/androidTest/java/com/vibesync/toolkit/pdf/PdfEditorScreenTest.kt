@@ -3,6 +3,8 @@ package com.vibesync.toolkit.pdf
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -22,12 +24,46 @@ import io.mockk.every
 import io.mockk.mockk
 import io.mockk.verify
 import kotlinx.coroutines.flow.MutableStateFlow
+import java.util.concurrent.atomic.AtomicInteger
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
 class PdfEditorScreenTest {
     @get:Rule
     val composeTestRule = createComposeRule()
+
+    @Test
+    fun editorWaitsForDocumentReadyBeforeRenderingAndEnablesSave() {
+        val viewModel = mockk<EditorViewModel>(relaxed = true)
+        val stateFlow = MutableStateFlow(EditorUiState(isDocumentReady = false))
+        val bitmap = Bitmap.createBitmap(80, 112, Bitmap.Config.ARGB_8888)
+        val bitmapRequests = AtomicInteger(0)
+        every { viewModel.uiState } returns stateFlow
+        coEvery { viewModel.getPageBitmap(0) } coAnswers {
+            bitmapRequests.incrementAndGet()
+            bitmap
+        }
+
+        composeTestRule.setContent {
+            VibeSyncPdfTheme {
+                PdfEditorScreen(
+                    documentUri = Uri.parse("content://test/ready.pdf"),
+                    viewModel = viewModel,
+                    onNavigateBack = {},
+                    onExportComplete = {}
+                )
+            }
+        }
+
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("editor_save").assertIsNotEnabled()
+        assertEquals(0, bitmapRequests.get())
+
+        stateFlow.value = stateFlow.value.copy(isDocumentReady = true, totalPages = 1)
+        composeTestRule.waitUntil(5_000) { bitmapRequests.get() == 1 }
+        composeTestRule.onNodeWithTag("editor_save").assertIsEnabled()
+    }
 
     @Test
     fun textToolOpensDialogAndPlacesText() {
