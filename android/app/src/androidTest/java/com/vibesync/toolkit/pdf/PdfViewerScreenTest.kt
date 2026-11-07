@@ -106,6 +106,35 @@ class PdfViewerScreenTest {
     }
 
     @Test
+    fun searchToolbarButtonOpensAndClosesSearchField() {
+        val stateFlow = MutableStateFlow(
+            com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(
+                fileName = "Searchable.pdf",
+                isLoading = false
+            )
+        )
+        every { mockViewModel.uiState } returns stateFlow
+
+        composeTestRule.setContent {
+            PdfViewerScreen(
+                documentUri = testUri,
+                viewModel = mockViewModel,
+                onNavigateBack = {},
+                onNavigateToEditor = {},
+                onShareDocument = {}
+            )
+        }
+
+        composeTestRule.onNodeWithTag("viewer_search_toggle")
+            .assertIsDisplayed()
+            .performClick()
+        composeTestRule.onNodeWithTag("viewer_search_input").assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag("viewer_search_toggle").performClick()
+        composeTestRule.onNodeWithTag("viewer_search_input").assertDoesNotExist()
+    }
+
+    @Test
     fun testPasswordDialogSubmissionAndPasswordVisibilityToggle() {
         val stateFlow = MutableStateFlow(
             com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(

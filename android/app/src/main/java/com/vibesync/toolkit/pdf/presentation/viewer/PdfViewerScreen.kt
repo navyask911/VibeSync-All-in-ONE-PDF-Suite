@@ -189,17 +189,19 @@ fun PdfViewerScreen(
                             )
                         )
                     }
-                    IconButton(
-                        onClick = {
-                            scale = (scale / 1.25f).coerceAtLeast(1f)
-                            if (scale <= 1f) {
-                                offsetX = 0f
-                                offsetY = 0f
+                    // Do not spend toolbar width on a disabled control at the default zoom.
+                    if (scale > 1f) {
+                        IconButton(
+                            onClick = {
+                                scale = (scale / 1.25f).coerceAtLeast(1f)
+                                if (scale <= 1f) {
+                                    offsetX = 0f
+                                    offsetY = 0f
+                                }
                             }
-                        },
-                        enabled = scale > 1f
-                    ) {
-                        Icon(Icons.Default.ZoomOut, contentDescription = stringResource(R.string.reset_zoom))
+                        ) {
+                            Icon(Icons.Default.ZoomOut, contentDescription = stringResource(R.string.reset_zoom))
+                        }
                     }
                     IconButton(onClick = {
                         scale = (scale * 1.25f).coerceAtMost(4f)
