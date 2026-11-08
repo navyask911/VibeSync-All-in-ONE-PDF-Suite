@@ -46,7 +46,11 @@ class SecurityVault(context: Context) {
      * Android Keystore; a versioned header and random IV are authenticated as AAD.
      * The destination is published only after the complete ciphertext and GCM tag are written.
      */
-    fun encryptFile(sourceFile: File, encryptedDestination: File) {
+    fun encryptFile(
+        sourceFile: File,
+        encryptedDestination: File,
+        onProgress: (bytesProcessed: Long, totalBytes: Long) -> Unit = { _, _ -> }
+    ) {
         require(sourceFile.isFile) { "Vault source file does not exist." }
         require(sourceFile.canonicalFile != encryptedDestination.canonicalFile) {
             "Vault source and destination must be different files."
@@ -62,7 +66,7 @@ class SecurityVault(context: Context) {
                 output.write(VAULT_FILE_MAGIC)
                 output.write(iv)
                 FileInputStream(sourceFile).use { input ->
-                    transformStream(input, output, cipher)
+                    transformStream(input, output, cipher, sourceFile.length(), onProgress)
                 }
                 output.fd.sync()
             }
@@ -73,7 +77,11 @@ class SecurityVault(context: Context) {
      * Authenticates and decrypts a vaulted file. Plaintext is staged in a sibling temporary
      * file and is not exposed at the destination unless the GCM authentication tag is valid.
      */
-    fun decryptFile(encryptedSource: File, decryptedDestination: File) {
+    fun decryptFile(
+        encryptedSource: File,
+        decryptedDestination: File,
+        onProgress: (bytesProcessed: Long, totalBytes: Long) -> Unit = { _, _ -> }
+    ) {
         require(encryptedSource.isFile) { "Encrypted vault file does not exist." }
         require(encryptedSource.canonicalFile != decryptedDestination.canonicalFile) {
             "Vault source and destination must be different files."
@@ -92,7 +100,8 @@ class SecurityVault(context: Context) {
                 cipher.updateAAD(VAULT_FILE_MAGIC)
 
                 FileOutputStream(temporary).use { output ->
-                    transformStream(input, output, cipher)
+                    val payloadBytes = (encryptedSource.length() - VAULT_FILE_MAGIC.size - GCM_IV_BYTES).coerceAtLeast(1L)
+                    transformStream(input, output, cipher, payloadBytes, onProgress)
                     output.fd.sync()
                 }
             }
@@ -119,17 +128,28 @@ class SecurityVault(context: Context) {
         }
     }
 
-    private fun transformStream(input: InputStream, output: OutputStream, cipher: Cipher) {
+    private fun transformStream(
+        input: InputStream,
+        output: OutputStream,
+        cipher: Cipher,
+        totalBytes: Long,
+        onProgress: (bytesProcessed: Long, totalBytes: Long) -> Unit
+    ) {
         val buffer = ByteArray(STREAM_BUFFER_BYTES)
+        var processed = 0L
+        onProgress(0L, totalBytes)
         while (true) {
             val count = input.read(buffer)
             if (count < 0) break
             if (count == 0) continue
             val transformed = cipher.update(buffer, 0, count)
             if (transformed != null && transformed.isNotEmpty()) output.write(transformed)
+            processed += count.toLong()
+            onProgress(processed.coerceAtMost(totalBytes), totalBytes)
         }
         val finalBytes = cipher.doFinal()
         if (finalBytes.isNotEmpty()) output.write(finalBytes)
+        onProgress(totalBytes, totalBytes)
     }
 
     private fun readFully(input: InputStream, destination: ByteArray) {

@@ -5,6 +5,17 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsEnabled
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
+import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
+import com.vibesync.toolkit.pdf.data.signature.SignatureRepository
+import com.vibesync.toolkit.pdf.presentation.editor.SignatureManagerScreen
 import com.vibesync.toolkit.pdf.core.security.SecurityVault
 import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
 import org.junit.After
@@ -12,6 +23,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -19,16 +31,25 @@ import org.junit.runner.RunWith
 class SignatureManagerTest {
     private lateinit var context: Application
     private lateinit var vault: SecurityVault
+    private lateinit var signatureRepository: SignatureRepository
+
+    @get:Rule
+    val composeTestRule = createComposeRule()
+
+    private val roundTripId = "instrumented_round_trip"
 
     @Before
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         vault = SecurityVault(context)
         vault.clearSignatures()
+        signatureRepository = SignatureRepository(context, vault)
+        signatureRepository.deleteSignature(roundTripId)
     }
 
     @After
     fun tearDown() {
+        signatureRepository.deleteSignature(roundTripId)
         vault.clearSignatures()
     }
 
@@ -51,6 +72,47 @@ class SignatureManagerTest {
         decrypted.recycle()
         first.recycle()
         second.recycle()
+    }
+
+    @Test
+    fun testSignatureCreationAndStorageRoundTrip() {
+        composeTestRule.setContent {
+            VibeSyncPdfTheme {
+                SignatureManagerScreen(
+                    onNavigateBack = {},
+                    onSelectSignature = { _, _, _, _, _, _ -> },
+                    signatureRepository = signatureRepository
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag("signature_create_fab").assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithTag("signature_capture_name")
+            .performTextInput(roundTripId)
+        composeTestRule.onNodeWithTag("signature_capture_canvas").performTouchInput {
+            down(Offset(width * 0.15f, height * 0.70f))
+            moveTo(Offset(width * 0.35f, height * 0.35f), 100)
+            moveTo(Offset(width * 0.55f, height * 0.65f), 100)
+            moveTo(Offset(width * 0.82f, height * 0.25f), 100)
+            up()
+        }
+        composeTestRule.onNodeWithTag("signature_capture_save").assertIsEnabled().performClick()
+
+        composeTestRule.waitUntil(15_000) {
+            signatureRepository.encryptedFile(roundTripId)?.let { it.isFile && it.length() > 0L } == true &&
+                signatureRepository.listSignatures().any { it.id == roundTripId }
+        }
+        val encryptedFile = signatureRepository.encryptedFile(roundTripId)
+        assertNotNull("The signature should be stored as an encrypted file", encryptedFile)
+        assertTrue(requireNotNull(encryptedFile).canonicalPath.startsWith(
+            java.io.File(context.filesDir, "signatures").canonicalPath
+        ))
+
+        val restored = signatureRepository.getSignature(roundTripId)
+        assertNotNull("The saved signature should decrypt and decode", restored)
+        assertEquals(1200, restored!!.width)
+        assertEquals(400, restored.height)
+        restored.recycle()
     }
 
     @Test

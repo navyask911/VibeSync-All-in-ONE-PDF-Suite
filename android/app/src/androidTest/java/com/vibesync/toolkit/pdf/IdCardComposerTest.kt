@@ -38,8 +38,14 @@ class IdCardComposerTest {
             assertTrue(pageHeight - (top.y + top.height) >= margin15mm - 0.6f)
             assertTrue(bottom.y >= margin15mm - 0.6f)
             assertTrue(top.y - (bottom.y + bottom.height) >= gap10mm - 0.2f)
-            assertEquals(front.width.toFloat() / front.height, top.width / top.height, 0.001f)
-            assertEquals(back.width.toFloat() / back.height, bottom.width / bottom.height, 0.001f)
+            val standardCardWidth = 85.6f * 72f / 25.4f
+            val standardCardHeight = 53.98f * 72f / 25.4f
+            assertEquals(standardCardWidth, top.width, 0.2f)
+            assertEquals(standardCardHeight, top.height, 0.2f)
+            assertEquals(standardCardWidth, bottom.width, 0.2f)
+            assertEquals(standardCardHeight, bottom.height, 0.2f)
+            assertEquals(standardCardWidth / standardCardHeight, top.width / top.height, 0.001f)
+            assertEquals(standardCardWidth / standardCardHeight, bottom.width / bottom.height, 0.001f)
 
             ParcelFileDescriptor.open(output, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
                 PdfRenderer(descriptor).use { renderer ->

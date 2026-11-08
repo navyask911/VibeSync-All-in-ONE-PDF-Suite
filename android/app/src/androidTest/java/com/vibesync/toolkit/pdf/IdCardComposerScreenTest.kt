@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertHasClickAction
 import androidx.compose.ui.test.assertIsEnabled
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -18,6 +19,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.presentation.tools.IdCardComposerScreen
+import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
 
@@ -48,6 +50,31 @@ class IdCardComposerScreenTest {
         } finally {
             front.recycle()
             back.recycle()
+        }
+    }
+
+    @Test
+    fun testIdCardSlotsTriggerPickers() {
+        val pickerRequests = mutableListOf<String>()
+        setTestContent {
+            IdCardComposerScreen(
+                onNavigateBack = {},
+                onPickerRequested = { slot, source -> pickerRequests += "$slot:$source" }
+            )
+        }
+
+        composeRule.onNodeWithTag("id_card_front_surface").assertIsDisplayed()
+            .assertHasClickAction().performClick()
+        composeRule.onNodeWithTag("id_card_back_surface").assertIsDisplayed()
+            .assertHasClickAction().performClick()
+        composeRule.onNodeWithTag("id_card_camera_front").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("id_card_camera_back").assertIsDisplayed().performClick()
+
+        composeRule.runOnIdle {
+            assertEquals(
+                listOf("front:gallery", "back:gallery", "front:camera", "back:camera"),
+                pickerRequests
+            )
         }
     }
 

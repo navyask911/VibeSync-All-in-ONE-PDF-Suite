@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Badge
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Flip
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Button
@@ -32,6 +34,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -62,17 +65,30 @@ import java.io.IOException
 fun IdCardComposerScreen(
     onNavigateBack: () -> Unit,
     previewFront: Bitmap? = null,
-    previewBack: Bitmap? = null
+    previewBack: Bitmap? = null,
+    onPickerRequested: ((slot: String, source: String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var frontUri by remember { mutableStateOf<Uri?>(null) }
     var backUri by remember { mutableStateOf<Uri?>(null) }
+    var frontCameraBitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var backCameraBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf<Int?>(null) }
     var pendingFile by remember { mutableStateOf<File?>(null) }
-    val frontPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> frontUri = uri }
-    val backPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> backUri = uri }
+    val frontPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) { frontUri = uri; frontCameraBitmap = null }
+    }
+    val backPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) { backUri = uri; backCameraBitmap = null }
+    }
+    val frontCameraPicker = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+        if (bitmap != null) { frontCameraBitmap = bitmap; frontUri = null }
+    }
+    val backCameraPicker = rememberLauncherForActivityResult(ActivityResultContracts.TakePicturePreview()) { bitmap ->
+        if (bitmap != null) { backCameraBitmap = bitmap; backUri = null }
+    }
     val saveLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/pdf")) { destination ->
         val file = pendingFile
         pendingFile = null
@@ -94,17 +110,49 @@ fun IdCardComposerScreen(
             busy = false
         }
     }
-    val frontBitmap by produceState<Bitmap?>(initialValue = previewFront, key1 = frontUri, key2 = previewFront) {
-        if (previewFront != null) value = previewFront
-        else value = withContext(Dispatchers.IO) {
-            frontUri?.let { uri -> runCatching { PdfBitmapUtils.decodeStreamDownsampled(openInputStream = { context.contentResolver.openInputStream(uri) }) }.getOrNull() }
+    val frontDecodedBitmap by produceState<Bitmap?>(initialValue = previewFront, key1 = frontUri, key2 = previewFront) {
+        value = if (previewFront != null) previewFront else withContext(Dispatchers.IO) {
+            frontUri?.let { uri -> runCatching {
+                PdfBitmapUtils.decodeStreamDownsampled(
+                    openInputStream = { context.contentResolver.openInputStream(uri) },
+                    maxDimension = 1600
+                )
+            }.getOrNull() }
         }
     }
-    val backBitmap by produceState<Bitmap?>(initialValue = previewBack, key1 = backUri, key2 = previewBack) {
-        if (previewBack != null) value = previewBack
-        else value = withContext(Dispatchers.IO) {
-            backUri?.let { uri -> runCatching { PdfBitmapUtils.decodeStreamDownsampled(openInputStream = { context.contentResolver.openInputStream(uri) }) }.getOrNull() }
+    val backDecodedBitmap by produceState<Bitmap?>(initialValue = previewBack, key1 = backUri, key2 = previewBack) {
+        value = if (previewBack != null) previewBack else withContext(Dispatchers.IO) {
+            backUri?.let { uri -> runCatching {
+                PdfBitmapUtils.decodeStreamDownsampled(
+                    openInputStream = { context.contentResolver.openInputStream(uri) },
+                    maxDimension = 1600
+                )
+            }.getOrNull() }
         }
+    }
+    val frontBitmap = frontCameraBitmap ?: frontDecodedBitmap
+    val backBitmap = backCameraBitmap ?: backDecodedBitmap
+
+    // Release decoded/camera bitmaps when a new selection replaces them or the screen leaves.
+    DisposableEffect(frontDecodedBitmap, previewFront) {
+        val bitmap = frontDecodedBitmap
+        onDispose {
+            if (bitmap != null && bitmap !== previewFront && !bitmap.isRecycled) bitmap.recycle()
+        }
+    }
+    DisposableEffect(backDecodedBitmap, previewBack) {
+        val bitmap = backDecodedBitmap
+        onDispose {
+            if (bitmap != null && bitmap !== previewBack && !bitmap.isRecycled) bitmap.recycle()
+        }
+    }
+    DisposableEffect(frontCameraBitmap) {
+        val bitmap = frontCameraBitmap
+        onDispose { bitmap?.let { if (!it.isRecycled) it.recycle() } }
+    }
+    DisposableEffect(backCameraBitmap) {
+        val bitmap = backCameraBitmap
+        onDispose { bitmap?.let { if (!it.isRecycled) it.recycle() } }
     }
 
     Scaffold(topBar = {
@@ -118,23 +166,73 @@ fun IdCardComposerScreen(
         Column(Modifier.padding(padding).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(stringResource(R.string.id_card_description), color = MaterialTheme.colorScheme.onSurfaceVariant)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                Card(modifier = Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Card(
+                    modifier = Modifier.weight(1f)
+                        .clickable {
+                            if (onPickerRequested != null) onPickerRequested("front", "gallery")
+                            else frontPicker.launch(arrayOf("image/*"))
+                        }
+                        .testTag("id_card_front_surface"),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
                     Column(Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(stringResource(R.string.id_card_front), fontWeight = FontWeight.SemiBold)
-                        if (frontBitmap != null) Image(frontBitmap!!.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxWidth().height(110.dp), contentScale = ContentScale.Fit)
+                        if (frontBitmap != null) Image(frontBitmap.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxWidth().height(110.dp), contentScale = ContentScale.Fit)
                         else Spacer(Modifier.height(110.dp))
-                        OutlinedButton(onClick = { frontPicker.launch(arrayOf("image/*")) }, modifier = Modifier.fillMaxWidth().testTag("id_card_pick_front")) {
-                            Icon(Icons.Default.Badge, contentDescription = null); Text(stringResource(R.string.id_card_pick_front))
+                        OutlinedButton(
+                            onClick = {
+                                if (onPickerRequested != null) onPickerRequested("front", "gallery")
+                                else frontPicker.launch(arrayOf("image/*"))
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag("id_card_pick_front")
+                        ) {
+                            Icon(Icons.Default.Badge, contentDescription = null)
+                            Text(stringResource(R.string.id_card_pick_front))
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                if (onPickerRequested != null) onPickerRequested("front", "camera")
+                                else frontCameraPicker.launch(null)
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag("id_card_camera_front")
+                        ) {
+                            Icon(Icons.Default.PhotoCamera, contentDescription = null)
+                            Text(stringResource(R.string.id_card_camera))
                         }
                     }
                 }
-                Card(modifier = Modifier.weight(1f), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
+                Card(
+                    modifier = Modifier.weight(1f)
+                        .clickable {
+                            if (onPickerRequested != null) onPickerRequested("back", "gallery")
+                            else backPicker.launch(arrayOf("image/*"))
+                        }
+                        .testTag("id_card_back_surface"),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                ) {
                     Column(Modifier.padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text(stringResource(R.string.id_card_back), fontWeight = FontWeight.SemiBold)
-                        if (backBitmap != null) Image(backBitmap!!.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxWidth().height(110.dp), contentScale = ContentScale.Fit)
+                        if (backBitmap != null) Image(backBitmap.asImageBitmap(), contentDescription = null, modifier = Modifier.fillMaxWidth().height(110.dp), contentScale = ContentScale.Fit)
                         else Spacer(Modifier.height(110.dp))
-                        OutlinedButton(onClick = { backPicker.launch(arrayOf("image/*")) }, modifier = Modifier.fillMaxWidth().testTag("id_card_pick_back")) {
-                            Icon(Icons.Default.Flip, contentDescription = null); Text(stringResource(R.string.id_card_pick_back))
+                        OutlinedButton(
+                            onClick = {
+                                if (onPickerRequested != null) onPickerRequested("back", "gallery")
+                                else backPicker.launch(arrayOf("image/*"))
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag("id_card_pick_back")
+                        ) {
+                            Icon(Icons.Default.Flip, contentDescription = null)
+                            Text(stringResource(R.string.id_card_pick_back))
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                if (onPickerRequested != null) onPickerRequested("back", "camera")
+                                else backCameraPicker.launch(null)
+                            },
+                            modifier = Modifier.fillMaxWidth().testTag("id_card_camera_back")
+                        ) {
+                            Icon(Icons.Default.PhotoCamera, contentDescription = null)
+                            Text(stringResource(R.string.id_card_camera))
                         }
                     }
                 }

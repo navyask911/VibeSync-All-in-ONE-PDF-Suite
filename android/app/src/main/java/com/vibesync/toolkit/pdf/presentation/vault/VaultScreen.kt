@@ -1,6 +1,7 @@
 package com.vibesync.toolkit.pdf.presentation.vault
 
 import android.content.Intent
+import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
@@ -25,10 +26,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -46,6 +50,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.IOException
+import kotlin.math.roundToInt
 
 @Composable
 fun VaultScreen(
@@ -62,15 +67,59 @@ fun VaultScreen(
     var movableScans by remember { mutableStateOf(emptyList<File>()) }
     var pendingExportFile by remember { mutableStateOf<File?>(null) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isImporting by remember { mutableStateOf(false) }
+    var importProgress by remember { mutableFloatStateOf(0f) }
 
     fun refreshFiles() {
-        runCatching { storage.listVaultFiles() to storage.listMovableScans() }
-            .onSuccess { (vault, scans) ->
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching { storage.listVaultFiles() to storage.listMovableDocuments() }
+            }
+            result.onSuccess { (vault, scans) ->
                 vaultFiles = vault
                 movableScans = scans
                 errorMessage = null
+            }.onFailure { errorMessage = it.localizedMessage ?: "" }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { sourceUri ->
+        if (sourceUri != null && authenticated && !isImporting) {
+            scope.launch {
+                isImporting = true
+                importProgress = 0f
+                errorMessage = null
+                val result = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val metadata = readPdfSourceMetadata(context, sourceUri)
+                        val mimeType = context.contentResolver.getType(sourceUri)
+                        if (!mimeType.equals("application/pdf", ignoreCase = true) &&
+                            !metadata.first.endsWith(".pdf", ignoreCase = true)
+                        ) {
+                            throw IOException("Select a PDF document to import.")
+                        }
+                        val input = context.contentResolver.openInputStream(sourceUri)
+                            ?: throw IOException("The selected PDF could not be opened.")
+                        storage.importPdf(
+                            inputStream = input,
+                            displayName = metadata.first,
+                            expectedBytes = metadata.second
+                        ) { fraction ->
+                            importProgress = fraction.coerceIn(0f, 1f)
+                        }
+                    }
+                }
+                result.onSuccess {
+                    errorMessage = null
+                    refreshFiles()
+                }.onFailure {
+                    errorMessage = it.localizedMessage ?: context.getString(R.string.vault_import_failed)
+                }
+                isImporting = false
             }
-            .onFailure { errorMessage = it.localizedMessage ?: "" }
+        }
     }
 
     val exportLauncher = rememberLauncherForActivityResult(
@@ -136,6 +185,23 @@ fun VaultScreen(
                 Text(stringResource(R.string.vault_unlock))
             }
         } else {
+            OutlinedButton(
+                onClick = { importLauncher.launch(arrayOf("application/pdf")) },
+                enabled = !isImporting,
+                modifier = Modifier.fillMaxWidth().testTag("vault_import_external_pdf")
+            ) {
+                Text(stringResource(R.string.vault_import_external_pdf))
+            }
+            if (isImporting) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    LinearProgressIndicator(progress = importProgress, modifier = Modifier.fillMaxWidth())
+                    Text(
+                        stringResource(R.string.vault_import_progress, (importProgress * 100f).roundToInt()),
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.testTag("vault_import_progress")
+                    )
+                }
+            }
             Text(stringResource(R.string.vault_files), style = MaterialTheme.typography.titleMedium)
             LazyColumn(
                 modifier = Modifier.weight(1f).fillMaxWidth().testTag("vault_file_list"),
@@ -158,21 +224,30 @@ fun VaultScreen(
                             ) {
                                 TextButton(
                                     onClick = {
-                                        runCatching {
-                                            val decrypted = storage.decryptToCache(file)
-                                            val uri = FileProvider.getUriForFile(
-                                                context,
-                                                "${context.packageName}.fileprovider",
-                                                decrypted
-                                            )
-                                            val viewIntent = Intent(Intent.ACTION_VIEW)
-                                                .setDataAndType(uri, "application/pdf")
-                                                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                            context.startActivity(
-                                                Intent.createChooser(viewIntent, context.getString(R.string.open_pdf))
-                                            )
-                                        }.onFailure {
-                                            errorMessage = it.localizedMessage ?: context.getString(R.string.failed_to_open_pdf)
+                                        scope.launch {
+                                            val decryptedResult = withContext(Dispatchers.IO) {
+                                                runCatching { storage.decryptToCache(file) }
+                                            }
+                                            decryptedResult.onSuccess { decrypted ->
+                                                runCatching {
+                                                    val uri = FileProvider.getUriForFile(
+                                                        context,
+                                                        "${context.packageName}.fileprovider",
+                                                        decrypted
+                                                    )
+                                                    val viewIntent = Intent(Intent.ACTION_VIEW)
+                                                        .setDataAndType(uri, "application/pdf")
+                                                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                                    context.startActivity(
+                                                        Intent.createChooser(viewIntent, context.getString(R.string.open_pdf))
+                                                    )
+                                                }.onFailure {
+                                                    decrypted.delete()
+                                                    errorMessage = it.localizedMessage ?: context.getString(R.string.failed_to_open_pdf)
+                                                }
+                                            }.onFailure {
+                                                errorMessage = it.localizedMessage ?: context.getString(R.string.failed_to_open_pdf)
+                                            }
                                         }
                                     },
                                     modifier = Modifier.testTag("vault_open_${file.name}")
@@ -181,13 +256,18 @@ fun VaultScreen(
                                 }
                                 TextButton(
                                     onClick = {
-                                        runCatching {
-                                            pendingExportFile = storage.decryptToCache(file)
-                                            exportLauncher.launch(storage.displayName(file))
-                                        }.onFailure {
-                                            pendingExportFile?.delete()
-                                            pendingExportFile = null
-                                            errorMessage = it.localizedMessage ?: context.getString(R.string.export_failed)
+                                        scope.launch {
+                                            val result = withContext(Dispatchers.IO) {
+                                                runCatching { storage.decryptToCache(file) }
+                                            }
+                                            result.onSuccess { decrypted ->
+                                                pendingExportFile = decrypted
+                                                exportLauncher.launch(storage.displayName(file))
+                                            }.onFailure {
+                                                pendingExportFile?.delete()
+                                                pendingExportFile = null
+                                                errorMessage = it.localizedMessage ?: context.getString(R.string.export_failed)
+                                            }
                                         }
                                     },
                                     modifier = Modifier.testTag("vault_export_${file.name}")
@@ -203,9 +283,13 @@ fun VaultScreen(
                     Card(modifier = Modifier.fillMaxWidth()) {
                         Row(
                             modifier = Modifier.fillMaxWidth().clickable {
-                                runCatching { storage.moveIntoVault(file) }
-                                    .onSuccess { errorMessage = null; refreshFiles() }
-                                    .onFailure { errorMessage = it.localizedMessage ?: "" }
+                                scope.launch {
+                                    val result = withContext(Dispatchers.IO) {
+                                        runCatching { storage.moveIntoVault(file) }
+                                    }
+                                    result.onSuccess { errorMessage = null; refreshFiles() }
+                                        .onFailure { errorMessage = it.localizedMessage ?: "" }
+                                }
                             }.padding(12.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -225,6 +309,7 @@ fun VaultScreen(
                 )
             }
             Button(
+                enabled = !isImporting,
                 onClick = {
                     pendingExportFile?.delete()
                     pendingExportFile = null
@@ -238,4 +323,21 @@ fun VaultScreen(
             ) { Text(stringResource(R.string.vault_lock_action)) }
         }
     }
+}
+
+
+private fun readPdfSourceMetadata(context: android.content.Context, uri: android.net.Uri): Pair<String, Long> {
+    var name = uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() } ?: "Imported_Document.pdf"
+    var size = -1L
+    context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE), null, null, null)
+        ?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (nameIndex >= 0) cursor.getString(nameIndex)?.takeIf { it.isNotBlank() }?.let { name = it }
+                if (sizeIndex >= 0 && !cursor.isNull(sizeIndex)) size = cursor.getLong(sizeIndex).coerceAtLeast(0L)
+            }
+        }
+    if (!name.endsWith(".pdf", ignoreCase = true)) name += ".pdf"
+    return name to size
 }

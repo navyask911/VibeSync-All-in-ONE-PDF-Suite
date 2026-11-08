@@ -19,11 +19,13 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
+import com.vibesync.toolkit.pdf.data.signature.SignatureRepository
 import com.vibesync.toolkit.pdf.presentation.editor.EditorUiState
 import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
 import com.vibesync.toolkit.pdf.data.model.ToolMode
@@ -210,6 +212,71 @@ class PdfEditorScreenTest {
             if (!signatureBitmap.isRecycled) signatureBitmap.recycle()
             documentA.delete()
             documentB.delete()
+        }
+    }
+
+    @Test
+    fun insertSavedSignaturePickerLoadsEncryptedRepositoryEntry() {
+        val context = ApplicationProvider.getApplicationContext<android.app.Application>()
+        val repository = SignatureRepository(context)
+        val signatureId = "editor_picker_instrumented"
+        repository.deleteSignature(signatureId)
+        val sourceSignature = Bitmap.createBitmap(120, 48, Bitmap.Config.ARGB_8888).apply {
+            eraseColor(android.graphics.Color.TRANSPARENT)
+            val canvas = android.graphics.Canvas(this)
+            canvas.drawLine(
+                8f, 36f, 112f, 10f,
+                Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    color = android.graphics.Color.BLACK
+                    strokeWidth = 6f
+                }
+            )
+        }
+        repository.saveSignature(signatureId, sourceSignature)
+        sourceSignature.recycle()
+
+        val viewModel = mockk<EditorViewModel>(relaxed = true)
+        every { viewModel.uiState } returns MutableStateFlow(EditorUiState())
+        coEvery { viewModel.getPageBitmap(any()) } returns null
+        val selectedBitmap = slot<Bitmap>()
+
+        try {
+            composeTestRule.setContent {
+                VibeSyncPdfTheme {
+                    PdfEditorScreen(
+                        documentUri = Uri.parse("content://test/saved-signature-picker.pdf"),
+                        viewModel = viewModel,
+                        onNavigateBack = {},
+                        onExportComplete = {}
+                    )
+                }
+            }
+
+            composeTestRule.onNodeWithTag("editor_insert_saved_signature")
+                .assertIsDisplayed().performClick()
+            composeTestRule.waitUntil(10_000) {
+                composeTestRule.onAllNodesWithTag("editor_saved_signature_$signatureId")
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+            composeTestRule.onNodeWithTag("editor_saved_signature_$signatureId")
+                .assertIsDisplayed().performClick()
+            verify(timeout = 5_000, exactly = 1) {
+                viewModel.addSignature(
+                    capture(selectedBitmap),
+                    any(),
+                    any(),
+                    any(),
+                    any(),
+                    any(),
+                    false,
+                    any()
+                )
+            }
+            assertEquals(120, selectedBitmap.captured.width)
+            assertEquals(48, selectedBitmap.captured.height)
+            selectedBitmap.captured.recycle()
+        } finally {
+            repository.deleteSignature(signatureId)
         }
     }
 

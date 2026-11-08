@@ -3,6 +3,12 @@ package com.vibesync.toolkit.pdf
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.pdf.PdfDocument
+import com.vibesync.toolkit.pdf.data.vault.VaultStorage
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.File
 import androidx.test.core.app.ApplicationProvider
 import com.vibesync.toolkit.pdf.core.security.SecurityVault
 import org.junit.After
@@ -73,6 +79,67 @@ class SecurityVaultTest {
         assertNotNull(retrieved)
         assertEquals(150, retrieved!!.width)
         assertEquals(75, retrieved.height)
+    }
+
+    @Test
+    fun testPdfVaultFileImportAndDecryption() {
+        val sourceDocument = PdfDocument()
+        val sourceBytes = ByteArrayOutputStream().use { output ->
+            try {
+                val page = sourceDocument.startPage(
+                    PdfDocument.PageInfo.Builder(595, 842, 1).create()
+                )
+                page.canvas.drawText(
+                    "Vault import integrity marker",
+                    42f,
+                    80f,
+                    Paint(Paint.ANTI_ALIAS_FLAG).apply { textSize = 20f; color = Color.BLACK }
+                )
+                sourceDocument.finishPage(page)
+                sourceDocument.writeTo(output)
+                output.toByteArray()
+            } finally {
+                sourceDocument.close()
+            }
+        }
+
+        val storage = VaultStorage(context)
+        val progress = mutableListOf<Float>()
+        val encrypted = storage.importPdf(
+            inputStream = ByteArrayInputStream(sourceBytes),
+            displayName = "Integrity_Round_Trip.pdf",
+            expectedBytes = sourceBytes.size.toLong(),
+            onProgress = { progress += it }
+        )
+        var decrypted: File? = null
+        try {
+            assertTrue("Encrypted vault output must exist", encrypted.isFile && encrypted.length() > 0L)
+            assertTrue("Vault output must be stored under filesDir/vault",
+                encrypted.canonicalFile.parentFile == File(context.filesDir, "vault").canonicalFile)
+            assertTrue("Only encrypted .vlt files should be listed", encrypted.name.endsWith(".vlt"))
+            assertTrue(storage.listVaultFiles().any { it.canonicalFile == encrypted.canonicalFile })
+            assertTrue("Import progress should reach 100%", progress.isNotEmpty() && progress.last() >= 0.999f)
+
+            decrypted = storage.decryptToCache(encrypted)
+            assertTrue("Decrypted PDF must be written to the private cache", decrypted.isFile && decrypted.length() > 0L)
+            assertArrayEquals("AES-GCM decryption must reproduce every source byte", sourceBytes, decrypted.readBytes())
+
+            val exportDirectory = File(context.cacheDir, "pdf_cache").apply { mkdirs() }
+            val appExport = File(exportDirectory, "VibeSync_VaultScannerRegression.pdf")
+            appExport.writeBytes(sourceBytes)
+            try {
+                assertTrue(
+                    "The vault scanner should include VibeSync PDFs in internal export cache",
+                    storage.listMovableDocuments().any { it.canonicalFile == appExport.canonicalFile }
+                )
+            } finally {
+                appExport.delete()
+            }
+        } finally {
+            decrypted?.delete()
+            encrypted.delete()
+            storage.clearDecryptedCache()
+        }
     }
 
     @Test

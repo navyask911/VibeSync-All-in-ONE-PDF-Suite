@@ -2,6 +2,9 @@ package com.vibesync.toolkit.pdf.presentation.editor
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -22,6 +25,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Draw
 import androidx.compose.material.icons.filled.Edit
@@ -31,6 +35,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
@@ -42,12 +47,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -56,8 +67,13 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.security.SecurityVault
+import com.vibesync.toolkit.pdf.data.signature.SignatureRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
@@ -66,16 +82,22 @@ fun SignatureManagerScreen(
     onNavigateBack: () -> Unit,
     onSelectSignature: (Bitmap, Float, Float, Float, Float, Float) -> Unit,
     modifier: Modifier = Modifier,
-    securityVault: SecurityVault? = null
+    securityVault: SecurityVault? = null,
+    signatureRepository: SignatureRepository? = null
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current.density
-    val vault = remember(context, securityVault) { securityVault ?: SecurityVault(context) }
-    val signatures = remember { mutableStateListOf<SecurityVault.SavedSignature>() }
+    val repository = remember(context, securityVault, signatureRepository) {
+        signatureRepository ?: SignatureRepository(context, securityVault ?: SecurityVault(context))
+    }
+    val scope = rememberCoroutineScope()
+    val signatures = remember { mutableStateListOf<SignatureRepository.SavedSignature>() }
     var selectedId by remember { mutableStateOf<String?>(null) }
     var previewBitmap by remember { mutableStateOf<Bitmap?>(null) }
     var showRename by remember { mutableStateOf(false) }
     var showDelete by remember { mutableStateOf(false) }
+    var showCapture by remember { mutableStateOf(false) }
+    var isSavingCapture by remember { mutableStateOf(false) }
     var renameValue by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var offsetX by remember { mutableStateOf(24f) }
@@ -87,7 +109,7 @@ fun SignatureManagerScreen(
 
     fun refreshSignatures() {
         signatures.clear()
-        signatures.addAll(vault.listSignatures())
+        signatures.addAll(repository.listSignatures())
         if (selectedId != null && signatures.none { it.id == selectedId }) {
             selectedId = null
             previewBitmap = null
@@ -96,13 +118,21 @@ fun SignatureManagerScreen(
 
     fun selectSignature(id: String) {
         selectedId = id
-        previewBitmap = vault.getSignature(id)
+        previewBitmap = null
         offsetX = 24f
         offsetY = 24f
         sizeScale = 1f
         rotationDegrees = 0f
         placementZoom = 1f
         placementPan = Offset.Zero
+        scope.launch {
+            val loaded = withContext(Dispatchers.IO) { repository.getSignature(id) }
+            if (selectedId == id) {
+                previewBitmap = loaded
+            } else {
+                loaded?.let { if (!it.isRecycled) it.recycle() }
+            }
+        }
     }
 
     DisposableEffect(Unit) {
@@ -116,7 +146,8 @@ fun SignatureManagerScreen(
         }
     }
 
-    Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
+    Box(modifier = modifier.fillMaxSize().padding(16.dp)) {
+        Column(modifier = Modifier.fillMaxSize()) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             IconButton(onClick = onNavigateBack) {
                 Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
@@ -284,6 +315,38 @@ fun SignatureManagerScreen(
             }
             errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         }
+        }
+        FloatingActionButton(
+            onClick = { showCapture = true },
+            modifier = Modifier.align(Alignment.BottomEnd).padding(8.dp).testTag("signature_create_fab")
+        ) {
+            Icon(Icons.Default.Add, contentDescription = stringResource(R.string.signature_capture_title))
+        }
+    }
+
+    if (showCapture) {
+        SignatureCaptureDialog(
+            isSaving = isSavingCapture,
+            onDismiss = { if (!isSavingCapture) showCapture = false },
+            onSave = { id, bitmap ->
+                isSavingCapture = true
+                scope.launch {
+                    val saved = withContext(Dispatchers.IO) {
+                        runCatching { repository.saveSignature(id, bitmap) }
+                    }
+                    if (!bitmap.isRecycled) bitmap.recycle()
+                    isSavingCapture = false
+                    saved.onSuccess { file ->
+                        showCapture = false
+                        errorMessage = null
+                        refreshSignatures()
+                        selectSignature(file.name.removeSuffix(".sig"))
+                    }.onFailure {
+                        errorMessage = it.localizedMessage ?: context.getString(R.string.signature_capture_save_failed)
+                    }
+                }
+            }
+        )
     }
 
     if (showRename) {
@@ -301,7 +364,7 @@ fun SignatureManagerScreen(
             confirmButton = {
                 TextButton(onClick = {
                     val oldId = selectedId
-                    if (oldId != null && vault.renameSignature(oldId, renameValue)) {
+                    if (oldId != null && repository.renameSignature(oldId, renameValue)) {
                         val changedId = renameValue.trim()
                         showRename = false
                         refreshSignatures()
@@ -320,7 +383,7 @@ fun SignatureManagerScreen(
             title = { Text(stringResource(R.string.signature_manager_delete_title)) },
             confirmButton = {
                 TextButton(onClick = {
-                    selectedId?.let { vault.deleteSignature(it) }
+                    selectedId?.let { repository.deleteSignature(it) }
                     showDelete = false
                     refreshSignatures()
                 }) { Text(stringResource(R.string.signature_manager_delete)) }
@@ -328,4 +391,116 @@ fun SignatureManagerScreen(
             dismissButton = { TextButton(onClick = { showDelete = false }) { Text(stringResource(R.string.manual_crop_cancel)) } }
         )
     }
+}
+
+
+@Composable
+private fun SignatureCaptureDialog(
+    isSaving: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (String, Bitmap) -> Unit
+) {
+    var signatureName by remember { mutableStateOf("") }
+    var strokes by remember { mutableStateOf<List<List<Offset>>>(emptyList()) }
+    var canvasWidth by remember { mutableStateOf(0f) }
+    var canvasHeight by remember { mutableStateOf(0f) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.signature_capture_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedTextField(
+                    value = signatureName,
+                    onValueChange = { signatureName = it },
+                    label = { Text(stringResource(R.string.signature_capture_name)) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth().testTag("signature_capture_name")
+                )
+                Text(stringResource(R.string.signature_capture_hint), style = MaterialTheme.typography.bodySmall)
+                Canvas(
+                    modifier = Modifier.fillMaxWidth()
+                        .height(170.dp)
+                        .background(Color.White, RoundedCornerShape(8.dp))
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                        .onSizeChanged {
+                            canvasWidth = it.width.toFloat()
+                            canvasHeight = it.height.toFloat()
+                        }
+                        .testTag("signature_capture_canvas")
+                        .pointerInput(Unit) {
+                            detectDragGestures(
+                                onDragStart = { point -> strokes = strokes + listOf(listOf(point)) },
+                                onDrag = { change, _ ->
+                                    change.consume()
+                                    if (strokes.isNotEmpty()) {
+                                        strokes = strokes.dropLast(1) + listOf(strokes.last() + change.position)
+                                    }
+                                }
+                            )
+                        }
+                ) {
+                    strokes.forEach { points ->
+                        if (points.isNotEmpty()) {
+                            val path = Path().apply {
+                                moveTo(points.first().x, points.first().y)
+                                points.drop(1).forEach { lineTo(it.x, it.y) }
+                            }
+                            drawPath(
+                                path = path,
+                                color = Color.Black,
+                                style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                            )
+                        }
+                    }
+                }
+                Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(
+                        onClick = { strokes = emptyList() },
+                        enabled = !isSaving
+                    ) { Text(stringResource(R.string.signature_capture_clear)) }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !isSaving && signatureName.isNotBlank() && strokes.any { it.size > 0 } &&
+                    canvasWidth > 0f && canvasHeight > 0f,
+                modifier = Modifier.testTag("signature_capture_save"),
+                onClick = {
+                    val bitmap = Bitmap.createBitmap(1200, 400, Bitmap.Config.ARGB_8888)
+                    val canvas = android.graphics.Canvas(bitmap)
+                    canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
+                    val scaleX = bitmap.width / canvasWidth
+                    val scaleY = bitmap.height / canvasHeight
+                    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                        color = android.graphics.Color.BLACK
+                        style = android.graphics.Paint.Style.STROKE
+                        strokeCap = android.graphics.Paint.Cap.ROUND
+                        strokeJoin = android.graphics.Paint.Join.ROUND
+                        strokeWidth = 12f
+                    }
+                    strokes.forEach { points ->
+                        if (points.size == 1) {
+                            canvas.drawCircle(points.single().x * scaleX, points.single().y * scaleY, 6f, paint)
+                        } else if (points.size > 1) {
+                            val path = android.graphics.Path().apply {
+                                moveTo(points.first().x * scaleX, points.first().y * scaleY)
+                                points.drop(1).forEach { lineTo(it.x * scaleX, it.y * scaleY) }
+                            }
+                            canvas.drawPath(path, paint)
+                        }
+                    }
+                    onSave(signatureName.trim(), bitmap)
+                }
+            ) {
+                if (isSaving) Text("Saving…") else Text(stringResource(R.string.signature_capture_save))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !isSaving) {
+                Text(stringResource(R.string.cancel))
+            }
+        }
+    )
 }

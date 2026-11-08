@@ -37,6 +37,10 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import com.vibesync.toolkit.pdf.data.signature.SignatureRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -69,6 +73,10 @@ fun PdfEditorScreen(
 
     var showSignatureDialog by remember(documentUri) { mutableStateOf(false) }
     var showSignatureManagerDialog by remember(documentUri) { mutableStateOf(false) }
+    var showSavedSignaturePicker by remember(documentUri) { mutableStateOf(false) }
+    var savedSignatureEntries by remember(documentUri) {
+        mutableStateOf<List<SignatureRepository.SavedSignature>>(emptyList())
+    }
     var showTextInputDialog by remember(documentUri) { mutableStateOf(false) }
     var pendingTapOffset by remember(documentUri) { mutableStateOf(Offset.Zero) }
     var textInputState by remember(documentUri) { mutableStateOf("") }
@@ -76,6 +84,8 @@ fun PdfEditorScreen(
     var scale by remember(documentUri) { mutableFloatStateOf(1f) }
     var offset by remember(documentUri) { mutableStateOf(Offset.Zero) }
     val snackbarHostState = remember(documentUri) { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
+    val signatureRepository = remember(context) { SignatureRepository(context) }
 
     DisposableEffect(documentUri) {
         onDispose { viewModel.resetEditorState() }
@@ -191,6 +201,22 @@ fun PdfEditorScreen(
                         modifier = Modifier.testTag("editor_saved_signatures")
                     ) {
                         Icon(Icons.Default.Draw, contentDescription = stringResource(R.string.signature_manager_title))
+                    }
+                    IconButton(
+                        onClick = {
+                            showSavedSignaturePicker = true
+                            coroutineScope.launch {
+                                savedSignatureEntries = withContext(Dispatchers.IO) {
+                                    signatureRepository.listSignatures()
+                                }
+                            }
+                        },
+                        modifier = Modifier.testTag("editor_insert_saved_signature")
+                    ) {
+                        Icon(
+                            Icons.Default.Draw,
+                            contentDescription = stringResource(R.string.editor_insert_saved_signature)
+                        )
                     }
                 }
             }
@@ -557,6 +583,58 @@ fun PdfEditorScreen(
                 )
             }
         }
+    }
+
+    if (showSavedSignaturePicker) {
+        AlertDialog(
+            onDismissRequest = { showSavedSignaturePicker = false },
+            title = { Text(stringResource(R.string.editor_insert_saved_signature)) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (savedSignatureEntries.isEmpty()) {
+                        Text(stringResource(R.string.editor_saved_signature_empty))
+                    } else {
+                        savedSignatureEntries.forEach { signature ->
+                            TextButton(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        val bitmap = withContext(Dispatchers.IO) {
+                                            signatureRepository.getSignature(signature.id)
+                                        }
+                                        if (bitmap == null || bitmap.isRecycled) {
+                                            snackbarHostState.showSnackbar(
+                                                context.getString(R.string.signature_capture_save_failed)
+                                            )
+                                        } else {
+                                            val targetWidth = SignatureStrokeMetrics.DEFAULT_TARGET_WIDTH_PX
+                                            val targetHeight = SignatureStrokeMetrics.DEFAULT_TARGET_HEIGHT_PX
+                                            val pageHeightPx = screenWidthPx * 842f / 595f
+                                            viewModel.addSignature(
+                                                bitmap,
+                                                x = ((screenWidthPx - targetWidth) / 2f).coerceAtLeast(0f),
+                                                y = ((pageHeightPx - targetHeight) / 2f).coerceAtLeast(0f),
+                                                width = targetWidth,
+                                                height = targetHeight,
+                                                saveToVault = false
+                                            )
+                                            showSavedSignaturePicker = false
+                                        }
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().testTag("editor_saved_signature_${signature.id}")
+                            ) {
+                                Text(signature.id, modifier = Modifier.fillMaxWidth())
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSavedSignaturePicker = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
     }
 
     // Text Input Modal Dialog
