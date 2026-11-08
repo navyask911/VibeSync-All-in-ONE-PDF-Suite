@@ -4,7 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
-import android.net.ParcelFileDescriptor
+import android.os.ParcelFileDescriptor
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
