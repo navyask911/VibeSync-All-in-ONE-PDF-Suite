@@ -111,7 +111,10 @@ fun PdfEditorScreen(
                             .padding(horizontal = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        IconButton(onClick = onNavigateBack) {
+                        IconButton(
+                            onClick = onNavigateBack,
+                            modifier = Modifier.testTag("editor_navigate_back")
+                        ) {
                             Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
                         }
                         Text(
