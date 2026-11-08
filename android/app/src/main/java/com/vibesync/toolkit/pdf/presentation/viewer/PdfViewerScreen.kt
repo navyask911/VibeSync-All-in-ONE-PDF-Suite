@@ -99,9 +99,8 @@ fun PdfViewerScreen(
     var scanMenuExpanded by remember(documentUri) { mutableStateOf(false) }
     var showRenameScanDialog by remember(documentUri) { mutableStateOf(false) }
     var showDeleteScanDialog by remember(documentUri) { mutableStateOf(false) }
-    var showSearchDialog by remember(documentUri) { mutableStateOf(false) }
+    var isSearchActive by remember(documentUri) { mutableStateOf(false) }
     var searchQuery by rememberSaveable(documentUri) { mutableStateOf("") }
-    var searchHasBeenRun by rememberSaveable(documentUri) { mutableStateOf(false) }
     var renamedScanName by rememberSaveable(documentUri) { mutableStateOf("") }
 
     LaunchedEffect(uiState.fileName, documentUri) {
@@ -162,14 +161,94 @@ fun PdfViewerScreen(
                         IconButton(onClick = onNavigateBack) {
                             Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
                         }
-                        Text(
-                            text = uiState.fileName, maxLines = 1, overflow = TextOverflow.Clip,
-                            modifier = Modifier.weight(1f)
-                                .basicMarquee(iterations = Int.MAX_VALUE)
-                                .clickable { onRenameClick(uiState.fileName) }
-                                .testTag("viewer_rename_title"),
-                            style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold
-                        )
+                        if (isSearchActive) {
+                            OutlinedTextField(
+                                value = searchQuery,
+                                onValueChange = { query ->
+                                    searchQuery = query
+                                    // Reuse the existing cancellable search pipeline as the query changes.
+                                    viewModel.searchDocument(query)
+                                },
+                                modifier = Modifier.weight(1f).height(56.dp)
+                                    .testTag("viewer_search_field"),
+                                placeholder = {
+                                    Text(
+                                        stringResource(R.string.viewer_search_hint),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Clip
+                                    )
+                                },
+                                singleLine = true,
+                                textStyle = MaterialTheme.typography.bodyMedium,
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Text,
+                                    imeAction = ImeAction.Search
+                                ),
+                                keyboardActions = KeyboardActions(onSearch = {
+                                    viewModel.searchDocument(searchQuery)
+                                }),
+                                trailingIcon = {
+                                    when {
+                                        uiState.isSearchRunning || uiState.isSearchOcrRunning -> {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                strokeWidth = 2.dp
+                                            )
+                                        }
+                                        searchQuery.isNotBlank() -> {
+                                            Text(
+                                                if (uiState.searchMatches.isEmpty()) "0"
+                                                else "${uiState.currentSearchMatchIndex + 1}/${uiState.searchMatches.size}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
+                                }
+                            )
+                            IconButton(
+                                onClick = viewModel::showPreviousSearchMatch,
+                                enabled = uiState.searchMatches.isNotEmpty(),
+                                modifier = Modifier.testTag("viewer_search_previous")
+                            ) {
+                                Icon(
+                                    Icons.Default.KeyboardArrowUp,
+                                    contentDescription = stringResource(R.string.viewer_search_previous)
+                                )
+                            }
+                            IconButton(
+                                onClick = viewModel::showNextSearchMatch,
+                                enabled = uiState.searchMatches.isNotEmpty(),
+                                modifier = Modifier.testTag("viewer_search_next")
+                            ) {
+                                Icon(
+                                    Icons.Default.KeyboardArrowDown,
+                                    contentDescription = stringResource(R.string.viewer_search_next)
+                                )
+                            }
+                            IconButton(
+                                onClick = {
+                                    isSearchActive = false
+                                    searchQuery = ""
+                                    viewModel.clearSearch()
+                                },
+                                modifier = Modifier.testTag("viewer_search_close")
+                            ) {
+                                Icon(
+                                    Icons.Default.Close,
+                                    contentDescription = stringResource(R.string.cancel)
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = uiState.fileName, maxLines = 1, overflow = TextOverflow.Clip,
+                                modifier = Modifier.weight(1f)
+                                    .basicMarquee(iterations = Int.MAX_VALUE)
+                                    .clickable { onRenameClick(uiState.fileName) }
+                                    .testTag("viewer_rename_title"),
+                                style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold
+                            )
+                        }
                         Box {
                             IconButton(onClick = { scanMenuExpanded = true },
                                 modifier = Modifier.testTag("viewer_more_actions")) {
@@ -294,8 +373,10 @@ fun PdfViewerScreen(
                     }
                     Row(Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 2.dp),
                         horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
-                        IconButton(onClick = { showSearchDialog = true }, modifier = Modifier.testTag("viewer_search")) {
-                            Icon(Icons.Default.Search, contentDescription = "Search")
+                        if (!isSearchActive) {
+                            IconButton(onClick = { isSearchActive = true }, modifier = Modifier.testTag("viewer_search")) {
+                                Icon(Icons.Default.Search, contentDescription = "Search")
+                            }
                         }
                         IconButton(
                             onClick = {
@@ -644,103 +725,6 @@ fun PdfViewerScreen(
                 }
             }
         }
-    }
-
-    if (showSearchDialog) {
-        val searchStatus = uiState.searchErrorMessage ?: when {
-            uiState.isSearchOcrRunning -> stringResource(R.string.viewer_search_running_ocr)
-            uiState.isSearchRunning -> stringResource(R.string.viewer_searching)
-            !searchHasBeenRun -> ""
-            uiState.searchMatches.isEmpty() -> stringResource(R.string.viewer_search_no_matches)
-            else -> stringResource(
-                R.string.viewer_search_position,
-                uiState.currentSearchMatchIndex + 1,
-                uiState.searchMatches.size
-            )
-        }
-        AlertDialog(
-            onDismissRequest = {
-                showSearchDialog = false
-                searchQuery = ""
-                searchHasBeenRun = false
-                viewModel.clearSearch()
-            },
-            title = { Text(stringResource(R.string.viewer_search)) },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = {
-                            searchQuery = it
-                            searchHasBeenRun = false
-                            viewModel.clearSearch()
-                        },
-                        label = { Text(stringResource(R.string.viewer_search_hint)) },
-                        singleLine = true,
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Text,
-                            imeAction = ImeAction.Search
-                        ),
-                        keyboardActions = KeyboardActions(onSearch = {
-                            searchHasBeenRun = true
-                            viewModel.searchDocument(searchQuery)
-                        }),
-                        modifier = Modifier.fillMaxWidth().testTag("viewer_search_field")
-                    )
-                    if (searchHasBeenRun) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Text(
-                                searchStatus,
-                                modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            IconButton(
-                                onClick = viewModel::showPreviousSearchMatch,
-                                enabled = uiState.searchMatches.isNotEmpty(),
-                                modifier = Modifier.testTag("viewer_search_previous")
-                            ) {
-                                Icon(
-                                    Icons.Default.KeyboardArrowUp,
-                                    contentDescription = stringResource(R.string.viewer_search_previous)
-                                )
-                            }
-                            IconButton(
-                                onClick = viewModel::showNextSearchMatch,
-                                enabled = uiState.searchMatches.isNotEmpty(),
-                                modifier = Modifier.testTag("viewer_search_next")
-                            ) {
-                                Icon(
-                                    Icons.Default.KeyboardArrowDown,
-                                    contentDescription = stringResource(R.string.viewer_search_next)
-                                )
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    enabled = searchQuery.isNotBlank() && !uiState.isSearchRunning,
-                    onClick = {
-                        searchHasBeenRun = true
-                        viewModel.searchDocument(searchQuery)
-                    }
-                ) { Text(stringResource(R.string.viewer_search)) }
-            },
-            dismissButton = {
-                TextButton(onClick = {
-                    showSearchDialog = false
-                    searchQuery = ""
-                    searchHasBeenRun = false
-                    viewModel.clearSearch()
-                }) { Text(stringResource(R.string.cancel)) }
-            }
-        )
     }
 
     if (isManagedScan && showRenameScanDialog) {

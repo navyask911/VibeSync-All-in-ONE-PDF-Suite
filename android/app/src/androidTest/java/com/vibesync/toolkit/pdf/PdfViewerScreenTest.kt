@@ -241,12 +241,63 @@ class PdfViewerScreenTest {
         composeTestRule.runOnIdle { assert(renameRequests == 1) }
         composeTestRule.onNodeWithTag("viewer_search").performClick()
         composeTestRule.onNodeWithTag("viewer_search_field").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Cancel").performClick()
+        composeTestRule.onNodeWithTag("viewer_search_close").performClick()
         composeTestRule.onNodeWithTag("viewer_more_actions").performClick()
         listOf("viewer_zoom_out","viewer_zoom_in","viewer_previous_page","viewer_next_page",
             "viewer_share","viewer_edit","viewer_print","viewer_export_menu").forEach { tag ->
             composeTestRule.onNodeWithTag(tag, useUnmergedTree = true).assertExists()
         }
+    }
+
+    @Test
+    fun searchOpensInlineAndKeepsThePdfPageVisibleWithoutAModalScrim() {
+        val bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
+        val stateFlow = MutableStateFlow(
+            com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(
+                fileName = "Inline_Search_Test.pdf",
+                pageCount = 1,
+                currentPageIndex = 0,
+                isLoading = false,
+                pagesMetadata = listOf(PageMetadata(pageIndex = 0, widthPt = 595f, heightPt = 842f))
+            )
+        )
+        every { mockViewModel.uiState } returns stateFlow
+        coEvery { mockViewModel.acquirePageBitmap(0, 2.0f) } returns fakeLease(bitmap)
+
+        composeTestRule.setContent {
+            VibeSyncPdfTheme {
+                PdfViewerScreen(
+                    documentUri = testUri,
+                    viewModel = mockViewModel,
+                    onNavigateBack = {},
+                    onNavigateToEditor = {},
+                    onShareDocument = {}
+                )
+            }
+        }
+
+        // Establish that an actual page bitmap is rendered before search mode is entered.
+        composeTestRule.onNodeWithTag("pdf_page_list").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("PDF page 1").assertIsDisplayed()
+
+        composeTestRule.onNodeWithTag("viewer_search").assertIsDisplayed().performClick()
+        val searchField = composeTestRule.onNodeWithTag("viewer_search_field")
+        searchField.assertIsDisplayed().performClick().performTextInput("needle")
+
+        // The top-bar controls are inline, while the same PDF page remains rendered underneath.
+        composeTestRule.onNodeWithTag("viewer_search_previous").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("viewer_search_next").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("viewer_search_close").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("pdf_page_list").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("PDF page 1").assertIsDisplayed()
+
+        // The former AlertDialog's Cancel action must not be present.
+        composeTestRule.onNodeWithText("Cancel").assertDoesNotExist()
+        verify(exactly = 1) { mockViewModel.searchDocument("needle") }
+
+        composeTestRule.onNodeWithTag("viewer_search_close").performClick()
+        composeTestRule.onNodeWithTag("viewer_rename_title").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("PDF page 1").assertIsDisplayed()
     }
 
     private fun fakeLease(bitmap: Bitmap): BitmapCache.BitmapLease {
@@ -299,7 +350,7 @@ class PdfViewerScreenTest {
 
         composeTestRule.onNodeWithTag("viewer_search").assertIsDisplayed().performClick()
         composeTestRule.onNodeWithTag("viewer_search_field").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Cancel").performClick()
+        composeTestRule.onNodeWithTag("viewer_search_close").performClick()
 
         composeTestRule.onNodeWithTag("viewer_edit").assertIsDisplayed().performClick()
         composeTestRule.onNodeWithTag("editor_stroke_size_surface").assertIsDisplayed()
