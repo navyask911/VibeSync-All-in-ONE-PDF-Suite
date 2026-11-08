@@ -10,7 +10,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import java.text.BreakIterator
 import java.text.Normalizer
+import java.util.Locale
 
 /** PDF glyph offsets paired with a page-normalized visible rectangle. */
 data class PdfCharacterBounds(
@@ -89,10 +91,13 @@ private class PositionedPdfTextStripper : PDFTextStripper() {
                 position.pageWidth
             }).coerceAtLeast(1f)
 
-            // TextPosition x/y are page-rotation-adjusted. Y is measured to the glyph baseline
-            // from the top edge, so subtract glyph height to get the visible top coordinate.
+            // PDF space uses a bottom-left origin. TextPosition.x/y are already adjusted by
+            // PDFBox for page rotation and expose the glyph baseline with a top-left origin.
+            // Convert back to a bottom-left baseline, then transform the glyph's top edge to
+            // top-left canvas coordinates before normalizing to the page's 0..10,000 space.
             val left = position.x
-            val top = position.y - position.height
+            val baselineFromBottom = pageHeight - position.y
+            val top = pageHeight - (baselineFromBottom + position.height)
             val right = left + position.width
             val bottom = top + position.height
             val bounds = PdfSearchHighlight(
@@ -211,26 +216,70 @@ object PdfUnicodeSearch {
     }
 
     private fun normalizeWithOffsetMap(value: String): Pair<String, List<Int>> {
-        val normalized = StringBuilder()
-        val offsets = mutableListOf<Int>()
-        var cursor = 0
-        while (cursor < value.length) {
-            val start = cursor
-            cursor += Character.charCount(value.codePointAt(cursor))
-            while (cursor < value.length) {
-                val nextCodePoint = value.codePointAt(cursor)
-                when (Character.getType(nextCodePoint)) {
-                    Character.NON_SPACING_MARK.toInt(),
-                    Character.COMBINING_SPACING_MARK.toInt(),
-                    Character.ENCLOSING_MARK.toInt() -> cursor += Character.charCount(nextCodePoint)
-                    else -> break
+        // Normalize the complete extracted page explicitly, not only ASCII-like runs. This
+        // covers canonical mark ordering/composition used by Kannada and other Indic scripts.
+        val normalizedText = Normalizer.normalize(value, Normalizer.Form.NFC)
+        if (value.isEmpty()) return normalizedText to emptyList()
+
+        // Preserve a mapping to the original PDFTextStripper UTF-16 offsets so positioned glyph
+        // rectangles still line up after NFC composes a base character and its combining marks.
+        val graphemes = BreakIterator.getCharacterInstance(Locale.ROOT).apply {
+            setText(value)
+        }
+        val normalizedChunks = StringBuilder()
+        val offsets = ArrayList<Int>(normalizedText.length)
+        var start = graphemes.first()
+        var end = graphemes.next()
+        while (end != BreakIterator.DONE) {
+            val normalizedChunk = Normalizer.normalize(
+                value.substring(start, end),
+                Normalizer.Form.NFC
+            )
+            normalizedChunks.append(normalizedChunk)
+            repeat(normalizedChunk.length) { offsets += start }
+            start = end
+            end = graphemes.next()
+        }
+
+        // Grapheme boundaries normally preserve NFC composition boundaries. If a platform
+        // BreakIterator implementation differs, retain a safe monotonic offset map for the
+        // normalized text rather than returning more offsets than there are normalized units.
+        if (offsets.size != normalizedText.length ||
+            normalizedChunks.toString() != normalizedText
+        ) {
+            offsets.clear()
+            var originalCursor = 0
+            var normalizedCursor = 0
+            while (originalCursor < value.length && normalizedCursor < normalizedText.length) {
+                val originalStart = originalCursor
+                val next = value.codePointAt(originalCursor)
+                originalCursor += Character.charCount(next)
+                while (originalCursor < value.length) {
+                    val codePoint = value.codePointAt(originalCursor)
+                    val type = Character.getType(codePoint)
+                    if (type == Character.NON_SPACING_MARK.toInt() ||
+                        type == Character.COMBINING_SPACING_MARK.toInt() ||
+                        type == Character.ENCLOSING_MARK.toInt()
+                    ) {
+                        originalCursor += Character.charCount(codePoint)
+                    } else {
+                        break
+                    }
+                }
+                val chunk = Normalizer.normalize(
+                    value.substring(originalStart, originalCursor),
+                    Normalizer.Form.NFC
+                )
+                repeat(chunk.length) {
+                    if (normalizedCursor < normalizedText.length) offsets += originalStart
+                    normalizedCursor += 1
                 }
             }
-            val normalizedChunk = Normalizer.normalize(value.substring(start, cursor), Normalizer.Form.NFC)
-            normalized.append(normalizedChunk)
-            repeat(normalizedChunk.length) { offsets += start }
+            while (offsets.size < normalizedText.length) offsets += value.lastIndex
+            while (offsets.size > normalizedText.length) offsets.removeAt(offsets.lastIndex)
         }
-        return normalized.toString() to offsets
+
+        return normalizedText to offsets
     }
 
     /** Join adjacent glyph rectangles on the same text line into a single readable highlight. */
