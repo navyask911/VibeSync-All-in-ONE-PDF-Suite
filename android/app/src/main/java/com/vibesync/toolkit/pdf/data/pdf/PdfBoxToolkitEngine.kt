@@ -694,8 +694,20 @@ class PdfBoxToolkitEngine(
                     if (pageIndex !in 0 until renderer.pageCount) return@forEach
 
                     renderer.openPage(pageIndex).use { renderedPage ->
-                        val pageWidthPt = renderedPage.width.toFloat().coerceAtLeast(1f)
-                        val pageHeightPt = renderedPage.height.toFloat().coerceAtLeast(1f)
+                        // Android PdfRenderer exposes page dimensions as rounded integer pixels.
+                        // Preserve PDFBox's precise point dimensions for the output MediaBox so
+                        // A4 (595.27563 x 841.8898 pt) does not silently become (595 x 842 pt).
+                        val outputPage = document.getPage(pageIndex)
+                        val sourceMediaBox = outputPage.mediaBox
+                        val isQuarterTurned = outputPage.rotation % 180 != 0
+                        val pageWidthPt = (
+                            if (isQuarterTurned) sourceMediaBox.height else sourceMediaBox.width
+                        ).coerceAtLeast(1f)
+                        val pageHeightPt = (
+                            if (isQuarterTurned) sourceMediaBox.width else sourceMediaBox.height
+                        ).coerceAtLeast(1f)
+                        val rendererWidthPx = renderedPage.width.toFloat().coerceAtLeast(1f)
+                        val rendererHeightPx = renderedPage.height.toFloat().coerceAtLeast(1f)
                         val maxScale = kotlin.math.sqrt(
                             MAX_EDITOR_EXPORT_PIXELS.toDouble() /
                                 (pageWidthPt.toDouble() * pageHeightPt.toDouble())
@@ -709,7 +721,12 @@ class PdfBoxToolkitEngine(
                         try {
                             bitmap.eraseColor(Color.WHITE)
                             val matrix = Matrix().apply {
-                                setScale(bitmap.width / pageWidthPt, bitmap.height / pageHeightPt)
+                                // Scale from the renderer's rounded raster extent into the bitmap
+                                // whose point-space dimensions came from the original MediaBox.
+                                setScale(
+                                    bitmap.width / rendererWidthPx,
+                                    bitmap.height / rendererHeightPx
+                                )
                             }
                             renderedPage.render(
                                 bitmap, null, matrix,
@@ -717,7 +734,6 @@ class PdfBoxToolkitEngine(
                             )
                             drawEditorAnnotations(bitmap, annotations, screenWidthPx)
 
-                            val outputPage = document.getPage(pageIndex)
                             outputPage.mediaBox = PDRectangle(pageWidthPt, pageHeightPt)
                             outputPage.cropBox = outputPage.mediaBox
                             outputPage.rotation = 0
