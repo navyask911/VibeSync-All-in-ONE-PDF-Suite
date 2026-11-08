@@ -444,4 +444,17 @@
     <string name="viewer_searching">Pesquisando PDF…</string>
     <string name="viewer_search_running_ocr">Executando OCR…</string>
     <string name="viewer_search_failed">Falha na pesquisa. Tente novamente.</string>
+    <string name="id_card_camera">Camera</string>
+    <string name="signature_capture_title">Create saved signature</string>
+    <string name="signature_capture_hint">Draw your signature in the area below.</string>
+    <string name="signature_capture_clear">Clear</string>
+    <string name="signature_capture_save">Save signature</string>
+    <string name="signature_capture_name">Signature name</string>
+    <string name="signature_capture_empty">Draw a signature before saving.</string>
+    <string name="signature_capture_save_failed">Could not save this signature. Please try again.</string>
+    <string name="editor_insert_saved_signature">Insert saved signature</string>
+    <string name="editor_saved_signature_empty">No saved signatures yet.</string>
+    <string name="vault_import_external_pdf">Import external PDF</string>
+    <string name="vault_import_progress">Securing PDF… %1$d%%</string>
+    <string name="vault_import_failed">Could not import this PDF into the vault.</string>
 </resources>
