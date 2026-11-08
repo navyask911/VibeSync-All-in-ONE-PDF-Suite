@@ -7,7 +7,13 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
+import android.graphics.Path
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.RectF
 import android.graphics.Typeface
+import android.graphics.pdf.PdfRenderer as AndroidPdfRenderer
+import android.os.ParcelFileDescriptor
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextDirectionHeuristics
@@ -649,121 +655,158 @@ class PdfBoxToolkitEngine(
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "flatten_src_")
             sourceFileToDelete = sourceFile
             PDDocument.load(sourceFile).use { document ->
-
-                pageAnnotationsMap.forEach { (pageIndex, annotations) ->
-                    if (pageIndex < document.numberOfPages && !annotations.isEmpty) {
-                        val page = document.getPage(pageIndex)
-                        val mediaBox = page.mediaBox
-                        val pageWidthPt = mediaBox.width
-                        val pageHeightPt = mediaBox.height
-
-                        // Calculate horizontal and vertical scale factor from screen pixels to 72 DPI PDF points
-                        val scaleFactor = pageWidthPt / screenWidthPx.coerceAtLeast(1f)
-
-                        PDPageContentStream(document, page, PDPageContentStream.AppendMode.APPEND, true, true).use { cs ->
-
-                            // 1. Highlighters (semi-transparent stroke with graphics state)
-                            annotations.strokes.filter { it.isHighlighter }.forEach { stroke ->
-                                if (stroke.points.size >= 2) {
-                                    val gs = PDExtendedGraphicsState().apply {
-                                        strokingAlphaConstant = 0.35f
-                                        blendMode = BlendMode.MULTIPLY
-                                    }
-                                    cs.setGraphicsStateParameters(gs)
-                                    cs.setLineCapStyle(1)
-                                    cs.setLineJoinStyle(1)
-                                    val r = Color.red(stroke.colorArgb) / 255f
-                                    val g = Color.green(stroke.colorArgb) / 255f
-                                    val b = Color.blue(stroke.colorArgb) / 255f
-                                    cs.setStrokingColor(r, g, b)
-                                    cs.setLineWidth(stroke.strokeWidth * pageWidthPt)
-
-                                    val first = stroke.points.first()
-                                    val startPdfX = first.x.coerceIn(0f, 1f) * pageWidthPt
-                                    val startPdfY = pageHeightPt - (first.y.coerceIn(0f, 1f) * pageHeightPt)
-                                    cs.moveTo(startPdfX, startPdfY)
-
-                                    for (i in 1 until stroke.points.size) {
-                                        val pt = stroke.points[i]
-                                        cs.lineTo(pt.x.coerceIn(0f, 1f) * pageWidthPt, pageHeightPt - (pt.y.coerceIn(0f, 1f) * pageHeightPt))
-                                    }
-                                    cs.stroke()
-                                }
-                            }
-
-                            // 2. Freehand Pen Vector Strokes (Opaque)
-                            annotations.strokes.filter { !it.isHighlighter }.forEach { stroke ->
-                                if (stroke.points.size >= 2) {
-                                    val gs = PDExtendedGraphicsState().apply {
-                                        strokingAlphaConstant = stroke.alpha.coerceIn(0f, 1f)
-                                    }
-                                    cs.setGraphicsStateParameters(gs)
-                                    cs.setLineCapStyle(1)
-                                    cs.setLineJoinStyle(1)
-                                    val r = Color.red(stroke.colorArgb) / 255f
-                                    val g = Color.green(stroke.colorArgb) / 255f
-                                    val b = Color.blue(stroke.colorArgb) / 255f
-                                    cs.setStrokingColor(r, g, b)
-                                    cs.setLineWidth(stroke.strokeWidth * pageWidthPt)
-
-                                    val first = stroke.points.first()
-                                    val startPdfX = first.x.coerceIn(0f, 1f) * pageWidthPt
-                                    val startPdfY = pageHeightPt - (first.y.coerceIn(0f, 1f) * pageHeightPt)
-                                    cs.moveTo(startPdfX, startPdfY)
-
-                                    for (i in 1 until stroke.points.size) {
-                                        val pt = stroke.points[i]
-                                        cs.lineTo(pt.x.coerceIn(0f, 1f) * pageWidthPt, pageHeightPt - (pt.y.coerceIn(0f, 1f) * pageHeightPt))
-                                    }
-                                    cs.stroke()
-                                }
-                            }
-
-                            // 3. Text Annotations
-                            annotations.textAnnotations.forEach { textItem ->
-                                cs.beginText()
-                                cs.setFont(PDType1Font.HELVETICA_BOLD, textItem.fontSizeSp * scaleFactor * 0.9f)
-                                val r = Color.red(textItem.colorArgb) / 255f
-                                val g = Color.green(textItem.colorArgb) / 255f
-                                val b = Color.blue(textItem.colorArgb) / 255f
-                                cs.setNonStrokingColor(r, g, b)
-
-                                val pdfX = textItem.x * scaleFactor
-                                val pdfY = pageHeightPt - (textItem.y * scaleFactor)
-                                cs.newLineAtOffset(pdfX, pdfY)
-                                cs.showText(textItem.text)
-                                cs.endText()
-                            }
-
-                            // 4. Digital Signatures (Vector / Bitmap stamps)
-                            annotations.signatures.forEach { sig ->
-                                val bitmap = sig.bitmap
-                                if (bitmap != null && !bitmap.isRecycled) {
-                                    val pdImage = LosslessFactory.createFromImage(document, bitmap)
-                                    val sigPdfX = sig.x * scaleFactor
-                                    val sigPdfY = pageHeightPt - ((sig.y + sig.height) * scaleFactor)
-                                    val sigWidthPt = sig.width * scaleFactor
-                                    val sigHeightPt = sig.height * scaleFactor
-                                    cs.drawImage(pdImage, sigPdfX, sigPdfY, sigWidthPt, sigHeightPt)
-                                }
-                            }
-                        }
-                    }
-                }
-
+                compositeAnnotatedPages(sourceFile, document, pageAnnotationsMap, screenWidthPx)
                 applyVibeSyncWatermark(document)
-                document.save(outputFile)
+                FileOutputStream(outputFile).use { outputStream -> document.save(outputStream) }
             }
             Result.success(outputFile)
         } catch (cancelled: CancellationException) {
             outputFile.delete()
             throw cancelled
-        } catch (e: Exception) {
+        } catch (error: Exception) {
             outputFile.delete()
-            Log.e(TAG, "Failed to flatten annotations onto PDF", e)
-            Result.failure(e)
+            Log.e(TAG, "Failed to flatten annotations onto PDF", error)
+            Result.failure(error)
         } finally {
             sourceFileToDelete?.delete()
+        }
+    }
+
+    /**
+     * Rasterizes annotated pages at up to 300 DPI and composites the complete editor layer.
+     * PdfRenderer, its file descriptor, and each open page have deterministic close scopes.
+     */
+    private suspend fun compositeAnnotatedPages(
+        sourceFile: File,
+        document: PDDocument,
+        pageAnnotationsMap: Map<Int, PageAnnotations>,
+        screenWidthPx: Float
+    ) {
+        val annotatedPages = pageAnnotationsMap.filter { (pageIndex, annotations) ->
+            pageIndex in 0 until document.numberOfPages && !annotations.isEmpty
+        }
+        if (annotatedPages.isEmpty()) return
+
+        ParcelFileDescriptor.open(sourceFile, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+            AndroidPdfRenderer(descriptor).use { renderer ->
+                annotatedPages.toSortedMap().forEach { (pageIndex, annotations) ->
+                    currentCoroutineContext().ensureActive()
+                    if (pageIndex !in 0 until renderer.pageCount) return@forEach
+
+                    renderer.openPage(pageIndex).use { renderedPage ->
+                        val pageWidthPt = renderedPage.width.toFloat().coerceAtLeast(1f)
+                        val pageHeightPt = renderedPage.height.toFloat().coerceAtLeast(1f)
+                        val maxScale = kotlin.math.sqrt(
+                            MAX_EDITOR_EXPORT_PIXELS.toDouble() /
+                                (pageWidthPt.toDouble() * pageHeightPt.toDouble())
+                        ).toFloat()
+                        val renderScale = minOf(EDITOR_EXPORT_DPI / 72f, maxScale).coerceAtLeast(0.001f)
+                        val bitmap = Bitmap.createBitmap(
+                            ceil(pageWidthPt * renderScale).toInt().coerceAtLeast(1),
+                            ceil(pageHeightPt * renderScale).toInt().coerceAtLeast(1),
+                            Bitmap.Config.ARGB_8888
+                        )
+                        try {
+                            bitmap.eraseColor(Color.WHITE)
+                            val matrix = Matrix().apply {
+                                setScale(bitmap.width / pageWidthPt, bitmap.height / pageHeightPt)
+                            }
+                            renderedPage.render(
+                                bitmap, null, matrix,
+                                AndroidPdfRenderer.Page.RENDER_MODE_FOR_PRINT
+                            )
+                            drawEditorAnnotations(bitmap, annotations, screenWidthPx)
+
+                            val outputPage = document.getPage(pageIndex)
+                            outputPage.mediaBox = PDRectangle(pageWidthPt, pageHeightPt)
+                            outputPage.cropBox = outputPage.mediaBox
+                            outputPage.rotation = 0
+                            val image = LosslessFactory.createFromImage(document, bitmap)
+                            PDPageContentStream(
+                                document, outputPage,
+                                PDPageContentStream.AppendMode.OVERWRITE, true, true
+                            ).use { it.drawImage(image, 0f, 0f, pageWidthPt, pageHeightPt) }
+                        } finally {
+                            if (!bitmap.isRecycled) bitmap.recycle()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun drawEditorAnnotations(
+        bitmap: Bitmap,
+        annotations: PageAnnotations,
+        screenWidthPx: Float
+    ) {
+        val canvas = Canvas(bitmap)
+        val pageWidthPx = bitmap.width.toFloat()
+        val pageHeightPx = bitmap.height.toFloat()
+        val safeScreenWidth = screenWidthPx.takeIf { it.isFinite() && it > 0f } ?: 595f
+        val scaleX = pageWidthPx / safeScreenWidth
+        val screenHeightPx = safeScreenWidth * pageHeightPx / pageWidthPx
+        val scaleY = pageHeightPx / screenHeightPx
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.DITHER_FLAG).apply {
+            strokeCap = Paint.Cap.ROUND
+            strokeJoin = Paint.Join.ROUND
+            style = Paint.Style.STROKE
+        }
+
+        fun strokePath(points: List<com.vibesync.toolkit.pdf.data.model.Point2D>): Path =
+            Path().apply {
+                val first = points.first()
+                moveTo(first.x.coerceIn(0f, 1f) * pageWidthPx, first.y.coerceIn(0f, 1f) * pageHeightPx)
+                points.drop(1).forEach { point ->
+                    lineTo(point.x.coerceIn(0f, 1f) * pageWidthPx, point.y.coerceIn(0f, 1f) * pageHeightPx)
+                }
+            }
+
+        annotations.strokes.filter { it.isHighlighter }.forEach { stroke ->
+            if (stroke.points.size >= 2) {
+                paint.color = stroke.colorArgb
+                paint.alpha = (stroke.alpha.coerceIn(0f, 1f) * 255f).roundToInt()
+                paint.strokeWidth = (stroke.strokeWidth * pageWidthPx).coerceAtLeast(1f)
+                paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.MULTIPLY)
+                canvas.drawPath(strokePath(stroke.points), paint)
+            }
+        }
+        annotations.strokes.filter { !it.isHighlighter }.forEach { stroke ->
+            if (stroke.points.size >= 2) {
+                paint.color = stroke.colorArgb
+                paint.alpha = (stroke.alpha.coerceIn(0f, 1f) * 255f).roundToInt()
+                paint.strokeWidth = (stroke.strokeWidth * pageWidthPx).coerceAtLeast(1f)
+                paint.xfermode = null
+                canvas.drawPath(strokePath(stroke.points), paint)
+            }
+        }
+
+        paint.xfermode = null
+        paint.style = Paint.Style.FILL
+        annotations.textAnnotations.forEach { annotation ->
+            paint.color = annotation.colorArgb
+            paint.textSize = (annotation.fontSizeSp * scaleX * 0.9f).coerceAtLeast(1f)
+            canvas.drawText(
+                annotation.text,
+                annotation.x.coerceAtLeast(0f) * scaleX,
+                annotation.y.coerceAtLeast(0f) * scaleY + paint.textSize,
+                paint
+            )
+        }
+        annotations.signatures.forEach { signature ->
+            val signatureBitmap = signature.bitmap
+            if (signatureBitmap != null && !signatureBitmap.isRecycled) {
+                val destination = RectF(
+                    signature.x.coerceAtLeast(0f) * scaleX,
+                    signature.y.coerceAtLeast(0f) * scaleY,
+                    (signature.x + signature.width).coerceAtLeast(0f) * scaleX,
+                    (signature.y + signature.height).coerceAtLeast(0f) * scaleY
+                )
+                canvas.drawBitmap(
+                    signatureBitmap, null, destination,
+                    Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+                )
+            }
         }
     }
 
@@ -1091,6 +1134,8 @@ class PdfBoxToolkitEngine(
         private const val WATERMARK_ANGLE_KEY = "watermark_angle"
         private const val WATERMARK_ENABLED_KEY = "watermark_custom_enabled"
         private const val DEFAULT_WATERMARK_OPACITY = 0.45f
+        private const val EDITOR_EXPORT_DPI = 300f
+        private const val MAX_EDITOR_EXPORT_PIXELS = 8_000_000L
     }
 }
 

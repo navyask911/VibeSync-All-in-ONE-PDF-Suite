@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.background
@@ -68,17 +67,22 @@ fun PdfEditorScreen(
     val density = LocalDensity.current
     val uiState by viewModel.uiState.collectAsState()
 
-    var showSignatureDialog by remember { mutableStateOf(false) }
-    var showSignatureManagerDialog by remember { mutableStateOf(false) }
-    var showTextInputDialog by remember { mutableStateOf(false) }
-    var pendingTapOffset by remember { mutableStateOf(Offset.Zero) }
-    var textInputState by remember { mutableStateOf("") }
-    var screenWidthPx by remember { mutableFloatStateOf(1080f) }
+    var showSignatureDialog by remember(documentUri) { mutableStateOf(false) }
+    var showSignatureManagerDialog by remember(documentUri) { mutableStateOf(false) }
+    var showTextInputDialog by remember(documentUri) { mutableStateOf(false) }
+    var pendingTapOffset by remember(documentUri) { mutableStateOf(Offset.Zero) }
+    var textInputState by remember(documentUri) { mutableStateOf("") }
+    var screenWidthPx by remember(documentUri) { mutableFloatStateOf(1080f) }
     var scale by remember(documentUri) { mutableFloatStateOf(1f) }
     var offset by remember(documentUri) { mutableStateOf(Offset.Zero) }
-    val snackbarHostState = remember { SnackbarHostState() }
+    val snackbarHostState = remember(documentUri) { SnackbarHostState() }
+
+    DisposableEffect(documentUri) {
+        onDispose { viewModel.resetEditorState() }
+    }
 
     LaunchedEffect(documentUri) {
+        viewModel.resetEditorState()
         viewModel.initEditor(documentUri)
         AdMobManager.preloadInterstitial(context)
     }
@@ -93,17 +97,22 @@ fun PdfEditorScreen(
             Column {
                 TopAppBar(
                     title = {
-                        Text(
-                            text = uiState.fileName,
-                            maxLines = 1,
-                            modifier = Modifier
-                                .fillMaxWidth(0.85f)
-                                .basicMarquee(iterations = Int.MAX_VALUE)
-                                .clickable { onRenameClick(uiState.fileName) }
-                                .testTag("editor_rename_title"),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = uiState.fileName,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier
+                                    .weight(1f, fill = false)
+                                    .clickable { onRenameClick(uiState.fileName) }
+                                    .testTag("editor_rename_title"),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     },
                     navigationIcon = {
                         IconButton(onClick = onNavigateBack) {

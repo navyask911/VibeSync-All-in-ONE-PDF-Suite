@@ -33,6 +33,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -986,44 +987,13 @@ fun PdfPageItem(
                         fontWeight = FontWeight.SemiBold
                     )
                 }
+                // The overlay is a sibling above the page bitmap; parent zoom, pan and scroll
+                // affect both in the same coordinate space, with no duplicated offsets.
                 if (highlightOverlays.isNotEmpty()) {
-                    Canvas(
-                        modifier = Modifier.matchParentSize().testTag("viewer_search_highlights")
-                    ) {
-                        val sourceBitmap = bitmapForCompose
-                        if (sourceBitmap != null && sourceBitmap.width > 0 && sourceBitmap.height > 0) {
-                            val scaleX = size.width / sourceBitmap.width.toFloat()
-                            val scaleY = size.height / sourceBitmap.height.toFloat()
-                            highlightOverlays.forEach { overlay ->
-                                val left = (
-                                    overlay.bounds.left.toFloat() /
-                                        PdfSearchHighlight.COORDINATE_SCALE * sourceBitmap.width
-                                    ).toInt().coerceIn(0, sourceBitmap.width)
-                                val top = (
-                                    overlay.bounds.top.toFloat() /
-                                        PdfSearchHighlight.COORDINATE_SCALE * sourceBitmap.height
-                                    ).toInt().coerceIn(0, sourceBitmap.height)
-                                val right = (
-                                    overlay.bounds.right.toFloat() /
-                                        PdfSearchHighlight.COORDINATE_SCALE * sourceBitmap.width
-                                    ).toInt().coerceIn(left, sourceBitmap.width)
-                                val bottom = (
-                                    overlay.bounds.bottom.toFloat() /
-                                        PdfSearchHighlight.COORDINATE_SCALE * sourceBitmap.height
-                                    ).toInt().coerceIn(top, sourceBitmap.height)
-                                drawRect(
-                                    color = Color(0xFFFFEB3B).copy(
-                                        alpha = if (overlay.isCurrent) 0.50f else 0.26f
-                                    ),
-                                    topLeft = Offset(left * scaleX, top * scaleY),
-                                    size = androidx.compose.ui.geometry.Size(
-                                        (right - left).coerceAtLeast(2) * scaleX,
-                                        (bottom - top).coerceAtLeast(2) * scaleY
-                                    )
-                                )
-                            }
-                        }
-                    }
+                    PdfSearchHighlightLayer(
+                        highlightOverlays = highlightOverlays,
+                        modifier = Modifier.matchParentSize()
+                    )
                 }
             }
             renderFailed -> {
@@ -1073,3 +1043,33 @@ data class SearchHighlightOverlay(
     val bounds: PdfSearchHighlight,
     val isCurrent: Boolean
 )
+
+/** Draws page-normalized match rectangles on a Canvas layer above the PDF bitmap. */
+@Composable
+fun PdfSearchHighlightLayer(
+    highlightOverlays: List<SearchHighlightOverlay>,
+    modifier: Modifier = Modifier
+) {
+    if (highlightOverlays.isEmpty()) return
+
+    Canvas(modifier = modifier.testTag("viewer_search_highlights")) {
+        highlightOverlays.forEach { overlay ->
+            val rect = overlay.bounds.toCanvasRect(size)
+            if (rect.width > 0f && rect.height > 0f) {
+                drawRect(
+                    color = Color(0x66FFEB3B),
+                    topLeft = rect.topLeft,
+                    size = rect.size
+                )
+                if (overlay.isCurrent) {
+                    drawRect(
+                        color = Color(0xFFFF9800),
+                        topLeft = rect.topLeft,
+                        size = rect.size,
+                        style = Stroke(width = 2.dp.toPx())
+                    )
+                }
+            }
+        }
+    }
+}

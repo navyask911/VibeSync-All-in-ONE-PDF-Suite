@@ -2,6 +2,8 @@ package com.vibesync.toolkit.pdf.data.pdf
 
 import android.content.Context
 import android.net.Uri
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.text.PDFTextStripper
 import com.tom_roush.pdfbox.text.TextPosition
@@ -89,12 +91,12 @@ private class PositionedPdfTextStripper : PDFTextStripper() {
                 position.pageWidth
             }).coerceAtLeast(1f)
 
-            // TextPosition x/y are page-rotation-adjusted. Y is measured to the glyph baseline
-            // from the top edge, so subtract glyph height to get the visible top coordinate.
+            // PDFBox TextPosition x/y are already converted from PDF's bottom-left origin to the
+            // rotated page's top-left origin (points). y marks the glyph baseline; subtract height.
             val left = position.x
-            val top = position.y - position.height
+            val bottom = position.y
+            val top = (bottom - position.height).coerceAtLeast(0f)
             val right = left + position.width
-            val bottom = top + position.height
             val bounds = PdfSearchHighlight(
                 left = normalizedCoordinate(left, pageWidth),
                 top = normalizedCoordinate(top, pageHeight),
@@ -128,13 +130,29 @@ private class PositionedPdfTextStripper : PDFTextStripper() {
             .coerceIn(0, PdfSearchHighlight.COORDINATE_SCALE)
 }
 
-/** Page-normalized (0..10,000) bounds; independent of the render bitmap's pixel dimensions. */
+/** Top-left page-normalized (0..10,000) rectangle, independent of bitmap resolution. */
 data class PdfSearchHighlight(
     val left: Int,
     val top: Int,
     val right: Int,
     val bottom: Int
 ) {
+    fun toCanvasRect(canvasSize: Size): Rect {
+        val width = canvasSize.width.coerceAtLeast(0f)
+        val height = canvasSize.height.coerceAtLeast(0f)
+        val leftNorm = left.coerceIn(0, COORDINATE_SCALE)
+        val topNorm = top.coerceIn(0, COORDINATE_SCALE)
+        val rightNorm = right.coerceIn(leftNorm, COORDINATE_SCALE)
+        val bottomNorm = bottom.coerceIn(topNorm, COORDINATE_SCALE)
+        val factor = COORDINATE_SCALE.toFloat()
+        return Rect(
+            left = leftNorm / factor * width,
+            top = topNorm / factor * height,
+            right = rightNorm / factor * width,
+            bottom = bottomNorm / factor * height
+        )
+    }
+
     companion object {
         const val COORDINATE_SCALE = 10_000
     }
@@ -211,7 +229,7 @@ object PdfUnicodeSearch {
     }
 
     private fun normalizeWithOffsetMap(value: String): Pair<String, List<Int>> {
-        val normalized = StringBuilder()
+        val normalizedText = Normalizer.normalize(value, Normalizer.Form.NFC)
         val offsets = mutableListOf<Int>()
         var cursor = 0
         while (cursor < value.length) {
@@ -227,10 +245,11 @@ object PdfUnicodeSearch {
                 }
             }
             val normalizedChunk = Normalizer.normalize(value.substring(start, cursor), Normalizer.Form.NFC)
-            normalized.append(normalizedChunk)
             repeat(normalizedChunk.length) { offsets += start }
         }
-        return normalized.toString() to offsets
+        val fallbackOffset = offsets.lastOrNull() ?: 0
+        while (offsets.size < normalizedText.length) offsets += fallbackOffset
+        return normalizedText to offsets.take(normalizedText.length)
     }
 
     /** Join adjacent glyph rectangles on the same text line into a single readable highlight. */
