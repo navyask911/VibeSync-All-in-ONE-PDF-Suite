@@ -131,11 +131,15 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun resetEditorState() {
         activeDocumentUri = null
-        editorLoadJob?.cancel()
+        val pendingLoad = editorLoadJob
+        val pendingSave = saveJob
+        pendingLoad?.cancel()
+        pendingSave?.cancel()
         editorLoadJob = null
-        saveJob?.cancel()
         saveJob = null
 
+        // Remove bitmap references from the live session now, but do not recycle their pixels
+        // until an in-flight PDFBox flatten operation has stopped using its snapshot.
         val signatureBitmaps = temporarySignatureBitmaps.toList()
         temporarySignatureBitmaps.clear()
         pageAnnotationsMap.clear()
@@ -148,17 +152,18 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             documentLoadedRevision = _uiState.value.documentLoadedRevision + 1
         )
 
-        // Drop cache entries immediately; the renderer close below also releases legacy leases
-        // and its retained ParcelFileDescriptor/PdfRenderer pair.
-        BitmapCache.getInstance().clear()
         val previousCleanup = rendererCleanupJob
         rendererCleanupJob = viewModelScope.launch(Dispatchers.IO) {
             previousCleanup?.join()
+            pendingLoad?.join()
+            pendingSave?.join()
+            signatureBitmaps.forEach { bitmap ->
+                if (!bitmap.isRecycled) bitmap.recycle()
+            }
+            // closeDocumentSafely also releases active/legacy page bitmap leases, the native
+            // PdfRenderer and its retained ParcelFileDescriptor, plus the renderer cache.
             rendererEngine.closeDocumentSafely()
-        }
-
-        signatureBitmaps.forEach { bitmap ->
-            if (!bitmap.isRecycled) bitmap.recycle()
+            BitmapCache.getInstance().clear()
         }
     }
 
@@ -456,6 +461,13 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     fun saveFlattenedDocument(screenWidthPx: Float, onComplete: (File) -> Unit) {
         persistCurrentPageAnnotations()
         val sourceUri = activeDocumentUri ?: return
+        val annotationsSnapshot = pageAnnotationsMap.mapValues { (_, annotations) ->
+            annotations.copy(
+                strokes = annotations.strokes.toList(),
+                textAnnotations = annotations.textAnnotations.toList(),
+                signatures = annotations.signatures.toList()
+            )
+        }
         _uiState.value = _uiState.value.copy(isSaving = true)
 
         saveJob?.cancel()
@@ -471,7 +483,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             }
             val result = toolkitEngine.flattenAnnotations(
                 sourceUri = sourceUri,
-                pageAnnotationsMap = pageAnnotationsMap,
+                pageAnnotationsMap = annotationsSnapshot,
                 screenWidthPx = screenWidthPx,
                 outputFile = outputFile
             )
@@ -494,28 +506,36 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     override fun onCleared() {
         activeDocumentUri = null
-        editorLoadJob?.cancel()
-        saveJob?.cancel()
+        val pendingLoad = editorLoadJob
+        val pendingSave = saveJob
+        pendingLoad?.cancel()
+        pendingSave?.cancel()
+        editorLoadJob = null
+        saveJob = null
         pageAnnotationsMap.clear()
         undoStack.clear()
         redoStack.clear()
-        temporarySignatureBitmaps.forEach { bitmap ->
-            if (!bitmap.isRecycled) bitmap.recycle()
-        }
+        val signatureBitmaps = temporarySignatureBitmaps.toList()
         temporarySignatureBitmaps.clear()
-        BitmapCache.getInstance().clear()
         super.onCleared()
 
-        // Rendering and native close share the renderer lock. Never block the main thread
-        // waiting for an in-flight PDF page render during lifecycle teardown.
+        // A standalone I/O scope outlives viewModelScope cancellation. Wait for any cancelled
+        // load/export to leave native code before recycling bitmaps and closing PdfRenderer/PFD.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
+                pendingLoad?.join()
+                pendingSave?.join()
                 rendererEngine.closeDocumentSafely()
             } catch (error: Exception) {
                 Log.w(
                     "EditorViewModel",
                     "renderer.cleanup_failed category=" + error.javaClass.simpleName
                 )
+            } finally {
+                signatureBitmaps.forEach { bitmap ->
+                    if (!bitmap.isRecycled) bitmap.recycle()
+                }
+                BitmapCache.getInstance().clear()
             }
         }
     }
