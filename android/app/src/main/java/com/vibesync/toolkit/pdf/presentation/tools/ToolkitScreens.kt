@@ -551,7 +551,7 @@ fun ConvertImagesScreen(
                     isConverting = true
                     errorMessage = null
                     coroutineScope.launch {
-                        val output = UriUtils.createExportCacheFile(context, "images_to_pdf")
+                        val output = UriUtils.createExportCacheFile(context, "VibeSync_ImagesToPDF")
                         val result = engine.convertImagesToPdf(selectedUris.toList(), output)
                         isConverting = false
                         result.fold(

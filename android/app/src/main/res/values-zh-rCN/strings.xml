@@ -92,7 +92,6 @@
     <string name="failed_to_open_pdf">无法打开 PDF</string>
     <string name="pdf_page_description">PDF 第 %1$d 页</string>
     <string name="admob_app_id">ca-app-pub-4783826505860771~4377815936</string>
-    <string name="admob_banner_unit_id">ca-app-pub-4783826505860771/3755922842</string>
     <string name="selected_file_name">已选择：%1$s</string>
     <string name="tool_select_pdf_to_split">选择要拆分的 PDF</string>
     <string name="tool_choose_pdf_document">选择 PDF 文档</string>
@@ -434,7 +433,7 @@
     <string name="vault_lock_action">Lock vault</string>
     <string name="vault_biometric_title">Unlock VibeSync Vault</string>
     <string name="vault_biometric_subtitle">Authenticate with strong biometrics or your device PIN.</string>
-    <!-- PDF viewer search -->
+    <!-- On-device PDF text search -->
     <string name="viewer_search">在 PDF 中搜索</string>
     <string name="viewer_search_hint">在此 PDF 中查找文本</string>
     <string name="viewer_search_close">关闭搜索</string>

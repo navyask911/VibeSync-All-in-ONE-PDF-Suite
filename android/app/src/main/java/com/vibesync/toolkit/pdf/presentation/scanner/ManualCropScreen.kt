@@ -1,7 +1,7 @@
 package com.vibesync.toolkit.pdf.presentation.scanner
 
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import android.graphics.Paint
 import android.graphics.PointF
 import android.graphics.RectF
@@ -94,7 +94,7 @@ fun ManualCropScreen(
         loadFailed = false
         val decoded = withContext(Dispatchers.IO) {
             runCatching {
-                context.contentResolver.openInputStream(uri)?.use { input -> BitmapFactory.decodeStream(input) }
+                PdfBitmapUtils.decodeStreamDownsampled(openInputStream = { context.contentResolver.openInputStream(uri) })
             }.getOrNull()
         }
         loading = false
@@ -126,12 +126,12 @@ fun ManualCropScreen(
         }
     }) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.fillMaxSize().padding(padding).padding(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(
                 stringResource(R.string.manual_crop_instructions),
-                style = MaterialTheme.typography.bodyMedium
+                style = MaterialTheme.typography.bodySmall
             )
             val bitmap = sourceBitmap
             if (loading) {

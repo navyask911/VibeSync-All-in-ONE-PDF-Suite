@@ -12,8 +12,10 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.LayoutDirection
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.data.pdf.ResolutionProfile
@@ -76,17 +78,39 @@ class ResolutionProfileSelectorTest {
     @Test
     fun pdfExportNameDialogShowsProfileSelector() {
         val file = File(composeRule.activity.cacheDir, "resolution-profile-export-test.pdf")
-            .apply { writeBytes(byteArrayOf(0x25, 0x50, 0x44, 0x46)) }
-        composeRule.activity.runOnUiThread {
-            val method = MainActivity::class.java.getDeclaredMethod(
-                "shareFiles", List::class.java, String::class.java, String::class.java,
-                Boolean::class.javaPrimitiveType!!
-            )
-            method.isAccessible = true
-            method.invoke(composeRule.activity, listOf(file), "application/pdf", "Test_Export", false)
+        file.writeBytes(byteArrayOf(0x25, 0x50, 0x44, 0x46))
+
+        try {
+            composeRule.activity.runOnUiThread {
+                // Exercise the dialog handoff directly. shareFiles() first performs asynchronous
+                // PDF watermark staging, which is outside this dialog's presentation contract.
+                val method = MainActivity::class.java.getDeclaredMethod(
+                    "shareFilesPrepared", List::class.java, String::class.java, String::class.java,
+                    Boolean::class.javaPrimitiveType!!
+                )
+                method.isAccessible = true
+                method.invoke(composeRule.activity, listOf(file), "application/pdf", "Test_Export", false)
+            }
+
+            composeRule.waitUntil(20_000) {
+                composeRule.onAllNodesWithTag("resolution_profile_export_selector")
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+
+            composeRule.onAllNodesWithText("Name your output file").assertCountEquals(1)
+
+            composeRule.onNodeWithTag("resolution_profile_SMALLEST")
+                .performScrollTo()
+                .assertIsDisplayed()
+            composeRule.onNodeWithTag("resolution_profile_STANDARD")
+                .performScrollTo()
+                .assertIsDisplayed()
+            composeRule.onNodeWithTag("resolution_profile_LARGEST")
+                .performScrollTo()
+                .assertIsDisplayed()
+        } finally {
+            file.delete()
         }
-        composeRule.waitForIdle()
-        composeRule.onNodeWithTag("resolution_profile_export_selector").assertIsDisplayed()
     }
 
     /**

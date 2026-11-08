@@ -143,7 +143,6 @@
     <string name="title_encrypt">Chiffrer et protéger</string>
     <string name="title_convert">Images en PDF</string>
     <string name="admob_app_id">ca-app-pub-4783826505860771~4377815936</string>
-    <string name="admob_banner_unit_id">ca-app-pub-4783826505860771/3755922842</string>
 
 
     <string name="signature_draw_title">Dessinez votre signature</string>
@@ -444,7 +443,7 @@
     <string name="vault_lock_action">Lock vault</string>
     <string name="vault_biometric_title">Unlock VibeSync Vault</string>
     <string name="vault_biometric_subtitle">Authenticate with strong biometrics or your device PIN.</string>
-    <!-- PDF viewer search -->
+    <!-- On-device PDF text search -->
     <string name="viewer_search">Rechercher dans le PDF</string>
     <string name="viewer_search_hint">Rechercher du texte dans ce PDF</string>
     <string name="viewer_search_close">Fermer la recherche</string>

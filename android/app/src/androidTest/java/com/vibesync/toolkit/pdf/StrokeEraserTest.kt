@@ -89,11 +89,17 @@ class StrokeEraserTest {
     private fun newViewModel(): EditorViewModel =
         EditorViewModel(ApplicationProvider.getApplicationContext<Application>())
 
+    private val pageSizePx: Float
+        get() = with(composeTestRule.density) { 240.dp.toPx() }
+
     private fun stroke(id: String, y: Float) = VectorStroke(
         id = id,
-        points = listOf(Point2D(10f, y), Point2D(100f, y)),
+        points = listOf(
+            Point2D(10f / pageSizePx, y / pageSizePx),
+            Point2D(100f / pageSizePx, y / pageSizePx)
+        ),
         colorArgb = android.graphics.Color.BLACK,
-        strokeWidth = 3f
+        strokeWidth = 3f / pageSizePx
     )
 
     private fun showCanvas(viewModel: EditorViewModel) {

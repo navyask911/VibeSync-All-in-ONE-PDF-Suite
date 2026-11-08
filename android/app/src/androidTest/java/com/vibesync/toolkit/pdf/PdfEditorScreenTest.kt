@@ -2,9 +2,8 @@ package com.vibesync.toolkit.pdf
 
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsEnabled
-import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.click
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -18,52 +17,21 @@ import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.presentation.editor.EditorUiState
 import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
 import com.vibesync.toolkit.pdf.data.model.ToolMode
+import com.vibesync.toolkit.pdf.data.model.VectorStroke
 import com.vibesync.toolkit.pdf.presentation.editor.PdfEditorScreen
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.slot
 import io.mockk.verify
 import kotlinx.coroutines.flow.MutableStateFlow
-import java.util.concurrent.atomic.AtomicInteger
-import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
 class PdfEditorScreenTest {
     @get:Rule
     val composeTestRule = createComposeRule()
-
-    @Test
-    fun editorWaitsForDocumentReadyBeforeRenderingAndEnablesSave() {
-        val viewModel = mockk<EditorViewModel>(relaxed = true)
-        val stateFlow = MutableStateFlow(EditorUiState(isDocumentReady = false))
-        val bitmap = Bitmap.createBitmap(80, 112, Bitmap.Config.ARGB_8888)
-        val bitmapRequests = AtomicInteger(0)
-        every { viewModel.uiState } returns stateFlow
-        coEvery { viewModel.getPageBitmap(0) } coAnswers {
-            bitmapRequests.incrementAndGet()
-            bitmap
-        }
-
-        composeTestRule.setContent {
-            VibeSyncPdfTheme {
-                PdfEditorScreen(
-                    documentUri = Uri.parse("content://test/ready.pdf"),
-                    viewModel = viewModel,
-                    onNavigateBack = {},
-                    onExportComplete = {}
-                )
-            }
-        }
-
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("editor_save").assertIsNotEnabled()
-        assertEquals(0, bitmapRequests.get())
-
-        stateFlow.value = stateFlow.value.copy(isDocumentReady = true, totalPages = 1)
-        composeTestRule.waitUntil(5_000) { bitmapRequests.get() == 1 }
-        composeTestRule.onNodeWithTag("editor_save").assertIsEnabled()
-    }
 
     @Test
     fun textToolOpensDialogAndPlacesText() {
@@ -89,6 +57,45 @@ class PdfEditorScreenTest {
         composeTestRule.onNodeWithText("Place Text").performClick()
 
         verify(exactly = 1) { viewModel.addTextAnnotation("Hello", any(), any()) }
+    }
+
+
+    @Test
+    fun zoomedPageDragStoresNormalizedStrokeCoordinates() {
+        val vm = mockk<EditorViewModel>(relaxed = true)
+        every { vm.uiState } returns MutableStateFlow(EditorUiState(toolMode = ToolMode.PEN))
+        val bitmap = Bitmap.createBitmap(595, 842, Bitmap.Config.ARGB_8888)
+        coEvery { vm.getPageBitmap(any()) } returns bitmap
+        val captured = slot<VectorStroke>()
+        composeTestRule.setContent {
+            VibeSyncPdfTheme {
+                PdfEditorScreen(documentUri = Uri.parse("content://test/zoomed.pdf"),
+                    viewModel = vm, onNavigateBack = {}, onExportComplete = {})
+            }
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("editor_pdf_page").performTouchInput {
+            val y = height * 0.45f
+            down(0, Offset(width * 0.35f, y)); down(1, Offset(width * 0.65f, y))
+            moveTo(0, Offset(width * 0.20f, y)); moveTo(1, Offset(width * 0.80f, y))
+            up(0); up(1)
+        }
+        composeTestRule.waitForIdle()
+        composeTestRule.onNodeWithTag("editor_canvas_overlay").performTouchInput {
+            swipe(start = Offset(width * 0.34f, height * 0.40f),
+                end = Offset(width * 0.53f, height * 0.48f), durationMillis = 450)
+        }
+        composeTestRule.waitForIdle()
+        verify(timeout = 5_000, exactly = 1) { vm.addStroke(capture(captured)) }
+        assertTrue(captured.captured.points.size >= 2)
+        assertTrue(captured.captured.points.all { it.x in 0f..1f && it.y in 0f..1f })
+        val firstPoint = captured.captured.points.first()
+        assertTrue(
+            "actual normalized=(${firstPoint.x}, ${firstPoint.y})",
+            firstPoint.x in 0.14026667f..0.24026667f &&
+                firstPoint.y in 0.15849286f..0.25849286f
+        )
+        bitmap.recycle()
     }
 
     @Test

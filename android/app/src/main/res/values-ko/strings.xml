@@ -92,7 +92,6 @@
     <string name="failed_to_open_pdf">PDF를 열지 못했습니다</string>
     <string name="pdf_page_description">PDF 페이지 %1$d</string>
     <string name="admob_app_id">ca-app-pub-4783826505860771~4377815936</string>
-    <string name="admob_banner_unit_id">ca-app-pub-4783826505860771/3755922842</string>
     <string name="selected_file_name">선택됨: %1$s</string>
     <string name="tool_select_pdf_to_split">분할할 PDF 선택</string>
     <string name="tool_choose_pdf_document">PDF 문서 선택</string>
@@ -434,7 +433,7 @@
     <string name="vault_lock_action">Lock vault</string>
     <string name="vault_biometric_title">Unlock VibeSync Vault</string>
     <string name="vault_biometric_subtitle">Authenticate with strong biometrics or your device PIN.</string>
-    <!-- PDF viewer search -->
+    <!-- On-device PDF text search -->
     <string name="viewer_search">PDF에서 검색</string>
     <string name="viewer_search_hint">이 PDF에서 텍스트 찾기</string>
     <string name="viewer_search_close">검색 닫기</string>

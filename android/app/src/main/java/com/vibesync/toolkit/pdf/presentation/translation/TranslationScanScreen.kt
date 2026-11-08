@@ -2,7 +2,7 @@ package com.vibesync.toolkit.pdf.presentation.translation
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
+import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import android.graphics.Paint
 import android.graphics.Typeface
 import android.graphics.pdf.PdfDocument
@@ -478,9 +478,10 @@ private suspend fun recognizeUri(
     val mimeType = withContext(Dispatchers.IO) { context.contentResolver.getType(uri).orEmpty() }
     if (mimeType.startsWith("image/")) {
         val bitmap = withContext(Dispatchers.IO) {
-            val input = if (uri.scheme == "file") File(uri.path ?: "").inputStream()
-            else context.contentResolver.openInputStream(uri) ?: throw IOException("Unable to open the selected image.")
-            input.use { BitmapFactory.decodeStream(it) } ?: throw IOException("Unable to read the selected image.")
+            PdfBitmapUtils.decodeStreamDownsampled(openInputStream = {
+                if (uri.scheme == "file") File(uri.path ?: "").inputStream()
+                else context.contentResolver.openInputStream(uri)
+            }) ?: throw IOException("Unable to read the selected image.")
         }
         try {
             onProgress(0, 1)

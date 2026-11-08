@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">רכישה חד-פעמית · שנה אחת של גישת Pro</string>
+    <string name="pro_pass_restore_description">שחזרו את Pro Pass לאחר התקנה מחדש באמצעות אותו חשבון Google Play. הגישה משויכת למכשיר הזה.</string>
+    <string name="pro_pass_restore_action">שחזור Pro Pass</string>
+    <string name="pro_pass_restore_success">Pro Pass פעיל במכשיר הזה.</string>
+    <string name="pro_pass_restore_not_found">לא נמצא Pro Pass פעיל עבור חשבון Google Play הזה.</string>
+    <string name="pro_pass_device_mismatch">Pro Pass זה רשום במכשיר אחר.</string>
+    <string name="pro_pass_expired_owned">תוקף Pro Pass החד-פעמי הסתיים. Google Play עדיין מתעד את הרכישה, ולכן לא ניתן לרכוש אותו שוב בחשבון הזה.</string>
+</resources>

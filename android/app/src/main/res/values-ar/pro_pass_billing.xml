@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="pro_pass_one_time_copy">شراء لمرة واحدة · سنة واحدة من مزايا Pro</string>
+    <string name="pro_pass_restore_description">استعد Pro Pass بعد إعادة التثبيت باستخدام حساب Google Play نفسه. الوصول مرتبط بهذا الجهاز.</string>
+    <string name="pro_pass_restore_action">استعادة Pro Pass</string>
+    <string name="pro_pass_restore_success">Pro Pass نشط على هذا الجهاز.</string>
+    <string name="pro_pass_restore_not_found">لم يتم العثور على Pro Pass نشط لحساب Google Play هذا.</string>
+    <string name="pro_pass_device_mismatch">تم تسجيل Pro Pass هذا على جهاز آخر.</string>
+    <string name="pro_pass_expired_owned">انتهت صلاحية Pro Pass لمرة واحدة. لا يزال Google Play يسجل عملية الشراء، لذلك لا يمكن شراء هذا المنتج مرة أخرى بهذا الحساب.</string>
+</resources>

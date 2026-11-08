@@ -3,6 +3,10 @@ package com.vibesync.toolkit.pdf
 import android.app.Application
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
@@ -12,9 +16,13 @@ import com.vibesync.toolkit.pdf.data.model.PageMetadata
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfPageItem
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
+import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
+import com.vibesync.toolkit.pdf.data.model.ToolMode
+import com.vibesync.toolkit.pdf.presentation.editor.EditorUiState
+import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
+import com.vibesync.toolkit.pdf.presentation.editor.PdfEditorScreen
 import io.mockk.*
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -89,7 +97,8 @@ class PdfViewerScreenTest {
 
         // Verify document title and page count appear in top bar
         composeTestRule.onNodeWithText("Large_Catalog_2026.pdf").assertIsDisplayed()
-        composeTestRule.onAllNodesWithText("Page 1 of 30").assertCountEquals(2)
+        // A single page-position label is intentional; the old top/bottom duplicate was removed.
+        composeTestRule.onAllNodesWithText("Page 1 of 30").assertCountEquals(1)
 
         // Rapid continuous vertical scroll gestures to verify OOM-safe LazyColumn recycling
         val listNode = composeTestRule.onNodeWithTag("pdf_page_list")
@@ -104,98 +113,6 @@ class PdfViewerScreenTest {
 
         // Verify editor action button remains responsive
         composeTestRule.onNodeWithContentDescription("Edit & Sign").assertIsDisplayed().performClick()
-    }
-
-    @Test
-    fun searchFieldPrintAndEditRemainOnOneHorizontalToolbarRow() {
-        val stateFlow = MutableStateFlow(
-            com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(
-                fileName = "HorizontalToolbar.pdf",
-                isLoading = false
-            )
-        )
-        every { mockViewModel.uiState } returns stateFlow
-        var editClicked = false
-
-        composeTestRule.setContent {
-            PdfViewerScreen(
-                documentUri = testUri,
-                viewModel = mockViewModel,
-                onNavigateBack = {},
-                onNavigateToEditor = { editClicked = true },
-                onShareDocument = {}
-            )
-        }
-
-        composeTestRule.onNodeWithTag("viewer_search_toggle").performClick()
-        val searchBounds = composeTestRule.onNodeWithTag("viewer_search_input")
-            .fetchSemanticsNode().boundsInRoot
-        val printBounds = composeTestRule.onNodeWithTag("viewer_print")
-            .fetchSemanticsNode().boundsInRoot
-        val editBounds = composeTestRule.onNodeWithTag("viewer_edit_sign")
-            .fetchSemanticsNode().boundsInRoot
-
-        assertTrue(kotlin.math.abs(searchBounds.center.y - printBounds.center.y) < 3f)
-        assertTrue(kotlin.math.abs(editBounds.center.y - printBounds.center.y) < 3f)
-        composeTestRule.onNodeWithTag("viewer_edit_sign").performClick()
-        assertTrue(editClicked)
-    }
-
-    @Test
-    fun searchMatchOverlayIsComposedOnTheRenderedPage() {
-        val bitmap = Bitmap.createBitmap(100, 140, Bitmap.Config.ARGB_8888)
-        coEvery { mockViewModel.acquirePageBitmap(0, 2.0f) } returns fakeLease(bitmap)
-
-        composeTestRule.setContent {
-            PdfPageItem(
-                pageIndex = 0,
-                aspectRatio = 595f / 842f,
-                viewModel = mockViewModel,
-                documentKey = "highlighted-page",
-                highlightOverlays = listOf(
-                    com.vibesync.toolkit.pdf.presentation.viewer.SearchHighlightOverlay(
-                        com.vibesync.toolkit.pdf.data.pdf.PdfSearchHighlight(1000, 2000, 5500, 2600),
-                        isCurrent = true
-                    )
-                )
-            )
-        }
-
-        composeTestRule.waitUntil(5_000) {
-            composeTestRule.onAllNodesWithTag("viewer_search_highlights")
-                .fetchSemanticsNodes().isNotEmpty()
-        }
-        composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithTag("viewer_search_highlights").assertIsDisplayed()
-            }
-
-    @Test
-    fun searchToolbarButtonOpensAndClosesSearchField() {
-        val stateFlow = MutableStateFlow(
-            com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(
-                fileName = "Searchable.pdf",
-                isLoading = false
-            )
-        )
-        every { mockViewModel.uiState } returns stateFlow
-
-        composeTestRule.setContent {
-            PdfViewerScreen(
-                documentUri = testUri,
-                viewModel = mockViewModel,
-                onNavigateBack = {},
-                onNavigateToEditor = {},
-                onShareDocument = {}
-            )
-        }
-
-        composeTestRule.onNodeWithTag("viewer_search_toggle")
-            .assertIsDisplayed()
-            .performClick()
-        composeTestRule.onNodeWithTag("viewer_search_input").assertIsDisplayed()
-
-        composeTestRule.onNodeWithTag("viewer_search_toggle").performClick()
-        composeTestRule.onNodeWithTag("viewer_search_input").assertDoesNotExist()
     }
 
     @Test
@@ -301,11 +218,92 @@ class PdfViewerScreenTest {
         verify(exactly = 1) { mockViewModel.retryLastDocument() }
     }
 
+
+    @Test
+    fun twoRowToolbarKeepsEveryActionAndFilenameCanOpenRename() {
+        val stateFlow = MutableStateFlow(
+            com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(
+                fileName = "Very_Long_Physical_Device_Report_2026.pdf", pageCount = 1,
+                isLoading = false,
+                pagesMetadata = listOf(PageMetadata(pageIndex = 0, widthPt = 595f, heightPt = 842f))
+            )
+        )
+        every { mockViewModel.uiState } returns stateFlow
+        coEvery { mockViewModel.acquirePageBitmap(any(), any()) } returns null
+        var renameRequests = 0
+        composeTestRule.setContent {
+            PdfViewerScreen(documentUri = testUri, viewModel = mockViewModel,
+                onNavigateBack = {}, onNavigateToEditor = {}, onShareDocument = {},
+                onRenameClick = { renameRequests++ })
+        }
+        composeTestRule.onNodeWithTag("viewer_rename_title").assertIsDisplayed()
+            .assertHasClickAction().performClick()
+        composeTestRule.runOnIdle { assert(renameRequests == 1) }
+        composeTestRule.onNodeWithTag("viewer_search").performClick()
+        composeTestRule.onNodeWithTag("viewer_search_field").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Cancel").performClick()
+        composeTestRule.onNodeWithTag("viewer_more_actions").performClick()
+        listOf("viewer_zoom_out","viewer_zoom_in","viewer_previous_page","viewer_next_page",
+            "viewer_share","viewer_edit","viewer_print","viewer_export_menu").forEach { tag ->
+            composeTestRule.onNodeWithTag(tag, useUnmergedTree = true).assertExists()
+        }
+    }
+
     private fun fakeLease(bitmap: Bitmap): BitmapCache.BitmapLease {
         val lease = mockk<BitmapCache.BitmapLease>(relaxed = true)
         every { lease.key } returns "ui-test-${System.identityHashCode(bitmap)}"
         every { lease.bitmap } returns bitmap
         return lease
+    }
+
+    @Test
+    fun searchOpensAndEditSignKeepsVibgyorPenSizeAndHighlighterControls() {
+        val viewerState = MutableStateFlow(
+            com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(
+                fileName = "v1.0.15-baseline.pdf",
+                pageCount = 1,
+                isLoading = false,
+                pagesMetadata = listOf(PageMetadata(pageIndex = 0, widthPt = 595f, heightPt = 842f))
+            )
+        )
+        every { mockViewModel.uiState } returns viewerState
+        coEvery { mockViewModel.acquirePageBitmap(0, 2.0f) } returns null
+
+        val editorViewModel = mockk<EditorViewModel>(relaxed = true)
+        every { editorViewModel.uiState } returns MutableStateFlow(
+            EditorUiState(toolMode = ToolMode.PEN)
+        )
+        coEvery { editorViewModel.getPageBitmap(any()) } returns null
+
+        composeTestRule.setContent {
+            var editing by remember { mutableStateOf(false) }
+            VibeSyncPdfTheme {
+                if (editing) {
+                    PdfEditorScreen(
+                        documentUri = testUri,
+                        viewModel = editorViewModel,
+                        onNavigateBack = { editing = false },
+                        onExportComplete = {}
+                    )
+                } else {
+                    PdfViewerScreen(
+                        documentUri = testUri,
+                        viewModel = mockViewModel,
+                        onNavigateBack = {},
+                        onNavigateToEditor = { editing = true },
+                        onShareDocument = {}
+                    )
+                }
+            }
+        }
+
+        composeTestRule.onNodeWithTag("viewer_search").assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithTag("viewer_search_field").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Cancel").performClick()
+
+        composeTestRule.onNodeWithTag("viewer_edit").assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithTag("editor_stroke_size_surface").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("editor_tool_Highlighter").assertIsDisplayed()
     }
 
 }

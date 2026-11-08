@@ -5,14 +5,27 @@ import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import java.io.ByteArrayOutputStream
+import java.io.File
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
+import java.security.KeyStore
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 
 /**
  * Clean-room hardware-backed cryptographic vault utilizing Android Jetpack Security.
- * Stores digital signatures, encrypted preferences, and sensitive encryption keys locally
- * without exposing raw credentials to plaintext storage.
+ * Stores digital signatures and preferences in EncryptedSharedPreferences and protects
+ * vaulted document bytes with an AES-256-GCM key held by Android Keystore.
  */
 class SecurityVault(context: Context) {
 
@@ -29,6 +42,128 @@ class SecurityVault(context: Context) {
     )
 
     /**
+     * Encrypts a file to an authenticated AES-256-GCM container. The key never leaves
+     * Android Keystore; a versioned header and random IV are authenticated as AAD.
+     * The destination is published only after the complete ciphertext and GCM tag are written.
+     */
+    fun encryptFile(sourceFile: File, encryptedDestination: File) {
+        require(sourceFile.isFile) { "Vault source file does not exist." }
+        require(sourceFile.canonicalFile != encryptedDestination.canonicalFile) {
+            "Vault source and destination must be different files."
+        }
+        val cipher = Cipher.getInstance(VAULT_FILE_TRANSFORMATION)
+        cipher.init(Cipher.ENCRYPT_MODE, vaultFileKey())
+        val iv = cipher.iv ?: throw IOException("Android Keystore did not provide an AES-GCM IV.")
+        require(iv.size == GCM_IV_BYTES) { "Unexpected AES-GCM IV length." }
+        cipher.updateAAD(VAULT_FILE_MAGIC)
+
+        writeAtomically(encryptedDestination) { temporary ->
+            FileOutputStream(temporary).use { output ->
+                output.write(VAULT_FILE_MAGIC)
+                output.write(iv)
+                FileInputStream(sourceFile).use { input ->
+                    transformStream(input, output, cipher)
+                }
+                output.fd.sync()
+            }
+        }
+    }
+
+    /**
+     * Authenticates and decrypts a vaulted file. Plaintext is staged in a sibling temporary
+     * file and is not exposed at the destination unless the GCM authentication tag is valid.
+     */
+    fun decryptFile(encryptedSource: File, decryptedDestination: File) {
+        require(encryptedSource.isFile) { "Encrypted vault file does not exist." }
+        require(encryptedSource.canonicalFile != decryptedDestination.canonicalFile) {
+            "Vault source and destination must be different files."
+        }
+        writeAtomically(decryptedDestination) { temporary ->
+            FileInputStream(encryptedSource).use { input ->
+                val magic = ByteArray(VAULT_FILE_MAGIC.size)
+                readFully(input, magic)
+                if (!magic.contentEquals(VAULT_FILE_MAGIC)) {
+                    throw IOException("The vault file format is unsupported or corrupted.")
+                }
+                val iv = ByteArray(GCM_IV_BYTES)
+                readFully(input, iv)
+                val cipher = Cipher.getInstance(VAULT_FILE_TRANSFORMATION)
+                cipher.init(Cipher.DECRYPT_MODE, vaultFileKey(), GCMParameterSpec(GCM_TAG_BITS, iv))
+                cipher.updateAAD(VAULT_FILE_MAGIC)
+
+                FileOutputStream(temporary).use { output ->
+                    transformStream(input, output, cipher)
+                    output.fd.sync()
+                }
+            }
+        }
+    }
+
+    private fun vaultFileKey(): SecretKey = synchronized(VAULT_FILE_KEY_LOCK) {
+        val keyStore = KeyStore.getInstance(ANDROID_KEY_STORE).apply { load(null) }
+        (keyStore.getKey(VAULT_FILE_KEY_ALIAS, null) as? SecretKey)?.let { return@synchronized it }
+
+        KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEY_STORE).run {
+            init(
+                KeyGenParameterSpec.Builder(
+                    VAULT_FILE_KEY_ALIAS,
+                    KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+                )
+                    .setKeySize(256)
+                    .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setRandomizedEncryptionRequired(true)
+                    .build()
+            )
+            generateKey()
+        }
+    }
+
+    private fun transformStream(input: InputStream, output: OutputStream, cipher: Cipher) {
+        val buffer = ByteArray(STREAM_BUFFER_BYTES)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            if (count == 0) continue
+            val transformed = cipher.update(buffer, 0, count)
+            if (transformed != null && transformed.isNotEmpty()) output.write(transformed)
+        }
+        val finalBytes = cipher.doFinal()
+        if (finalBytes.isNotEmpty()) output.write(finalBytes)
+    }
+
+    private fun readFully(input: InputStream, destination: ByteArray) {
+        var offset = 0
+        while (offset < destination.size) {
+            val count = input.read(destination, offset, destination.size - offset)
+            if (count < 0) throw IOException("The vault file ended unexpectedly.")
+            offset += count
+        }
+    }
+
+    private fun writeAtomically(destination: File, writer: (File) -> Unit) {
+        val parent = destination.absoluteFile.parentFile
+            ?: throw IOException("Vault file destination has no parent directory.")
+        if (!parent.exists() && !parent.mkdirs()) {
+            throw IOException("Could not prepare the vault file directory.")
+        }
+        val temporary = File.createTempFile("vault_crypto_", ".partial", parent)
+        try {
+            writer(temporary)
+            if (destination.exists() && !destination.delete()) {
+                throw IOException("Could not replace the previous vault output.")
+            }
+            if (!temporary.renameTo(destination)) {
+                temporary.copyTo(destination, overwrite = true)
+                if (!temporary.delete()) temporary.deleteOnExit()
+            }
+        } catch (error: Exception) {
+            temporary.delete()
+            throw error
+        }
+    }
+
+    /**
      * Stores a user's signature bitmap encoded as encrypted AES-256 Base64 string.
      */
     fun saveSignature(signatureId: String, bitmap: Bitmap) {
@@ -36,7 +171,7 @@ class SecurityVault(context: Context) {
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
         val byteArray = stream.toByteArray()
         val base64String = Base64.encodeToString(byteArray, Base64.NO_WRAP)
-        
+
         encryptedPrefs.edit()
             .putString("${KEY_SIGNATURE_PREFIX}_$signatureId", base64String)
             .apply()
@@ -84,30 +219,18 @@ class SecurityVault(context: Context) {
         return encryptedPrefs.edit().remove(key).commit()
     }
 
-    /**
-     * Checks if a default signature exists in the encrypted vault.
-     */
-    fun hasDefaultSignature(): Boolean {
-        return encryptedPrefs.contains("${KEY_SIGNATURE_PREFIX}_default")
-    }
+    /** Checks if a default signature exists in the encrypted vault. */
+    fun hasDefaultSignature(): Boolean = encryptedPrefs.contains("${KEY_SIGNATURE_PREFIX}_default")
 
-    /**
-     * Stores the default user signature.
-     */
+    /** Stores the default user signature. */
     fun saveDefaultSignature(bitmap: Bitmap) {
         saveSignature("default", bitmap)
     }
 
-    /**
-     * Retrieves default user signature.
-     */
-    fun getDefaultSignature(): Bitmap? {
-        return getSignature("default")
-    }
+    /** Retrieves default user signature. */
+    fun getDefaultSignature(): Bitmap? = getSignature("default")
 
-    /**
-     * Clears all vaulted signatures.
-     */
+    /** Clears all vaulted signatures. */
     fun clearSignatures() {
         val editor = encryptedPrefs.edit()
         encryptedPrefs.all.keys
@@ -121,5 +244,13 @@ class SecurityVault(context: Context) {
     companion object {
         private const val SECURE_PREFS_FILE = "vibesync_encrypted_vault"
         private const val KEY_SIGNATURE_PREFIX = "vault_sig"
+        private const val ANDROID_KEY_STORE = "AndroidKeyStore"
+        private const val VAULT_FILE_KEY_ALIAS = "vibesync_vault_file_aes_v1"
+        private const val VAULT_FILE_TRANSFORMATION = "AES/GCM/NoPadding"
+        private const val GCM_IV_BYTES = 12
+        private const val GCM_TAG_BITS = 128
+        private const val STREAM_BUFFER_BYTES = 64 * 1024
+        private val VAULT_FILE_MAGIC = "VSVLT001".toByteArray(Charsets.US_ASCII)
+        private val VAULT_FILE_KEY_LOCK = Any()
     }
 }

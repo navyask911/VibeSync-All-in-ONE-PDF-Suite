@@ -92,7 +92,6 @@
     <string name="failed_to_open_pdf">PDF খোলা যায়নি</string>
     <string name="pdf_page_description">PDF পৃষ্ঠা %1$d</string>
     <string name="admob_app_id">ca-app-pub-4783826505860771~4377815936</string>
-    <string name="admob_banner_unit_id">ca-app-pub-4783826505860771/3755922842</string>
     <string name="selected_file_name">নির্বাচিত: %1$s</string>
     <string name="tool_select_pdf_to_split">ভাগ করার জন্য PDF বেছে নিন</string>
     <string name="tool_choose_pdf_document">PDF নথি বেছে নিন</string>
@@ -434,7 +433,7 @@
     <string name="vault_lock_action">Lock vault</string>
     <string name="vault_biometric_title">Unlock VibeSync Vault</string>
     <string name="vault_biometric_subtitle">Authenticate with strong biometrics or your device PIN.</string>
-    <!-- PDF viewer search -->
+    <!-- On-device PDF text search -->
     <string name="viewer_search">PDF-এ খুঁজুন</string>
     <string name="viewer_search_hint">এই PDF-এ লেখা খুঁজুন</string>
     <string name="viewer_search_close">অনুসন্ধান বন্ধ করুন</string>
