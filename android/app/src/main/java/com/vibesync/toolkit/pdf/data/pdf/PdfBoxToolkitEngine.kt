@@ -68,7 +68,7 @@ import org.bouncycastle.jce.provider.BouncyCastleProvider
 /**
  * Production-ready clean-room operational engine utilizing Apache PDFBox-Android (Apache 2.0).
  * Implements Split, Merge, Extract Images, Convert Images, Encrypt/Decrypt, Form Fill,
- * and 72-DPI Vector Annotation Flattening.
+ * and print-resolution raster flattening of edited PDF pages.
  */
 class PdfBoxToolkitEngine(
     private val context: Context,
@@ -641,8 +641,8 @@ class PdfBoxToolkitEngine(
     }
 
     /**
-     * Flattens and bakes real-time vector annotations, highlighters, text boxes,
-     * and digital signatures onto the original PDF stream mapped precisely at 72 DPI.
+     * Composites strokes, highlighters, text and signatures into annotated PDF page bitmaps at
+     * up to 300 DPI, then writes the resulting document through a managed output stream.
      */
     suspend fun flattenAnnotations(
         sourceUri: Uri,
