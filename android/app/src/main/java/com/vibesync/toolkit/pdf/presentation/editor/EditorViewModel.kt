@@ -153,7 +153,9 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         )
 
         val previousCleanup = rendererCleanupJob
-        rendererCleanupJob = viewModelScope.launch(Dispatchers.IO) {
+        // This cleanup must outlive ViewModel scope if navigation clears the ViewModel while
+        // disposal is still in flight. A subsequent initEditor joins this job before reopening.
+        rendererCleanupJob = CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             previousCleanup?.join()
             pendingLoad?.join()
             pendingSave?.join()

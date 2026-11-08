@@ -113,9 +113,17 @@ class PdfTextSearchInstrumentedTest {
             query = "ಕನ್ನಡ",
             characterBounds = characterBounds
         )
+        val decomposedIndic = "\u0C95\u0CC6\u0CD5"
+        val composedIndicQuery = "\u0C95\u0CC7"
+        val normalizedIndicMatches = PdfUnicodeSearch.findMatches(
+            pageIndex = 0,
+            text = decomposedIndic,
+            query = composedIndicQuery
+        )
 
         assertEquals(1, englishMatches.size)
         assertEquals(1, kannadaMatches.size)
+        assertEquals("NFC must equate canonically composed Indic text.", 1, normalizedIndicMatches.size)
         assertFalse(
             "English result must have a non-empty positioned overlay.",
             englishMatches.single().highlights.isEmpty()
@@ -173,7 +181,7 @@ class PdfTextSearchInstrumentedTest {
         }
 
         val activeBounds = englishMatches.single().highlights.single()
-        val borderPixel = pixelFor(activeBounds, 0.01f, 0.5f)
+        val borderPixel = pixelFor(activeBounds, 0.005f, 0.5f)
         assertTrue(
             "The active search result must have an orange outline: $borderPixel",
             borderPixel.red > borderPixel.green && borderPixel.red > borderPixel.blue
