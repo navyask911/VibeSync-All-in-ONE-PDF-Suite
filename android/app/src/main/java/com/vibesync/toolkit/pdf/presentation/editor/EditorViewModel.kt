@@ -14,11 +14,13 @@ import androidx.lifecycle.viewModelScope
 import com.vibesync.toolkit.pdf.core.security.SecurityVault
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.util.UriUtils
+import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.data.model.*
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.data.pdf.PdfRendererEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -65,6 +67,9 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
 
     private var activeDocumentUri: Uri? = null
+    private var editorLoadJob: Job? = null
+    private var rendererCleanupJob: Job? = null
+    private var saveJob: Job? = null
     private val pageAnnotationsMap = mutableMapOf<Int, PageAnnotations>()
 
     // Undo / Redo history stores complete page annotation snapshots so text,
@@ -74,7 +79,14 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     fun initEditor(uri: Uri) {
         activeDocumentUri = uri
-        viewModelScope.launch {
+        editorLoadJob?.cancel()
+        val cleanupBeforeOpen = rendererCleanupJob
+        editorLoadJob = viewModelScope.launch {
+            // A screen may be re-entered while its previous document is still closing.
+            // Wait for that close before opening the next file descriptor/renderer pair.
+            cleanupBeforeOpen?.join()
+            if (activeDocumentUri != uri) return@launch
+
             val app = getApplication<Application>()
             val fileName = withContext(Dispatchers.IO) {
                 runCatching { UriUtils.getFileName(app, uri) }
@@ -83,14 +95,70 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             } ?: uri.lastPathSegment?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
                 ?: app.getString(R.string.default_pdf_filename)
 
-            rendererEngine.openDocument(uri).onSuccess { count ->
-                _uiState.value = _uiState.value.copy(
-                    fileName = fileName,
-                    totalPages = count,
-                    documentLoadedRevision = _uiState.value.documentLoadedRevision + 1
-                )
-                loadPageAnnotations(0)
+            val openResult = rendererEngine.openDocument(uri)
+            if (activeDocumentUri != uri) {
+                rendererEngine.closeDocumentSafely()
+                return@launch
             }
+
+            openResult.fold(
+                onSuccess = { count ->
+                    _uiState.value = _uiState.value.copy(
+                        fileName = fileName,
+                        totalPages = count,
+                        documentLoadedRevision = _uiState.value.documentLoadedRevision + 1,
+                        errorMessage = null
+                    )
+                    loadPageAnnotations(0)
+                },
+                onFailure = { error ->
+                    _uiState.value = _uiState.value.copy(
+                        errorMessage = error.localizedMessage
+                            ?: app.getString(R.string.editor_failed_flatten)
+                    )
+                }
+            )
+        }
+    }
+
+    /**
+     * Ends the current editor session. Annotation state, page snapshots, undo history,
+     * signature bitmaps and the renderer's bitmap/file-descriptor caches are document-scoped.
+     *
+     * Vector highlighter paths are stored as VectorStroke entries with isHighlighter=true;
+     * clearing currentStrokes and pageAnnotationsMap therefore flushes both pen and highlighter
+     * paths rather than maintaining a second shadow list.
+     */
+    fun resetEditorState() {
+        activeDocumentUri = null
+        editorLoadJob?.cancel()
+        editorLoadJob = null
+        saveJob?.cancel()
+        saveJob = null
+
+        val signatureBitmaps = temporarySignatureBitmaps.toList()
+        temporarySignatureBitmaps.clear()
+        pageAnnotationsMap.clear()
+        undoStack.clear()
+        redoStack.clear()
+        penStrokeWidth = 8f
+        highlighterStrokeWidth = 24f
+
+        _uiState.value = EditorUiState(
+            documentLoadedRevision = _uiState.value.documentLoadedRevision + 1
+        )
+
+        // Drop cache entries immediately; the renderer close below also releases legacy leases
+        // and its retained ParcelFileDescriptor/PdfRenderer pair.
+        BitmapCache.getInstance().clear()
+        val previousCleanup = rendererCleanupJob
+        rendererCleanupJob = viewModelScope.launch(Dispatchers.IO) {
+            previousCleanup?.join()
+            rendererEngine.closeDocumentSafely()
+        }
+
+        signatureBitmaps.forEach { bitmap ->
+            if (!bitmap.isRecycled) bitmap.recycle()
         }
     }
 
@@ -390,7 +458,8 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
         val sourceUri = activeDocumentUri ?: return
         _uiState.value = _uiState.value.copy(isSaving = true)
 
-        viewModelScope.launch {
+        saveJob?.cancel()
+        saveJob = viewModelScope.launch {
             val exportDirectory = File(getApplication<Application>().cacheDir, "pdf_cache").apply {
                 if (!exists() && !mkdirs()) throw IOException("Unable to prepare the edited PDF export folder.")
             }
@@ -424,7 +493,19 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     override fun onCleared() {
+        activeDocumentUri = null
+        editorLoadJob?.cancel()
+        saveJob?.cancel()
+        pageAnnotationsMap.clear()
+        undoStack.clear()
+        redoStack.clear()
+        temporarySignatureBitmaps.forEach { bitmap ->
+            if (!bitmap.isRecycled) bitmap.recycle()
+        }
+        temporarySignatureBitmaps.clear()
+        BitmapCache.getInstance().clear()
         super.onCleared()
+
         // Rendering and native close share the renderer lock. Never block the main thread
         // waiting for an in-flight PDF page render during lifecycle teardown.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {

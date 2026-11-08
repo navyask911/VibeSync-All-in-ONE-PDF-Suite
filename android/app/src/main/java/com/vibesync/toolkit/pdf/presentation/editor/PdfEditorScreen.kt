@@ -68,19 +68,28 @@ fun PdfEditorScreen(
     val density = LocalDensity.current
     val uiState by viewModel.uiState.collectAsState()
 
-    var showSignatureDialog by remember { mutableStateOf(false) }
-    var showSignatureManagerDialog by remember { mutableStateOf(false) }
-    var showTextInputDialog by remember { mutableStateOf(false) }
-    var pendingTapOffset by remember { mutableStateOf(Offset.Zero) }
-    var textInputState by remember { mutableStateOf("") }
-    var screenWidthPx by remember { mutableFloatStateOf(1080f) }
+    var showSignatureDialog by remember(documentUri) { mutableStateOf(false) }
+    var showSignatureManagerDialog by remember(documentUri) { mutableStateOf(false) }
+    var showTextInputDialog by remember(documentUri) { mutableStateOf(false) }
+    var pendingTapOffset by remember(documentUri) { mutableStateOf(Offset.Zero) }
+    var textInputState by remember(documentUri) { mutableStateOf("") }
+    var screenWidthPx by remember(documentUri) { mutableFloatStateOf(1080f) }
     var scale by remember(documentUri) { mutableFloatStateOf(1f) }
     var offset by remember(documentUri) { mutableStateOf(Offset.Zero) }
     val snackbarHostState = remember { SnackbarHostState() }
 
-    LaunchedEffect(documentUri) {
+    // Entry clears any stale session before opening this URI; disposal clears it again so a
+    // ViewModel reused by navigation cannot carry annotations into the next document.
+    LaunchedEffect(documentUri, viewModel) {
+        viewModel.resetEditorState()
         viewModel.initEditor(documentUri)
         AdMobManager.preloadInterstitial(context)
+    }
+
+    DisposableEffect(documentUri, viewModel) {
+        onDispose {
+            viewModel.resetEditorState()
+        }
     }
 
     LaunchedEffect(uiState.errorMessage) {
@@ -91,26 +100,31 @@ fun PdfEditorScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             Column {
-                TopAppBar(
-                    title = {
+                Surface(
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 3.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(64.dp)
+                            .padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(onClick = onNavigateBack) {
+                            Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
+                        }
                         Text(
                             text = uiState.fileName,
                             maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier
-                                .fillMaxWidth(0.85f)
-                                .basicMarquee(iterations = Int.MAX_VALUE)
+                                .weight(1f, fill = false)
                                 .clickable { onRenameClick(uiState.fileName) }
                                 .testTag("editor_rename_title"),
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold
                         )
-                    },
-                    navigationIcon = {
-                        IconButton(onClick = onNavigateBack) {
-                            Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
-                        }
-                    },
-                    actions = {
                         IconButton(
                             onClick = {
                                 viewModel.saveFlattenedDocument(screenWidthPx) { savedFile ->
@@ -134,7 +148,7 @@ fun PdfEditorScreen(
                             }
                         }
                     }
-                )
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
@@ -491,22 +505,25 @@ fun PdfEditorScreen(
                     fontWeight = FontWeight.SemiBold
                 )
 
-                // Interactive Vector Canvas Overlay
-                VectorCanvasOverlay(
-                    modifier = Modifier.testTag("editor_canvas_overlay"),
-                    toolMode = uiState.toolMode,
-                    strokeColor = uiState.selectedColor,
-                    strokeWidth = uiState.strokeWidth,
-                    existingStrokes = uiState.currentStrokes,
-                    onStrokeAdded = { stroke -> viewModel.addStroke(stroke) },
-                    onTap = { offset ->
-                        if (uiState.toolMode == ToolMode.TEXT) {
-                            pendingTapOffset = offset
-                            showTextInputDialog = true
-                        }
-                    },
-                    bitmapSize = bitmap?.let { IntSize(it.width, it.height) } ?: IntSize.Zero
-                )
+                // Key the local active path/highlighter gesture state to the document as well as
+                // the ViewModel snapshots; an in-progress gesture cannot bleed into a new PDF.
+                key(documentUri) {
+                    VectorCanvasOverlay(
+                        modifier = Modifier.testTag("editor_canvas_overlay"),
+                        toolMode = uiState.toolMode,
+                        strokeColor = uiState.selectedColor,
+                        strokeWidth = uiState.strokeWidth,
+                        existingStrokes = uiState.currentStrokes,
+                        onStrokeAdded = { stroke -> viewModel.addStroke(stroke) },
+                        onTap = { offset ->
+                            if (uiState.toolMode == ToolMode.TEXT) {
+                                pendingTapOffset = offset
+                                showTextInputDialog = true
+                            }
+                        },
+                        bitmapSize = bitmap?.let { IntSize(it.width, it.height) } ?: IntSize.Zero
+                    )
+                }
             }
         }
     }
