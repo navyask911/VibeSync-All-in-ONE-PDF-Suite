@@ -22,6 +22,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipe
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
@@ -253,7 +254,7 @@ class PdfEditorScreenTest {
             }
 
             composeTestRule.onNodeWithTag("editor_insert_saved_signature")
-                .assertIsDisplayed().performClick()
+                .performScrollTo().assertIsDisplayed().performClick()
             composeTestRule.waitUntil(10_000) {
                 composeTestRule.onAllNodesWithTag("editor_saved_signature_$signatureId")
                     .fetchSemanticsNodes().isNotEmpty()

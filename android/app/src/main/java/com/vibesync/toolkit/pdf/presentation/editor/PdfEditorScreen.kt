@@ -155,7 +155,9 @@ fun PdfEditorScreen(
                     }
                 )
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    modifier = Modifier.fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically
                 ) {

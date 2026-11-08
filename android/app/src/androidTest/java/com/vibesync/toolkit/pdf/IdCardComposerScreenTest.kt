@@ -67,8 +67,8 @@ class IdCardComposerScreenTest {
             .assertHasClickAction().performClick()
         composeRule.onNodeWithTag("id_card_back_surface").assertIsDisplayed()
             .assertHasClickAction().performClick()
-        composeRule.onNodeWithTag("id_card_camera_front").assertIsDisplayed().performClick()
-        composeRule.onNodeWithTag("id_card_camera_back").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("id_card_camera_front").performScrollTo().assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("id_card_camera_back").performScrollTo().assertIsDisplayed().performClick()
 
         composeRule.runOnIdle {
             assertEquals(

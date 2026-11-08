@@ -50,7 +50,11 @@ class VaultStorage(context: Context) {
      */
     fun listMovableDocuments(): List<File> {
         val candidates = mutableListOf<File>()
-        candidates += collectPdfFiles(scansDirectory, maxDepth = 0, appExportOnly = false)
+        // Persistent scan-history PDFs are real user-visible exports even when their names begin
+        // with "vault_". Temporary-prefix exclusion is reserved for cache/public discovery paths.
+        candidates += collectPdfFiles(
+            scansDirectory, maxDepth = 0, appExportOnly = false, excludeTemporary = false
+        )
         candidates += collectPdfFiles(documentsDirectory, maxDepth = 2, appExportOnly = false)
         candidates += collectPdfFiles(pdfCacheDirectory, maxDepth = 2, appExportOnly = true)
 
@@ -189,7 +193,12 @@ class VaultStorage(context: Context) {
         }.orEmpty().forEach { it.delete() }
     }
 
-    private fun collectPdfFiles(directory: File, maxDepth: Int, appExportOnly: Boolean): List<File> {
+    private fun collectPdfFiles(
+        directory: File,
+        maxDepth: Int,
+        appExportOnly: Boolean,
+        excludeTemporary: Boolean = true
+    ): List<File> {
         if (!directory.isDirectory) return emptyList()
         val stack = ArrayDeque<Pair<File, Int>>()
         val output = mutableListOf<File>()
@@ -203,7 +212,7 @@ class VaultStorage(context: Context) {
                     child.extension.equals("pdf", ignoreCase = true) &&
                     child.length() > 0L &&
                     (!appExportOnly || child.name.startsWith(APP_EXPORT_PREFIX, ignoreCase = true)) &&
-                    !isTemporaryPdf(child.name)
+                    (!excludeTemporary || !isTemporaryPdf(child.name))
                 ) {
                     output += child
                 }
