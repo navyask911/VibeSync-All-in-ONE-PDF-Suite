@@ -92,6 +92,7 @@ import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.data.pdf.createWhiteBackgroundBitmap
 import com.vibesync.toolkit.pdf.presentation.dashboard.DashboardScreen
 import com.vibesync.toolkit.pdf.presentation.dashboard.DashboardViewModel
+import com.vibesync.toolkit.pdf.presentation.scanner.PdfScannerScreen
 import com.vibesync.toolkit.pdf.presentation.editor.EditorViewModel
 import com.vibesync.toolkit.pdf.presentation.editor.PdfEditorScreen
 import com.vibesync.toolkit.pdf.presentation.editor.SignatureManagerScreen
@@ -471,7 +472,17 @@ class MainActivity : AppCompatActivity() {
                                     if (route == "watermark") getSharedPreferences("pdf_watermark_options", MODE_PRIVATE).edit().putBoolean("watermark_custom_enabled", true).apply()
                                     navController.navigate("$route/${encodeUriRoute(uri)}")
                                 },
-                                onNavigateToPro = { navController.navigate("pro") }
+                                onNavigateToPro = { navController.navigate("pro") },
+                                onNavigateToSmartScan = { navController.navigate("smart_scan") }
+                            )
+                        }
+
+                        composable("smart_scan") {
+                            PdfScannerScreen(
+                                onNavigateBack = { navController.popBackStack() },
+                                onOpenPdf = { uri ->
+                                    navController.navigate("viewer/${encodeUriRoute(uri)}")
+                                }
                             )
                         }
 

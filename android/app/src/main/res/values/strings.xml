@@ -476,4 +476,17 @@
     <string name="viewer_searching">Searching PDF…</string>
     <string name="viewer_search_running_ocr">Running OCR…</string>
     <string name="viewer_search_failed">Search failed. Please try again.</string>
+
+
+    <!-- Smart PDF Scanner -->
+    <string name="smart_scan_title">Smart PDF Scanner</string>
+    <string name="smart_scan_subtitle">Find PDFs in Download and messaging app folders</string>
+    <string name="smart_scan_description">Choose Download, WhatsApp, Telegram, or another folder. VibeSync only scans folders you select.</string>
+    <string name="smart_scan_add_folder">Add Folder</string>
+    <string name="smart_scan_scan_again">Scan Again</string>
+    <string name="smart_scan_no_folders">No folders selected yet. Add a folder to start scanning.</string>
+    <string name="smart_scan_no_pdfs">No PDFs found in the selected folders.</string>
+    <string name="smart_scan_folder_count">%1$d PDFs</string>
+    <string name="smart_scan_permission_failed">Folder access could not be saved. Please choose the folder again.</string>
+    <string name="smart_scan_scan_failed">Could not scan the selected folders. Check access and try again.</string>
 </resources>

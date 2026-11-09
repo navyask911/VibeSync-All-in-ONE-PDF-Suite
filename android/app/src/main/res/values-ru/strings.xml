@@ -467,4 +467,17 @@
     <string name="vault_import_external_pdf">Import external PDF</string>
     <string name="vault_import_progress">Securing PDF… %1$d%%</string>
     <string name="vault_import_failed">Could not import this PDF into the vault.</string>
+
+
+    <!-- Smart PDF Scanner -->
+    <string name="smart_scan_title">Умный сканер PDF</string>
+    <string name="smart_scan_subtitle">Поиск PDF в папке «Загрузки» и папках мессенджеров</string>
+    <string name="smart_scan_description">Выберите «Загрузки», WhatsApp, Telegram или другую папку. VibeSync сканирует только выбранные вами папки.</string>
+    <string name="smart_scan_add_folder">Добавить папку</string>
+    <string name="smart_scan_scan_again">Сканировать снова</string>
+    <string name="smart_scan_no_folders">Папки ещё не выбраны. Добавьте папку, чтобы начать сканирование.</string>
+    <string name="smart_scan_no_pdfs">В выбранных папках PDF не найдены.</string>
+    <string name="smart_scan_folder_count">PDF: %1$d</string>
+    <string name="smart_scan_permission_failed">Не удалось сохранить доступ к папке. Выберите её ещё раз.</string>
+    <string name="smart_scan_scan_failed">Не удалось просканировать выбранные папки. Проверьте доступ и повторите попытку.</string>
 </resources>

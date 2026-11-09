@@ -457,4 +457,17 @@
     <string name="vault_import_external_pdf">Import external PDF</string>
     <string name="vault_import_progress">Securing PDF… %1$d%%</string>
     <string name="vault_import_failed">Could not import this PDF into the vault.</string>
+
+
+    <!-- Smart PDF Scanner -->
+    <string name="smart_scan_title">Akıllı PDF Tarayıcı</string>
+    <string name="smart_scan_subtitle">İndirilenler ve mesajlaşma uygulaması klasörlerinde PDF bul</string>
+    <string name="smart_scan_description">İndirilenler, WhatsApp, Telegram veya başka bir klasör seçin. VibeSync yalnızca seçtiğiniz klasörleri tarar.</string>
+    <string name="smart_scan_add_folder">Klasör Ekle</string>
+    <string name="smart_scan_scan_again">Yeniden Tara</string>
+    <string name="smart_scan_no_folders">Henüz klasör seçilmedi. Taramaya başlamak için bir klasör ekleyin.</string>
+    <string name="smart_scan_no_pdfs">Seçilen klasörlerde PDF bulunamadı.</string>
+    <string name="smart_scan_folder_count">%1$d PDF</string>
+    <string name="smart_scan_permission_failed">Klasör erişimi kaydedilemedi. Lütfen klasörü yeniden seçin.</string>
+    <string name="smart_scan_scan_failed">Seçilen klasörler taranamadı. Erişimi kontrol edip tekrar deneyin.</string>
 </resources>

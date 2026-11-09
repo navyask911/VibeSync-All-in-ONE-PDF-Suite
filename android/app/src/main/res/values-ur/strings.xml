@@ -457,4 +457,17 @@
     <string name="vault_import_external_pdf">Import external PDF</string>
     <string name="vault_import_progress">Securing PDF… %1$d%%</string>
     <string name="vault_import_failed">Could not import this PDF into the vault.</string>
+
+
+    <!-- Smart PDF Scanner -->
+    <string name="smart_scan_title">اسمارٹ PDF اسکینر</string>
+    <string name="smart_scan_subtitle">ڈاؤن لوڈ اور پیغام رسانی ایپس کے فولڈرز میں PDF تلاش کریں</string>
+    <string name="smart_scan_description">ڈاؤن لوڈ، WhatsApp، Telegram یا کوئی اور فولڈر منتخب کریں۔ VibeSync صرف منتخب فولڈرز اسکین کرتا ہے۔</string>
+    <string name="smart_scan_add_folder">فولڈر شامل کریں</string>
+    <string name="smart_scan_scan_again">دوبارہ اسکین کریں</string>
+    <string name="smart_scan_no_folders">ابھی کوئی فولڈر منتخب نہیں کیا گیا۔ اسکین شروع کرنے کے لیے فولڈر شامل کریں۔</string>
+    <string name="smart_scan_no_pdfs">منتخب فولڈرز میں کوئی PDF نہیں ملی۔</string>
+    <string name="smart_scan_folder_count">%1$d PDF</string>
+    <string name="smart_scan_permission_failed">فولڈر تک رسائی محفوظ نہیں ہو سکی۔ براہ کرم فولڈر دوبارہ منتخب کریں۔</string>
+    <string name="smart_scan_scan_failed">منتخب فولڈرز اسکین نہیں ہو سکے۔ رسائی چیک کریں اور دوبارہ کوشش کریں۔</string>
 </resources>

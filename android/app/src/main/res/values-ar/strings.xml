@@ -457,4 +457,17 @@
     <string name="vault_import_external_pdf">Import external PDF</string>
     <string name="vault_import_progress">Securing PDF… %1$d%%</string>
     <string name="vault_import_failed">Could not import this PDF into the vault.</string>
+
+
+    <!-- Smart PDF Scanner -->
+    <string name="smart_scan_title">ماسح PDF الذكي</string>
+    <string name="smart_scan_subtitle">اعثر على ملفات PDF في التنزيلات ومجلدات تطبيقات المراسلة</string>
+    <string name="smart_scan_description">اختر التنزيلات أو WhatsApp أو Telegram أو مجلدًا آخر. يفحص VibeSync المجلدات التي تحددها فقط.</string>
+    <string name="smart_scan_add_folder">إضافة مجلد</string>
+    <string name="smart_scan_scan_again">إعادة الفحص</string>
+    <string name="smart_scan_no_folders">لم يتم اختيار مجلدات بعد. أضف مجلدًا لبدء الفحص.</string>
+    <string name="smart_scan_no_pdfs">لم يتم العثور على ملفات PDF في المجلدات المحددة.</string>
+    <string name="smart_scan_folder_count">%1$d ملف PDF</string>
+    <string name="smart_scan_permission_failed">تعذر حفظ إذن الوصول إلى المجلد. يُرجى اختيار المجلد مرة أخرى.</string>
+    <string name="smart_scan_scan_failed">تعذر فحص المجلدات المحددة. تحقق من الإذن وحاول مرة أخرى.</string>
 </resources>

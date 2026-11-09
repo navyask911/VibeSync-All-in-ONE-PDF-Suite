@@ -98,7 +98,11 @@ class SafPdfFolderScanner(context: Context) {
                         dateFormat.format(Date(modifiedMillis))
                     } else {
                         ""
-                    }
+                    },
+                    parentFolderName = runCatching { node.parentFile?.name }
+                        .getOrNull()
+                        ?.takeIf { it.isNotBlank() }
+                        ?: root.name.orEmpty()
                 )
             } catch (cancelled: CancellationException) {
                 throw cancelled

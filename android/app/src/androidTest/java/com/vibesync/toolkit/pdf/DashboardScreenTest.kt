@@ -297,6 +297,30 @@ class DashboardScreenTest {
         assertEquals(true, context.getSharedPreferences("dashboard_pdf_section_preferences", Context.MODE_PRIVATE).getBoolean("pdf_section_visible", false))
     }
 
+    @Test
+    fun smartScanDashboardEntryOpensTheDedicatedScannerRoute() {
+        val viewModel = mockk<DashboardViewModel>(relaxed = true)
+        every { viewModel.uiState } returns MutableStateFlow(DashboardUiState())
+        var opened = false
+
+        composeTestRule.setContent {
+            VibeSyncPdfTheme {
+                DashboardScreen(
+                    viewModel = viewModel,
+                    onNavigateToViewer = {},
+                    onNavigateToEditor = {},
+                    onNavigateToTool = {},
+                    onLaunchScanner = {},
+                    onNavigateToSmartScan = { opened = true }
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag("dashboard_list")
+            .performScrollToNode(hasTestTag("tool_smart_scan"))
+        composeTestRule.onNodeWithTag("tool_smart_scan").performClick()
+        assertTrue(opened)
+    }
 }
 
 private class DashboardScreenRetryRule(

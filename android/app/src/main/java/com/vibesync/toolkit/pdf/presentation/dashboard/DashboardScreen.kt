@@ -73,7 +73,8 @@ fun DashboardScreen(
     onRenameDocument: (Uri, String) -> Unit = { _, _ -> },
     onDeleteDocument: (Uri) -> Unit = {},
     onNavigateToPdfTool: (String, Uri) -> Unit = { route, _ -> onNavigateToTool(route) },
-    onNavigateToPro: () -> Unit = {}
+    onNavigateToPro: () -> Unit = {},
+    onNavigateToSmartScan: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
@@ -162,6 +163,7 @@ fun DashboardScreen(
 
     val tools = remember {
         listOf(
+            ToolItem(context.getString(R.string.smart_scan_title), context.getString(R.string.smart_scan_subtitle), Icons.Default.FolderOpen, "smart_scan", VibeSyncCrimsonPrimary),
             ToolItem(context.getString(R.string.tool_view_read), context.getString(R.string.tool_view_read_subtitle), Icons.Default.MenuBook, "viewer_picker", VibeSyncCrimsonPrimary),
             ToolItem(context.getString(R.string.tool_edit_sign), context.getString(R.string.tool_edit_sign_subtitle), Icons.Default.Draw, "editor_picker", VibeSyncRubyAccent),
             ToolItem(context.getString(R.string.tool_document_scanner), context.getString(R.string.tool_document_scanner_subtitle), Icons.Default.DocumentScanner, "scanner", Color(0xFFD32F2F)),
@@ -366,7 +368,9 @@ fun DashboardScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable {
-                                    if (tool.route == "scanner") {
+                                    if (tool.route == "smart_scan") {
+                                        onNavigateToSmartScan()
+                                    } else if (tool.route == "scanner") {
                                         onNavigateToTool("scan_history")
                                     } else if (tool.route == "viewer_picker") {
                                         launchPickerSafely { viewerPickerLauncher.launch(arrayOf("application/pdf")) }

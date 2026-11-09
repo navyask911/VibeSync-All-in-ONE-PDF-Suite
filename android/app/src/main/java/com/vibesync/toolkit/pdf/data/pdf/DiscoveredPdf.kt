@@ -10,5 +10,7 @@ data class DiscoveredPdf(
     val sizeBytes: Long,
     val sizeFormatted: String,
     val lastModified: Long,
-    val formattedDate: String
+    val formattedDate: String,
+    /** Immediate containing folder name for grouped Smart Scan results. */
+    val parentFolderName: String = ""
 ) : Serializable

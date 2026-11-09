@@ -457,4 +457,17 @@
     <string name="vault_import_external_pdf">Import external PDF</string>
     <string name="vault_import_progress">Securing PDF… %1$d%%</string>
     <string name="vault_import_failed">Could not import this PDF into the vault.</string>
+
+
+    <!-- Smart PDF Scanner -->
+    <string name="smart_scan_title">스마트 PDF 스캐너</string>
+    <string name="smart_scan_subtitle">다운로드 및 메시지 앱 폴더에서 PDF 찾기</string>
+    <string name="smart_scan_description">다운로드, WhatsApp, Telegram 또는 다른 폴더를 선택하세요. VibeSync는 선택한 폴더만 스캔합니다.</string>
+    <string name="smart_scan_add_folder">폴더 추가</string>
+    <string name="smart_scan_scan_again">다시 스캔</string>
+    <string name="smart_scan_no_folders">아직 선택한 폴더가 없습니다. 스캔을 시작하려면 폴더를 추가하세요.</string>
+    <string name="smart_scan_no_pdfs">선택한 폴더에서 PDF를 찾지 못했습니다.</string>
+    <string name="smart_scan_folder_count">PDF %1$d개</string>
+    <string name="smart_scan_permission_failed">폴더 접근 권한을 저장하지 못했습니다. 폴더를 다시 선택하세요.</string>
+    <string name="smart_scan_scan_failed">선택한 폴더를 스캔하지 못했습니다. 접근 권한을 확인하고 다시 시도하세요.</string>
 </resources>
