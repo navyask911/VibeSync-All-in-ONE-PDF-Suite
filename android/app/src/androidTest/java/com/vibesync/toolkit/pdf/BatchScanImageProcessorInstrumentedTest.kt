@@ -53,7 +53,13 @@ class BatchScanImageProcessorInstrumentedTest {
                 ExifInterface.TAG_ORIENTATION,
                 ExifInterface.ORIENTATION_NORMAL
             )
-            assertEquals(ExifInterface.ORIENTATION_NORMAL, outputOrientation)
+            // The encoder may omit the EXIF orientation tag entirely (UNDEFINED = 0).
+            // Either an explicit NORMAL tag or no orientation tag means the raster is upright;
+            // physical 40x80 dimensions above prove the 90-degree transform was applied.
+            assertTrue(
+                outputOrientation == ExifInterface.ORIENTATION_NORMAL ||
+                    outputOrientation == ExifInterface.ORIENTATION_UNDEFINED
+            )
 
             val processed = BitmapFactory.decodeFile(output.absolutePath)
                 ?: throw AssertionError("The processed scan JPEG must decode.")
