@@ -13,6 +13,8 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.data.model.PageMetadata
+import com.vibesync.toolkit.pdf.data.pdf.PdfSearchHighlight
+import com.vibesync.toolkit.pdf.data.pdf.PdfSearchMatch
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfPageItem
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
@@ -239,8 +241,9 @@ class PdfViewerScreenTest {
         composeTestRule.onNodeWithTag("viewer_rename_title").assertIsDisplayed()
             .assertHasClickAction().performClick()
         composeTestRule.runOnIdle { assert(renameRequests == 1) }
-        listOf("viewer_search", "viewer_search_field", "viewer_search_previous", "viewer_search_next", "viewer_search_close")
-            .forEach { tag -> composeTestRule.onNodeWithTag(tag).assertDoesNotExist() }
+        composeTestRule.onNodeWithTag("viewer_search").performClick()
+        composeTestRule.onNodeWithTag("viewer_search_field").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("viewer_search_close").performClick()
         composeTestRule.onNodeWithTag("viewer_more_actions").performClick()
         listOf("viewer_zoom_out","viewer_zoom_in","viewer_previous_page","viewer_next_page",
             "viewer_share","viewer_edit","viewer_print","viewer_export_menu").forEach { tag ->
@@ -249,15 +252,26 @@ class PdfViewerScreenTest {
     }
 
     @Test
-    fun viewerDoesNotExposeSearchControlsAndKeepsThePdfPageVisible() {
+    fun searchOpensInlineAndKeepsThePdfPageVisibleWithoutAModalScrim() {
         val bitmap = Bitmap.createBitmap(100, 100, Bitmap.Config.ARGB_8888)
         val stateFlow = MutableStateFlow(
             com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(
-                fileName = "Viewer_No_Search_UI.pdf",
+                fileName = "Inline_Search_Test.pdf",
                 pageCount = 1,
                 currentPageIndex = 0,
                 isLoading = false,
-                pagesMetadata = listOf(PageMetadata(pageIndex = 0, widthPt = 595f, heightPt = 842f))
+                pagesMetadata = listOf(PageMetadata(pageIndex = 0, widthPt = 595f, heightPt = 842f)),
+                searchMatches = listOf(
+                    PdfSearchMatch(
+                        pageIndex = 0,
+                        startOffset = 0,
+                        endOffset = 6,
+                        snippet = "needle",
+                        highlight = PdfSearchHighlight(900, 1200, 4100, 1850),
+                        highlights = listOf(PdfSearchHighlight(900, 1200, 4100, 1850))
+                    )
+                ),
+                currentSearchMatchIndex = 0
             )
         )
         every { mockViewModel.uiState } returns stateFlow
@@ -275,10 +289,49 @@ class PdfViewerScreenTest {
             }
         }
 
+        // Establish that an actual page bitmap is rendered before search mode is entered.
         composeTestRule.onNodeWithTag("pdf_page_list").assertIsDisplayed()
         composeTestRule.onNodeWithContentDescription("PDF page 1").assertIsDisplayed()
-        listOf("viewer_search", "viewer_search_field", "viewer_search_previous", "viewer_search_next", "viewer_search_close")
-            .forEach { tag -> composeTestRule.onNodeWithTag(tag).assertDoesNotExist() }
+
+        composeTestRule.onNodeWithTag("viewer_search").assertIsDisplayed().performClick()
+        val searchField = composeTestRule.onNodeWithTag("viewer_search_field")
+        searchField.assertIsDisplayed().performClick().performTextInput("needle")
+
+        // The top-bar controls are inline, while the same PDF page remains rendered underneath.
+        composeTestRule.onNodeWithTag("viewer_search_previous").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("viewer_search_next").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("viewer_search_close").assertIsDisplayed()
+
+        // The field and its three match controls must be side by side in the same top-bar row.
+        val toolbarBounds = composeTestRule.onNodeWithTag("viewer_search_toolbar_row")
+            .fetchSemanticsNode().boundsInRoot
+        val controlBounds = listOf(
+            "viewer_search_field",
+            "viewer_search_previous",
+            "viewer_search_next",
+            "viewer_search_close"
+        ).map { tag ->
+            composeTestRule.onNodeWithTag(tag).fetchSemanticsNode().boundsInRoot
+        }
+        assertTrue(controlBounds.zipWithNext().all { (left, right) -> left.left < right.left })
+        assertTrue(controlBounds.maxOf { it.bottom } <= toolbarBounds.bottom + 1f)
+        assertTrue(controlBounds.minOf { it.top } >= toolbarBounds.top - 1f)
+        assertTrue(controlBounds.maxOf { it.center.y } - controlBounds.minOf { it.center.y } < 12f)
+
+        composeTestRule.onNodeWithTag("pdf_page_list").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("PDF page 1").assertIsDisplayed()
+        val highlight = composeTestRule.onNodeWithTag("viewer_search_highlights")
+        highlight.assertIsDisplayed()
+        val highlightBounds = highlight.fetchSemanticsNode().boundsInRoot
+        assertTrue("Search match must expose a visible page overlay.", highlightBounds.width > 0f && highlightBounds.height > 0f)
+
+        // The former AlertDialog's Cancel action must not be present.
+        composeTestRule.onNodeWithText("Cancel").assertDoesNotExist()
+        verify(exactly = 1) { mockViewModel.searchDocument("needle") }
+
+        composeTestRule.onNodeWithTag("viewer_search_close").performClick()
+        composeTestRule.onNodeWithTag("viewer_rename_title").assertIsDisplayed()
+        composeTestRule.onNodeWithContentDescription("PDF page 1").assertIsDisplayed()
     }
 
     private fun fakeLease(bitmap: Bitmap): BitmapCache.BitmapLease {
@@ -289,7 +342,7 @@ class PdfViewerScreenTest {
     }
 
     @Test
-    fun editSignKeepsVibgyorPenSizeAndHighlighterControls() {
+    fun searchOpensAndEditSignKeepsVibgyorPenSizeAndHighlighterControls() {
         val viewerState = MutableStateFlow(
             com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(
                 fileName = "v1.0.15-baseline.pdf",
@@ -329,8 +382,9 @@ class PdfViewerScreenTest {
             }
         }
 
-        listOf("viewer_search", "viewer_search_field", "viewer_search_previous", "viewer_search_next", "viewer_search_close")
-            .forEach { tag -> composeTestRule.onNodeWithTag(tag).assertDoesNotExist() }
+        composeTestRule.onNodeWithTag("viewer_search").assertIsDisplayed().performClick()
+        composeTestRule.onNodeWithTag("viewer_search_field").assertIsDisplayed()
+        composeTestRule.onNodeWithTag("viewer_search_close").performClick()
 
         composeTestRule.onNodeWithTag("viewer_edit").assertIsDisplayed().performClick()
         composeTestRule.onNodeWithTag("editor_stroke_size_surface").assertIsDisplayed()

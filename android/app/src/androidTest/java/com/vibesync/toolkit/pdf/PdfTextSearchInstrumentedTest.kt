@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.captureToImage
+import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.unit.dp
@@ -97,9 +99,24 @@ class PdfTextSearchInstrumentedTest {
             }
         }
         composeTestRule.onNodeWithTag("viewer_search_highlights").assertIsDisplayed()
-        val renderedBounds = composeTestRule.onNodeWithTag("viewer_search_highlights")
-            .fetchSemanticsNode().boundsInRoot
+        val highlightNode = composeTestRule.onNodeWithTag("viewer_search_highlights")
+        val renderedBounds = highlightNode.fetchSemanticsNode().boundsInRoot
         assertTrue(renderedBounds.width > 0f && renderedBounds.height > 0f)
+
+        // Ensure the active-result outline is actually painted, not only represented by a Canvas node.
+        val pixels = highlightNode.captureToImage().toPixelMap()
+        var orangePixels = 0
+        for (y in 0 until pixels.height) {
+            for (x in 0 until pixels.width) {
+                val pixel = pixels[x, y]
+                if (pixel.alpha > 0.8f && pixel.red > 0.8f &&
+                    pixel.green in 0.35f..0.75f && pixel.blue < 0.2f
+                ) {
+                    orangePixels += 1
+                }
+            }
+        }
+        assertTrue("The active PDF search match must render an orange outline.", orangePixels > 0)
     }
 
     @Test
