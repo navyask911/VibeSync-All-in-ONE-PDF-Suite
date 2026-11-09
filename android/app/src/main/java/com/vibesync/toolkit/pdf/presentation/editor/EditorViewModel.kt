@@ -81,8 +81,8 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     private val redoStack = mutableListOf<PageAnnotations>()
 
     /**
-     * Clears document-scoped annotations, undo/redo snapshots, signature bitmaps and renderer caches.
-     * Native renderer teardown runs off-main and is serialized with any in-flight open/render call.
+     * Opens a document only after prior loads and renderer cleanup have completed.
+     * Open failures are surfaced through EditorUiState.errorMessage.
      */
     fun initEditor(uri: Uri) {
         activeDocumentUri = uri
