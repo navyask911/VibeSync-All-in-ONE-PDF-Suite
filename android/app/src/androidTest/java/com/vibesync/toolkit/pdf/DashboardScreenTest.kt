@@ -33,20 +33,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.RuleChain
-import org.junit.rules.TestRule
-import org.junit.runner.Description
-import org.junit.runners.model.Statement
 
 class DashboardScreenTest {
-    private val composeTestRule = createComposeRule()
-
-    // Retry flaky Compose test-harness startup race.
-    // Diagnostic: Quality #651, tree 07fe84eb, transient IllegalStateException "No compose hierarchies found in the app".
     @get:Rule
-    val retryRule: TestRule = RuleChain
-        .outerRule(DashboardScreenRetryRule(maxAttempts = 3))
-        .around(composeTestRule)
+    val composeTestRule = createComposeRule()
 
     @Test
     fun dashboardBrandBannerAndActionToolbarUseSeparateRows() {
@@ -321,28 +311,4 @@ class DashboardScreenTest {
         composeTestRule.onNodeWithTag("tool_smart_scan").performClick()
         assertTrue(opened)
     }
-}
-
-private class DashboardScreenRetryRule(
-    private val maxAttempts: Int
-) : TestRule {
-    init {
-        require(maxAttempts > 0) { "maxAttempts must be positive" }
-    }
-
-    override fun apply(base: Statement, description: Description): Statement =
-        object : Statement() {
-            override fun evaluate() {
-                var lastFailure: Throwable? = null
-                repeat(maxAttempts) {
-                    try {
-                        base.evaluate()
-                        return
-                    } catch (failure: Throwable) {
-                        lastFailure = failure
-                    }
-                }
-                throw requireNotNull(lastFailure)
-            }
-        }
 }
