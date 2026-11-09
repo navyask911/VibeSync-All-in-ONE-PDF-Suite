@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.vibesync.toolkit.pdf.core.security.SecurityVault
+import com.vibesync.toolkit.pdf.core.util.BitmapCache
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.model.*
@@ -67,9 +68,12 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     private var activeDocumentUri: Uri? = null
     private val pageAnnotationsMap = mutableMapOf<Int, PageAnnotations>()
-    private var documentLoadJob: Job? = null
-    private var rendererCloseJob: Job? = null
-    private var exportJob: Job? = null
+    private var editorLoadJob: Job? = null
+    private var rendererCleanupJob: Job? = null
+    private var saveJob: Job? = null
+    // Cleanup must outlive viewModelScope so native resources and signature bitmaps are
+    // released even when navigation destroys the ViewModel during an in-flight export.
+    private val cleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     // Undo / Redo history stores complete page annotation snapshots so text,
     // signatures, and vector strokes all participate consistently.
@@ -80,47 +84,16 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
      * Clears document-scoped annotations, undo/redo snapshots, signature bitmaps and renderer caches.
      * Native renderer teardown runs off-main and is serialized with any in-flight open/render call.
      */
-    fun resetEditorState() {
-        documentLoadJob?.cancel()
-        documentLoadJob = null
-        val exportToCancel = exportJob
-        exportJob = null
-        exportToCancel?.cancel()
-        activeDocumentUri = null
-
-        val signatureBitmaps = temporarySignatureBitmaps.toList()
-        temporarySignatureBitmaps.clear()
-        pageAnnotationsMap.clear()
-        undoStack.clear()
-        redoStack.clear()
-        penStrokeWidth = 8f
-        highlighterStrokeWidth = 24f
-
-        // Pen and highlighter paths share currentStrokes; highlighters are marked by isHighlighter.
-        val nextRevision = _uiState.value.documentLoadedRevision + 1
-        _uiState.value = EditorUiState(documentLoadedRevision = nextRevision)
-
-        val previousClose = rendererCloseJob
-        rendererCloseJob = viewModelScope.launch {
-            previousClose?.join()
-            exportToCancel?.join()
-            signatureBitmaps.forEach { bitmap ->
-                if (!bitmap.isRecycled) bitmap.recycle()
-            }
-            try {
-                rendererEngine.closeDocumentSafely()
-            } catch (error: Exception) {
-                Log.w("EditorViewModel", "renderer.reset_failed category=" + error.javaClass.simpleName)
-            }
-        }
-    }
-
     fun initEditor(uri: Uri) {
-        documentLoadJob?.cancel()
         activeDocumentUri = uri
-        val pendingClose = rendererCloseJob
-        documentLoadJob = viewModelScope.launch {
-            pendingClose?.join()
+        val previousLoad = editorLoadJob
+        previousLoad?.cancel()
+        val cleanupBeforeOpen = rendererCleanupJob
+
+        editorLoadJob = viewModelScope.launch {
+            // Serialize replacement opens after any canceled load and renderer teardown.
+            previousLoad?.join()
+            cleanupBeforeOpen?.join()
             if (activeDocumentUri != uri) return@launch
 
             val app = getApplication<Application>()
@@ -132,14 +105,81 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                 ?: app.getString(R.string.default_pdf_filename)
 
             if (activeDocumentUri != uri) return@launch
-            rendererEngine.openDocument(uri).onSuccess { count ->
-                if (activeDocumentUri != uri) return@onSuccess
-                _uiState.value = _uiState.value.copy(
-                    fileName = fileName,
-                    totalPages = count,
-                    documentLoadedRevision = _uiState.value.documentLoadedRevision + 1
+            val openResult = rendererEngine.openDocument(uri)
+            if (activeDocumentUri != uri) {
+                // A newer document/session superseded this open while native code was running.
+                rendererEngine.closeDocumentSafely()
+                return@launch
+            }
+
+            openResult.fold(
+                onSuccess = { count ->
+                    if (activeDocumentUri != uri) return@fold
+                    _uiState.value = _uiState.value.copy(
+                        fileName = fileName,
+                        totalPages = count,
+                        documentLoadedRevision = _uiState.value.documentLoadedRevision + 1,
+                        errorMessage = null
+                    )
+                    loadPageAnnotations(0)
+                },
+                onFailure = { error ->
+                    if (activeDocumentUri == uri) {
+                        _uiState.value = _uiState.value.copy(
+                            errorMessage = error.localizedMessage
+                                ?: app.getString(R.string.document_load_error)
+                        )
+                    }
+                }
+            )
+        }
+    }
+
+    /**
+     * Clears document-owned state and schedules native cleanup outside viewModelScope.
+     * Loads and PDFBox saves are canceled and joined before their renderer/bitmap resources
+     * are closed or recycled. A later initEditor waits for this cleanup job.
+     */
+    fun resetEditorState() {
+        activeDocumentUri = null
+        val pendingLoad = editorLoadJob
+        val pendingSave = saveJob
+        pendingLoad?.cancel()
+        pendingSave?.cancel()
+        editorLoadJob = null
+        saveJob = null
+
+        val signatureBitmaps = temporarySignatureBitmaps.toList()
+        temporarySignatureBitmaps.clear()
+        pageAnnotationsMap.clear()
+        undoStack.clear()
+        redoStack.clear()
+        penStrokeWidth = 8f
+        highlighterStrokeWidth = 24f
+
+        _uiState.value = EditorUiState(
+            documentLoadedRevision = _uiState.value.documentLoadedRevision + 1
+        )
+
+        val previousCleanup = rendererCleanupJob
+        rendererCleanupJob = cleanupScope.launch {
+            try {
+                previousCleanup?.join()
+                pendingLoad?.join()
+                pendingSave?.join()
+                rendererEngine.closeDocumentSafely()
+            } catch (error: Exception) {
+                Log.w(
+                    "EditorViewModel",
+                    "renderer.reset_failed category=" + error.javaClass.simpleName
                 )
-                loadPageAnnotations(0)
+            } finally {
+                signatureBitmaps.forEach { bitmap ->
+                    if (!bitmap.isRecycled) bitmap.recycle()
+                }
+                // closeDocumentSafely clears the renderer cache; keep this explicit for all
+                // document-owned cache entries even when close itself reports an error.
+                BitmapCache.getInstance().clear()
             }
         }
     }
@@ -438,11 +478,22 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     fun saveFlattenedDocument(screenWidthPx: Float, onComplete: (File) -> Unit) {
         persistCurrentPageAnnotations()
         val sourceUri = activeDocumentUri ?: return
+        val annotationsSnapshot = pageAnnotationsMap.mapValues { (_, annotations) ->
+            annotations.copy(
+                strokes = annotations.strokes.toList(),
+                textAnnotations = annotations.textAnnotations.toList(),
+                signatures = annotations.signatures.toList()
+            )
+        }
         _uiState.value = _uiState.value.copy(isSaving = true)
 
-        exportJob?.cancel()
-        val annotationSnapshot = pageAnnotationsMap.toMap()
-        exportJob = viewModelScope.launch {
+        // Do not allow two PDFBox flatten jobs to mutate/read document resources concurrently.
+        val previousSave = saveJob
+        previousSave?.cancel()
+        saveJob = viewModelScope.launch {
+            previousSave?.join()
+            if (activeDocumentUri != sourceUri) return@launch
+
             val exportDirectory = File(getApplication<Application>().cacheDir, "pdf_cache").apply {
                 if (!exists() && !mkdirs()) throw IOException("Unable to prepare the edited PDF export folder.")
             }
@@ -454,56 +505,66 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
             }
             val result = toolkitEngine.flattenAnnotations(
                 sourceUri = sourceUri,
-                pageAnnotationsMap = annotationSnapshot,
+                pageAnnotationsMap = annotationsSnapshot,
                 screenWidthPx = screenWidthPx,
                 outputFile = outputFile
             )
 
+            if (activeDocumentUri != sourceUri) return@launch
             result.fold(
                 onSuccess = { file ->
+                    if (activeDocumentUri != sourceUri) return@fold
                     releaseSignatureBitmapsAfterFlatten()
                     _uiState.value = _uiState.value.copy(isSaving = false, exportSuccessFile = file)
                     onComplete(file)
                 },
                 onFailure = { error ->
-                    _uiState.value = _uiState.value.copy(
-                        isSaving = false,
-                        errorMessage = error.localizedMessage ?: getApplication<Application>().getString(R.string.editor_failed_flatten)
-                    )
+                    if (activeDocumentUri == sourceUri) {
+                        _uiState.value = _uiState.value.copy(
+                            isSaving = false,
+                            errorMessage = error.localizedMessage
+                                ?: getApplication<Application>().getString(R.string.editor_failed_flatten)
+                        )
+                    }
                 }
             )
         }
     }
 
     override fun onCleared() {
-        documentLoadJob?.cancel()
-        val pendingExport = exportJob
-        exportJob = null
-        pendingExport?.cancel()
         activeDocumentUri = null
-        val signatureBitmaps = temporarySignatureBitmaps.toList()
-        temporarySignatureBitmaps.clear()
+        val pendingLoad = editorLoadJob
+        val pendingSave = saveJob
+        pendingLoad?.cancel()
+        pendingSave?.cancel()
+        editorLoadJob = null
+        saveJob = null
         pageAnnotationsMap.clear()
         undoStack.clear()
         redoStack.clear()
+        val signatureBitmaps = temporarySignatureBitmaps.toList()
+        temporarySignatureBitmaps.clear()
+        val previousCleanup = rendererCleanupJob
         super.onCleared()
 
-        // Wait for the canceled flatten job before recycling signature bitmaps it may be reading.
-        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+        // This independent scope survives viewModelScope cancellation. Wait for any load/save
+        // and preceding reset cleanup before closing PdfRenderer/PFD and releasing bitmap memory.
+        rendererCleanupJob = cleanupScope.launch {
             try {
-                pendingExport?.join()
+                previousCleanup?.join()
+                pendingLoad?.join()
+                pendingSave?.join()
+                rendererEngine.closeDocumentSafely()
+            } catch (error: Exception) {
+                Log.w(
+                    "EditorViewModel",
+                    "renderer.cleanup_failed category=" + error.javaClass.simpleName
+                )
             } finally {
                 signatureBitmaps.forEach { bitmap ->
                     if (!bitmap.isRecycled) bitmap.recycle()
                 }
-                try {
-                    rendererEngine.closeDocumentSafely()
-                } catch (error: Exception) {
-                    Log.w(
-                        "EditorViewModel",
-                        "renderer.cleanup_failed category=" + error.javaClass.simpleName
-                    )
-                }
+                BitmapCache.getInstance().clear()
             }
         }
     }

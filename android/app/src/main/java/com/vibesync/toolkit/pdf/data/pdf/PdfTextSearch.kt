@@ -12,7 +12,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
+import java.text.BreakIterator
 import java.text.Normalizer
+import java.util.Locale
 
 /** PDF glyph offsets paired with a page-normalized visible rectangle. */
 data class PdfCharacterBounds(
@@ -206,11 +208,13 @@ object PdfUnicodeSearch {
             val nativeHighlights = if (characterBounds.isEmpty()) {
                 emptyList()
             } else {
-                val originalOffsets = (offset until endOffset)
+                val originalRanges = (offset until endOffset)
                     .mapNotNull { normalizedToOriginal.getOrNull(it) }
-                    .toHashSet()
+                    .distinct()
                 val matchingGlyphs = characterBounds.filter { glyph ->
-                    originalOffsets.any { it >= glyph.startOffset && it < glyph.endOffset }
+                    originalRanges.any { range ->
+                        range.start < glyph.endOffset && range.endExclusive > glyph.startOffset
+                    }
                 }
                 mergeGlyphBounds(matchingGlyphs.map { it.highlight })
             }
@@ -228,28 +232,82 @@ object PdfUnicodeSearch {
         return matches
     }
 
-    private fun normalizeWithOffsetMap(value: String): Pair<String, List<Int>> {
+    private data class OriginalTextRange(
+        val start: Int,
+        val endExclusive: Int
+    )
+
+    private fun normalizeWithOffsetMap(value: String): Pair<String, List<OriginalTextRange>> {
+        // Normalize the complete extracted page so canonically equivalent Indic text compares
+        // consistently regardless of whether PDFTextStripper emitted composed or decomposed marks.
         val normalizedText = Normalizer.normalize(value, Normalizer.Form.NFC)
-        val offsets = mutableListOf<Int>()
-        var cursor = 0
-        while (cursor < value.length) {
-            val start = cursor
-            cursor += Character.charCount(value.codePointAt(cursor))
-            while (cursor < value.length) {
-                val nextCodePoint = value.codePointAt(cursor)
-                when (Character.getType(nextCodePoint)) {
-                    Character.NON_SPACING_MARK.toInt(),
-                    Character.COMBINING_SPACING_MARK.toInt(),
-                    Character.ENCLOSING_MARK.toInt() -> cursor += Character.charCount(nextCodePoint)
-                    else -> break
+        if (value.isEmpty()) return normalizedText to emptyList()
+
+        // Segment source text by grapheme rather than code point. Every normalized UTF-16 unit
+        // keeps the full original grapheme range, allowing one normalized match to highlight all
+        // source glyphs (base consonant and dependent vowel/combining marks included).
+        val graphemes = BreakIterator.getCharacterInstance(Locale.ROOT).apply {
+            setText(value)
+        }
+        val normalizedChunks = StringBuilder()
+        val ranges = ArrayList<OriginalTextRange>(normalizedText.length)
+        var start = graphemes.first()
+        var end = graphemes.next()
+        while (end != BreakIterator.DONE) {
+            val normalizedChunk = Normalizer.normalize(
+                value.substring(start, end),
+                Normalizer.Form.NFC
+            )
+            normalizedChunks.append(normalizedChunk)
+            repeat(normalizedChunk.length) {
+                ranges += OriginalTextRange(start = start, endExclusive = end)
+            }
+            start = end
+            end = graphemes.next()
+        }
+
+        // Some platform BreakIterator versions can split a canonical combining sequence
+        // differently. Fall back to mark-aware source spans while preserving exact map length.
+        if (ranges.size != normalizedText.length || normalizedChunks.toString() != normalizedText) {
+            ranges.clear()
+            var originalCursor = 0
+            var normalizedCursor = 0
+            while (originalCursor < value.length && normalizedCursor < normalizedText.length) {
+                val originalStart = originalCursor
+                val firstCodePoint = value.codePointAt(originalCursor)
+                originalCursor += Character.charCount(firstCodePoint)
+                while (originalCursor < value.length) {
+                    val codePoint = value.codePointAt(originalCursor)
+                    val type = Character.getType(codePoint)
+                    if (type == Character.NON_SPACING_MARK.toInt() ||
+                        type == Character.COMBINING_SPACING_MARK.toInt() ||
+                        type == Character.ENCLOSING_MARK.toInt()
+                    ) {
+                        originalCursor += Character.charCount(codePoint)
+                    } else {
+                        break
+                    }
+                }
+                val chunk = Normalizer.normalize(
+                    value.substring(originalStart, originalCursor),
+                    Normalizer.Form.NFC
+                )
+                repeat(chunk.length) {
+                    if (normalizedCursor < normalizedText.length) {
+                        ranges += OriginalTextRange(originalStart, originalCursor)
+                    }
+                    normalizedCursor += 1
                 }
             }
-            val normalizedChunk = Normalizer.normalize(value.substring(start, cursor), Normalizer.Form.NFC)
-            repeat(normalizedChunk.length) { offsets += start }
+            while (ranges.size < normalizedText.length) {
+                ranges += OriginalTextRange(value.lastIndex, value.length)
+            }
+            while (ranges.size > normalizedText.length) {
+                ranges.removeAt(ranges.lastIndex)
+            }
         }
-        val fallbackOffset = offsets.lastOrNull() ?: 0
-        while (offsets.size < normalizedText.length) offsets += fallbackOffset
-        return normalizedText to offsets.take(normalizedText.length)
+
+        return normalizedText to ranges
     }
 
     /** Join adjacent glyph rectangles on the same text line into a single readable highlight. */

@@ -2,6 +2,8 @@ package com.vibesync.toolkit.pdf
 
 import com.vibesync.toolkit.pdf.data.ocr.OcrScript
 import com.vibesync.toolkit.pdf.data.ocr.OcrScriptSelector
+import com.vibesync.toolkit.pdf.data.pdf.PdfCharacterBounds
+import com.vibesync.toolkit.pdf.data.pdf.PdfSearchHighlight
 import com.vibesync.toolkit.pdf.data.pdf.PdfUnicodeSearch
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -39,6 +41,30 @@ class PdfUnicodeSearchTest {
         val composedQuery = "café"
 
         assertEquals(1, PdfUnicodeSearch.findMatches(0, decomposed, composedQuery).size)
+    }
+
+    @Test
+    fun normalizesKannadaGraphemesAndHighlightsAllOriginalGlyphs() {
+        val decomposedKannada = "\u0C95\u0CC6\u0CD5"
+        val composedQuery = "\u0C95\u0CC7"
+        val pageText = "x" + decomposedKannada + "y"
+        val start = 1
+        val glyphBounds = listOf(
+            PdfCharacterBounds(start, start + 1, PdfSearchHighlight(1, 10, 2, 20)),
+            PdfCharacterBounds(start + 1, start + 2, PdfSearchHighlight(3, 10, 4, 20)),
+            PdfCharacterBounds(start + 2, start + 3, PdfSearchHighlight(5, 10, 6, 20))
+        )
+
+        val match = PdfUnicodeSearch.findMatches(
+            pageIndex = 0,
+            text = pageText,
+            query = composedQuery,
+            characterBounds = glyphBounds
+        ).single()
+
+        // All source code units in the composed Kannada grapheme must remain searchable and
+        // contribute to one merged overlay, not just the first consonant glyph.
+        assertEquals(PdfSearchHighlight(1, 10, 6, 20), match.highlights.single())
     }
 
     @Test
