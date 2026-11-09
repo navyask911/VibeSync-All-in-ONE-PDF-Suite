@@ -75,6 +75,8 @@ fun PdfEditorScreen(
     var showSignatureDialog by remember(documentUri) { mutableStateOf(false) }
     var showSignatureManagerDialog by remember(documentUri) { mutableStateOf(false) }
     var showSavedSignaturePicker by remember(documentUri) { mutableStateOf(false) }
+    var showSavedSignatureCapture by remember(documentUri) { mutableStateOf(false) }
+    var isSavingSavedSignature by remember(documentUri) { mutableStateOf(false) }
     var savedSignatureEntries by remember(documentUri) {
         mutableStateOf<List<SignatureRepository.SavedSignature>>(emptyList())
     }
@@ -209,10 +211,16 @@ fun PdfEditorScreen(
                     }
                     IconButton(
                         onClick = {
-                            showSavedSignaturePicker = true
                             coroutineScope.launch {
-                                savedSignatureEntries = withContext(Dispatchers.IO) {
+                                val entries = withContext(Dispatchers.IO) {
                                     signatureRepository.listSignatures()
+                                }
+                                savedSignatureEntries = entries
+                                if (entries.isEmpty()) {
+                                    showSavedSignaturePicker = false
+                                    showSavedSignatureCapture = true
+                                } else {
+                                    showSavedSignaturePicker = true
                                 }
                             }
                         },
@@ -635,8 +643,58 @@ fun PdfEditorScreen(
                 }
             },
             confirmButton = {
+                TextButton(
+                    onClick = {
+                        showSavedSignaturePicker = false
+                        showSavedSignatureCapture = true
+                    },
+                    modifier = Modifier.testTag("editor_create_new_signature")
+                ) {
+                    Text("Create New Signature")
+                }
+            },
+            dismissButton = {
                 TextButton(onClick = { showSavedSignaturePicker = false }) {
                     Text(stringResource(R.string.cancel))
+                }
+            },
+            modifier = Modifier.testTag("editor_saved_signature_picker")
+        )
+    }
+
+    if (showSavedSignatureCapture) {
+        SignatureCaptureDialog(
+            isSaving = isSavingSavedSignature,
+            onDismiss = { if (!isSavingSavedSignature) showSavedSignatureCapture = false },
+            onSave = { signatureId, bitmap ->
+                isSavingSavedSignature = true
+                coroutineScope.launch {
+                    val saved = withContext(Dispatchers.IO) {
+                        runCatching { signatureRepository.saveSignature(signatureId, bitmap) }
+                    }
+                    isSavingSavedSignature = false
+                    saved.onSuccess {
+                        val targetWidth = SignatureStrokeMetrics.DEFAULT_TARGET_WIDTH_PX
+                        val targetHeight = SignatureStrokeMetrics.DEFAULT_TARGET_HEIGHT_PX
+                        val pageHeightPx = screenWidthPx * 842f / 595f
+                        viewModel.addSignature(
+                            bitmap,
+                            x = ((screenWidthPx - targetWidth) / 2f).coerceAtLeast(0f),
+                            y = ((pageHeightPx - targetHeight) / 2f).coerceAtLeast(0f),
+                            width = targetWidth,
+                            height = targetHeight,
+                            saveToVault = false
+                        )
+                        savedSignatureEntries = withContext(Dispatchers.IO) {
+                            signatureRepository.listSignatures()
+                        }
+                        showSavedSignatureCapture = false
+                    }.onFailure { error ->
+                        if (!bitmap.isRecycled) bitmap.recycle()
+                        snackbarHostState.showSnackbar(
+                            error.localizedMessage ?: context.getString(R.string.signature_capture_save_failed)
+                        )
+                    }
                 }
             }
         )
