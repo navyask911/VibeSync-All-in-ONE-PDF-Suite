@@ -32,7 +32,6 @@ internal fun preparePrintablePdf(
             FileOutputStream(printReadyFile).use { output ->
                 pdf.save(output)
                 output.flush()
-                output.fd.sync()
             }
         }
         if (!printReadyFile.isFile || !printReadyFile.canRead() || printReadyFile.length() <= 0L) {

@@ -126,8 +126,7 @@ class PdfViewerViewModel @JvmOverloads constructor(
                     FileOutputStream(editorCopy).use { output ->
                         input.copyTo(output)
                         output.flush()
-                        output.fd.sync()
-                    }
+                            }
                 }
                 if (!editorCopy.isFile || editorCopy.length() <= 0L) throw IOException("The unlocked PDF could not be handed to the editor.")
                 Uri.fromFile(editorCopy)

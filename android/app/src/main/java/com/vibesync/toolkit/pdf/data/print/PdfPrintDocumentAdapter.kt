@@ -164,7 +164,6 @@ class PdfPrintDocumentAdapter(
                 java.io.FileOutputStream(file).use { sink ->
                     source.copyTo(sink)
                     sink.flush()
-                    sink.fd.sync()
                 }
             }
             validateSourceFile(file)
