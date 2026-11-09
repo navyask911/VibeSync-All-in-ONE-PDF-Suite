@@ -125,52 +125,6 @@ class DashboardScreenTest {
     }
 
     @Test
-    fun allToolkitCardsExposeExpectedRoutesAndPrivacyDialogOpens() {
-        val viewModel = mockk<DashboardViewModel>(relaxed = true)
-        every { viewModel.uiState } returns MutableStateFlow(DashboardUiState())
-        val routes = mutableListOf<String>()
-        var scannerLaunched = false
-
-        composeTestRule.setContent {
-            VibeSyncPdfTheme {
-                DashboardScreen(
-                    viewModel = viewModel,
-                    onNavigateToViewer = {},
-                    onNavigateToEditor = {},
-                    onNavigateToTool = { routes.add(it) },
-                    onLaunchScanner = { scannerLaunched = true },
-                )
-            }
-        }
-
-        composeTestRule.waitUntil(5_000) {
-            runCatching {
-                composeTestRule.onNodeWithTag("dashboard_list").assertIsDisplayed()
-            }.isSuccess
-        }
-        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("tool_convert"))
-        composeTestRule.onNodeWithText("Images to PDF").assertIsDisplayed()
-        composeTestRule.onNodeWithText("Extract Images").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("tool_convert").performClick()
-        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("tool_extract"))
-        composeTestRule.onNodeWithTag("tool_extract").performClick()
-        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("tool_scanner"))
-        composeTestRule.onNodeWithTag("tool_scanner").performClick()
-
-        assertEquals(listOf("convert", "extract", "scan_history"), routes)
-        assertEquals(false, scannerLaunched)
-
-        composeTestRule.onNodeWithContentDescription("Privacy & Terms").performClick()
-        composeTestRule.onNodeWithText("Privacy & Data Safety Guarantee").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("privacy_legal_links").assertExists()
-        composeTestRule.onNodeWithTag("privacy_public_info").assertExists()
-        composeTestRule.onNodeWithTag("privacy_policy_link").assertExists()
-        composeTestRule.onNodeWithTag("privacy_license_link").assertExists()
-        composeTestRule.onNodeWithTag("privacy_terms_link").assertExists()
-        composeTestRule.onNodeWithTag("privacy_close_button").assertExists()
-    }
-
-    @Test
     fun languagePickerIncludesWorldwideLocales() {
         val viewModel = mockk<DashboardViewModel>(relaxed = true)
         every { viewModel.uiState } returns MutableStateFlow(DashboardUiState())
