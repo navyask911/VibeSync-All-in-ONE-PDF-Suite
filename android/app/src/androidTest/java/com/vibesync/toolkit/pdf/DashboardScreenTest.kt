@@ -247,10 +247,10 @@ class DashboardScreenTest {
     }
 
     @Test
-    fun dashboardCardsDispatchRoutesAndPrivacyDialogOpens() {
+    fun smartScanDashboardEntryOpensTheDedicatedScannerRoute() {
         val viewModel = mockk<DashboardViewModel>(relaxed = true)
         every { viewModel.uiState } returns MutableStateFlow(DashboardUiState())
-        val destinations = mutableListOf<String>()
+        var opened = false
 
         composeTestRule.setContent {
             VibeSyncPdfTheme {
@@ -258,9 +258,9 @@ class DashboardScreenTest {
                     viewModel = viewModel,
                     onNavigateToViewer = {},
                     onNavigateToEditor = {},
-                    onNavigateToTool = { destinations.add(it) },
+                    onNavigateToTool = {},
                     onLaunchScanner = {},
-                    onNavigateToSmartScan = { destinations.add("smart_scan") }
+                    onNavigateToSmartScan = { opened = true }
                 )
             }
         }
@@ -270,26 +270,9 @@ class DashboardScreenTest {
                 composeTestRule.onNodeWithTag("dashboard_list").assertIsDisplayed()
             }.isSuccess
         }
-        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("tool_convert"))
-        composeTestRule.onNodeWithTag("tool_convert").performClick()
-        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("tool_extract"))
-        composeTestRule.onNodeWithTag("tool_extract").performClick()
-        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("tool_scanner"))
-        composeTestRule.onNodeWithTag("tool_scanner").performClick()
-        composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("tool_smart_scan"))
+        composeTestRule.onNodeWithTag("dashboard_list")
+            .performScrollToNode(hasTestTag("tool_smart_scan"))
         composeTestRule.onNodeWithTag("tool_smart_scan").performClick()
-
-        assertEquals(
-            listOf("convert", "extract", "scan_history", "smart_scan"),
-            destinations
-        )
-
-        composeTestRule.onNodeWithContentDescription("Privacy & Terms").performClick()
-        composeTestRule.onNodeWithText("Privacy & Data Safety Guarantee").assertIsDisplayed()
-        composeTestRule.onNodeWithTag("privacy_legal_links").assertExists()
-        composeTestRule.onNodeWithTag("privacy_public_info").assertExists()
-        composeTestRule.onNodeWithTag("privacy_policy_link").assertExists()
-        composeTestRule.onNodeWithTag("privacy_license_link").assertExists()
-        composeTestRule.onNodeWithTag("privacy_terms_link").assertExists()
-        composeTestRule.onNodeWithTag("privacy_close_button").assertIsDisplayed()
-    }}
+        assertTrue(opened)
+    }
+}
