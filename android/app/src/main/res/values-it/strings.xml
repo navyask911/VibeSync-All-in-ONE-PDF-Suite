@@ -462,12 +462,12 @@
     <!-- Smart PDF Scanner -->
     <string name="smart_scan_title">Scanner PDF intelligente</string>
     <string name="smart_scan_subtitle">Trova PDF in Download e nelle cartelle delle app di messaggistica</string>
-    <string name="smart_scan_description">Scegli Download, WhatsApp, Telegram o un'altra cartella. VibeSync esegue la scansione solo delle cartelle selezionate.</string>
+    <string name="smart_scan_description">Scegli Download, WhatsApp, Telegram o un’altra cartella. VibeSync esegue la scansione solo delle cartelle selezionate.</string>
     <string name="smart_scan_add_folder">Aggiungi cartella</string>
     <string name="smart_scan_scan_again">Scansiona di nuovo</string>
     <string name="smart_scan_no_folders">Nessuna cartella selezionata. Aggiungi una cartella per iniziare.</string>
     <string name="smart_scan_no_pdfs">Nessun PDF trovato nelle cartelle selezionate.</string>
     <string name="smart_scan_folder_count">%1$d PDF</string>
-    <string name="smart_scan_permission_failed">Impossibile salvare l'accesso alla cartella. Selezionala di nuovo.</string>
-    <string name="smart_scan_scan_failed">Impossibile scansionare le cartelle selezionate. Verifica l'accesso e riprova.</string>
+    <string name="smart_scan_permission_failed">Impossibile salvare l’accesso alla cartella. Selezionala di nuovo.</string>
+    <string name="smart_scan_scan_failed">Impossibile scansionare le cartelle selezionate. Verifica l’accesso e riprova.</string>
 </resources>
