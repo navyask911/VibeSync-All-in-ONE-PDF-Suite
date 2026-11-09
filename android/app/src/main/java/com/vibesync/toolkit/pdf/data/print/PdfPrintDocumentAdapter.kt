@@ -4,13 +4,9 @@ import android.print.PageRange
 import android.print.PrintAttributes
 import android.print.PrintDocumentAdapter
 import android.print.PrintDocumentInfo
-import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
-import com.tom_roush.pdfbox.pdmodel.PDDocument
-import java.io.File
-import java.io.FileOutputStream
 
 internal fun copyPdfBytes(
-    source: File,
+    source: java.io.File,
     output: java.io.OutputStream,
     isCancelled: () -> Boolean = { false }
 ) {
@@ -33,16 +29,16 @@ class PdfPrintDocumentAdapter(
     private val context: android.content.Context,
     private val sourceUri: android.net.Uri,
     private val displayName: String,
-    preparedSource: File? = null,
+    preparedSource: java.io.File? = null,
     private val sessionPassword: String? = null
 ) : PrintDocumentAdapter() {
     private val lock = Any()
-    private val preparedSource: File? = preparedSource
-    private var stagedSource: File? = preparedSource
-    private var printableSource: File? = null
+    private val preparedSource: java.io.File? = preparedSource
+    private var stagedSource: java.io.File? = preparedSource
+    private var printableSource: java.io.File? = null
     private var printAttributes: PrintAttributes? = null
     private var pageCount = 0
-    private var destinationWriter: FileOutputStream? = null
+    private var destinationWriter: java.io.FileOutputStream? = null
 
     override fun onStart() {
         synchronized(lock) {
@@ -118,7 +114,7 @@ class PdfPrintDocumentAdapter(
         if (cancellationSignal.isCanceled) throw java.util.concurrent.CancellationException("PDF printing was cancelled.")
         val source = synchronized(lock) { ensureStagedSource() }
         validateSourceFile(source)
-        val output = FileOutputStream(destination.fileDescriptor)
+        val output = java.io.FileOutputStream(destination.fileDescriptor)
         synchronized(lock) {
             runCatching { destinationWriter?.close() }
             destinationWriter = output
@@ -136,54 +132,36 @@ class PdfPrintDocumentAdapter(
         super.onFinish()
     }
 
-    private fun ensureStagedSource(): File {
+    private fun ensureStagedSource(): java.io.File {
         printableSource?.takeIf { it.isFile && it.canRead() && it.length() > 0L }?.let { return it }
         val rawSource = stagedSource ?: stageSource().also { stagedSource = it }
         validateSourceFile(rawSource)
-
-        PDFBoxResourceLoader.init(context.applicationContext)
-        val printReadyFile = File.createTempFile("print_unlocked_", ".pdf", context.cacheDir)
-        try {
-            val document = if (sessionPassword.isNullOrBlank()) PDDocument.load(rawSource)
-            else PDDocument.load(rawSource, sessionPassword)
-            document.use { pdf ->
-                pdf.isAllSecurityToBeRemoved = true
-                FileOutputStream(printReadyFile).use { output ->
-                    pdf.save(output)
-                    output.flush()
-                    output.fd.sync()
-                }
-            }
-            validateSourceFile(printReadyFile)
-            PDDocument.load(printReadyFile).use { verified ->
-                check(!verified.isEncrypted) { "The print-ready PDF still contains security restrictions." }
-                check(verified.numberOfPages > 0) { "The print-ready PDF contains no pages." }
-            }
-            printableSource = printReadyFile
-            return printReadyFile
-        } catch (error: Exception) {
-            printReadyFile.delete()
-            throw error
-        }
+        val printReadyFile = com.vibesync.toolkit.pdf.data.pdf.preparePrintablePdf(
+            context,
+            rawSource,
+            sessionPassword
+        )
+        printableSource = printReadyFile
+        return printReadyFile
     }
 
-    private fun validateSourceFile(file: File) {
+    private fun validateSourceFile(file: java.io.File) {
         if (!file.exists() || !file.isFile || !file.canRead() || file.length() <= 0L) {
             throw java.io.IOException("The source PDF is empty or unreadable.")
         }
     }
 
-    private fun stageSource(): File {
-        val file = File.createTempFile("print_source_", ".pdf", context.cacheDir)
+    private fun stageSource(): java.io.File {
+        val file = java.io.File.createTempFile("print_source_", ".pdf", context.cacheDir)
         try {
             val input = if (sourceUri.scheme == "file") {
-                File(sourceUri.path ?: throw java.io.IOException("The source path is missing.")).inputStream()
+                java.io.File(sourceUri.path ?: throw java.io.IOException("The source path is missing.")).inputStream()
             } else {
                 context.contentResolver.openInputStream(sourceUri)
                     ?: throw java.io.IOException("Unable to open the selected PDF.")
             }
             input.use { source ->
-                FileOutputStream(file).use { sink ->
+                java.io.FileOutputStream(file).use { sink ->
                     source.copyTo(sink)
                     sink.flush()
                     sink.fd.sync()
