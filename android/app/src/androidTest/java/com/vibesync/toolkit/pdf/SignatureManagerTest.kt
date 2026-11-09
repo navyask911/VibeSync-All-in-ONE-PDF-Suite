@@ -117,6 +117,63 @@ class SignatureManagerTest {
     }
 
     @Test
+    fun signatureRetainsArgbInkColorAndRendersInSavedPreview() {
+        val signatureId = "argb_yellow_signature"
+        signatureRepository.deleteSignature(signatureId)
+        try {
+            composeTestRule.setContent {
+                VibeSyncPdfTheme {
+                    SignatureManagerScreen(
+                        onNavigateBack = {},
+                        onSelectSignature = { _, _, _, _, _, _ -> },
+                        signatureRepository = signatureRepository
+                    )
+                }
+            }
+
+            composeTestRule.onNodeWithTag("signature_create_fab").performClick()
+            composeTestRule.onNodeWithTag("signature_capture_name").performTextInput(signatureId)
+            composeTestRule.onNodeWithTag("signature_ink_yellow").assertIsDisplayed().performClick()
+            composeTestRule.onNodeWithTag("signature_capture_pen_size").assertIsDisplayed()
+            composeTestRule.onNodeWithTag("signature_capture_canvas").performTouchInput {
+                swipe(
+                    start = Offset(width * 0.15f, height * 0.52f),
+                    end = Offset(width * 0.85f, height * 0.52f),
+                    durationMillis = 350
+                )
+            }
+            composeTestRule.onNodeWithTag("signature_capture_save").assertIsEnabled().performClick()
+
+            composeTestRule.waitUntil(15_000) {
+                signatureRepository.encryptedFile(signatureId)?.let { it.isFile && it.length() > 0L } == true &&
+                    composeTestRule.onAllNodesWithTag("signature_placement_preview")
+                        .fetchSemanticsNodes().isNotEmpty()
+            }
+
+            val restored = requireNotNull(signatureRepository.getSignature(signatureId))
+            try {
+                assertEquals(Bitmap.Config.ARGB_8888, restored.config)
+                val pixels = IntArray(restored.width * restored.height)
+                restored.getPixels(pixels, 0, restored.width, 0, 0, restored.width, restored.height)
+                assertTrue(
+                    "Saved preview bitmap should preserve full-alpha yellow pixels",
+                    pixels.any { pixel ->
+                        android.graphics.Color.alpha(pixel) > 0 &&
+                            android.graphics.Color.red(pixel) > 220 &&
+                            android.graphics.Color.green(pixel) > 220 &&
+                            android.graphics.Color.blue(pixel) < 40
+                    }
+                )
+            } finally {
+                restored.recycle()
+            }
+            composeTestRule.onNodeWithTag("signature_placement_preview").assertIsDisplayed()
+        } finally {
+            signatureRepository.deleteSignature(signatureId)
+        }
+    }
+
+    @Test
     fun flattenedSignatureBitmapsAreReleasedAfterSuccessfulFlatten() {
         val viewModel = EditorViewModel(context)
         val signature = Bitmap.createBitmap(72, 28, Bitmap.Config.ARGB_8888).apply { eraseColor(Color.BLACK) }

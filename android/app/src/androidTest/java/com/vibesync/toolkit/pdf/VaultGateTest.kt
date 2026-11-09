@@ -63,6 +63,69 @@ class VaultGateTest {
     }
 
     @Test
+    fun vaultPdfItemOpensThroughInternalViewerCallbackWithoutExternalChooser() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val source = android.graphics.pdf.PdfDocument()
+        val sourceBytes = ByteArrayOutputStream().use { output ->
+            try {
+                val page = source.startPage(
+                    android.graphics.pdf.PdfDocument.PageInfo.Builder(595, 842, 1).create()
+                )
+                page.canvas.drawText(
+                    "Internal VibeSync vault viewer",
+                    36f,
+                    80f,
+                    android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { textSize = 18f }
+                )
+                source.finishPage(page)
+                source.writeTo(output)
+                output.toByteArray()
+            } finally {
+                source.close()
+            }
+        }
+        val storage = VaultStorage(context)
+        val encrypted = storage.importPdf(
+            inputStream = ByteArrayInputStream(sourceBytes),
+            displayName = "internal_viewer_route_test.pdf",
+            expectedBytes = sourceBytes.size.toLong()
+        )
+        val openedUri = java.util.concurrent.atomic.AtomicReference<android.net.Uri?>(null)
+
+        try {
+            composeRule.setContent {
+                VaultScreen(
+                    onNavigateBack = {},
+                    onAuthenticate = { callback -> callback(true) },
+                    storage = storage,
+                    onOpenPdf = { uri -> openedUri.set(uri) }
+                )
+            }
+
+            composeRule.onNodeWithTag("vault_unlock_button").performClick()
+            composeRule.waitUntil(10_000) {
+                composeRule.onAllNodesWithTag("vault_open_${encrypted.name}")
+                    .fetchSemanticsNodes().isNotEmpty()
+            }
+            composeRule.onNodeWithTag("vault_open_${encrypted.name}").performClick()
+            composeRule.waitUntil(10_000) { openedUri.get() != null }
+
+            val uri = requireNotNull(openedUri.get())
+            assertEquals("file", uri.scheme)
+            val decrypted = File(requireNotNull(uri.path))
+            assertTrue("Internal decrypted cache file must exist", decrypted.isFile)
+            assertEquals(
+                File(context.cacheDir, "pdf_cache").canonicalFile,
+                decrypted.canonicalFile.parentFile
+            )
+            assertTrue(decrypted.readBytes().contentEquals(sourceBytes))
+        } finally {
+            storage.clearDecryptedCache()
+            encrypted.delete()
+        }
+    }
+
+    @Test
     fun movingSavedPdfIntoVaultRemovesItFromMainScanDirectory() {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val scans = File(context.filesDir, "scans").apply { mkdirs() }
