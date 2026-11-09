@@ -5,8 +5,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -50,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
@@ -104,6 +107,8 @@ fun SignatureManagerScreen(
     var offsetY by remember { mutableStateOf(24f) }
     var placementZoom by remember { mutableStateOf(1f) }
     var placementPan by remember { mutableStateOf(Offset.Zero) }
+    var placementCanvasWidth by remember { mutableStateOf(0f) }
+    var placementCanvasHeight by remember { mutableStateOf(0f) }
     var sizeScale by remember { mutableStateOf(1f) }
     var rotationDegrees by remember { mutableStateOf(0f) }
 
@@ -195,6 +200,10 @@ fun SignatureManagerScreen(
                         .fillMaxWidth()
                         .height(180.dp)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .onSizeChanged {
+                            placementCanvasWidth = it.width.toFloat()
+                            placementCanvasHeight = it.height.toFloat()
+                        }
                         .testTag("signature_placement_canvas")
                         .pointerInput(preview) {
                             awaitEachGesture {
@@ -300,12 +309,29 @@ fun SignatureManagerScreen(
                     onClick = {
                         val selected = previewBitmap
                         if (selected != null && !selected.isRecycled) {
+                            // Match the preview's graphicsLayer transform when placing the bitmap.
+                            val untransformedCenter = Offset(
+                                x = (offsetX + 80f * sizeScale) * density,
+                                y = (offsetY + 40f * sizeScale) * density
+                            )
+                            val viewportCenter = Offset(
+                                x = placementCanvasWidth / 2f,
+                                y = placementCanvasHeight / 2f
+                            )
+                            val transformedCenter = Offset(
+                                x = (untransformedCenter.x - viewportCenter.x) * placementZoom +
+                                    viewportCenter.x + placementPan.x,
+                                y = (untransformedCenter.y - viewportCenter.y) * placementZoom +
+                                    viewportCenter.y + placementPan.y
+                            )
+                            val transformedWidth = 160f * sizeScale * density * placementZoom
+                            val transformedHeight = 80f * sizeScale * density * placementZoom
                             onSelectSignature(
                                 selected.copy(Bitmap.Config.ARGB_8888, true),
-                                offsetX * density,
-                                offsetY * density,
-                                160f * sizeScale * density,
-                                80f * sizeScale * density,
+                                transformedCenter.x - transformedWidth / 2f,
+                                transformedCenter.y - transformedHeight / 2f,
+                                transformedWidth,
+                                transformedHeight,
                                 rotationDegrees
                             )
                         }
@@ -394,16 +420,37 @@ fun SignatureManagerScreen(
 }
 
 
+private data class SignatureInkOption(val name: String, val argb: Int)
+
+private data class SignatureCaptureStroke(
+    val points: List<Offset>,
+    val colorArgb: Int,
+    val widthDp: Float
+)
+
+private val SIGNATURE_INK_PALETTE = listOf(
+    SignatureInkOption("violet", android.graphics.Color.rgb(148, 0, 211)),
+    SignatureInkOption("indigo", android.graphics.Color.rgb(75, 0, 130)),
+    SignatureInkOption("blue", android.graphics.Color.BLUE),
+    SignatureInkOption("green", android.graphics.Color.GREEN),
+    SignatureInkOption("yellow", android.graphics.Color.YELLOW),
+    SignatureInkOption("orange", android.graphics.Color.rgb(255, 165, 0)),
+    SignatureInkOption("red", android.graphics.Color.RED)
+)
+
 @Composable
-private fun SignatureCaptureDialog(
+internal fun SignatureCaptureDialog(
     isSaving: Boolean,
     onDismiss: () -> Unit,
     onSave: (String, Bitmap) -> Unit
 ) {
     var signatureName by remember { mutableStateOf("") }
-    var strokes by remember { mutableStateOf<List<List<Offset>>>(emptyList()) }
+    var strokes by remember { mutableStateOf<List<SignatureCaptureStroke>>(emptyList()) }
     var canvasWidth by remember { mutableStateOf(0f) }
     var canvasHeight by remember { mutableStateOf(0f) }
+    var inkColorArgb by remember { mutableStateOf(android.graphics.Color.BLACK) }
+    var penSizeDp by remember { mutableStateOf(4f) }
+    val density = LocalDensity.current.density
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -418,6 +465,42 @@ private fun SignatureCaptureDialog(
                     modifier = Modifier.fillMaxWidth().testTag("signature_capture_name")
                 )
                 Text(stringResource(R.string.signature_capture_hint), style = MaterialTheme.typography.bodySmall)
+                Text("Ink colour", style = MaterialTheme.typography.labelMedium)
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .testTag("signature_ink_palette"),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    SIGNATURE_INK_PALETTE.forEach { option ->
+                        Box(
+                            modifier = Modifier.size(34.dp)
+                                .clip(CircleShape)
+                                .background(Color(option.argb))
+                                .border(
+                                    width = if (inkColorArgb == option.argb) 3.dp else 1.dp,
+                                    color = if (inkColorArgb == option.argb) {
+                                        MaterialTheme.colorScheme.onSurface
+                                    } else {
+                                        MaterialTheme.colorScheme.outline
+                                    },
+                                    shape = CircleShape
+                                )
+                                .clickable(enabled = !isSaving) { inkColorArgb = option.argb }
+                                .testTag("signature_ink_${option.name}")
+                        )
+                    }
+                }
+                Text("Pen size", style = MaterialTheme.typography.labelMedium)
+                Slider(
+                    value = penSizeDp,
+                    onValueChange = { penSizeDp = it },
+                    valueRange = 1f..12f,
+                    steps = 10,
+                    enabled = !isSaving,
+                    modifier = Modifier.testTag("signature_capture_pen_size")
+                )
                 Canvas(
                     modifier = Modifier.fillMaxWidth()
                         .height(170.dp)
@@ -428,28 +511,42 @@ private fun SignatureCaptureDialog(
                             canvasHeight = it.height.toFloat()
                         }
                         .testTag("signature_capture_canvas")
-                        .pointerInput(Unit) {
-                            detectDragGestures(
-                                onDragStart = { point -> strokes = strokes + listOf(listOf(point)) },
-                                onDrag = { change, _ ->
-                                    change.consume()
-                                    if (strokes.isNotEmpty()) {
-                                        strokes = strokes.dropLast(1) + listOf(strokes.last() + change.position)
+                        .pointerInput(inkColorArgb, penSizeDp, isSaving) {
+                            if (!isSaving) {
+                                detectDragGestures(
+                                    onDragStart = { point ->
+                                        strokes = strokes + SignatureCaptureStroke(
+                                            points = listOf(point),
+                                            colorArgb = inkColorArgb,
+                                            widthDp = penSizeDp
+                                        )
+                                    },
+                                    onDrag = { change, _ ->
+                                        change.consume()
+                                        if (strokes.isNotEmpty()) {
+                                            strokes = strokes.dropLast(1) + strokes.last().copy(
+                                                points = strokes.last().points + change.position
+                                            )
+                                        }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
                 ) {
-                    strokes.forEach { points ->
-                        if (points.isNotEmpty()) {
+                    strokes.forEach { stroke ->
+                        if (stroke.points.isNotEmpty()) {
                             val path = Path().apply {
-                                moveTo(points.first().x, points.first().y)
-                                points.drop(1).forEach { lineTo(it.x, it.y) }
+                                moveTo(stroke.points.first().x, stroke.points.first().y)
+                                stroke.points.drop(1).forEach { lineTo(it.x, it.y) }
                             }
                             drawPath(
                                 path = path,
-                                color = Color.Black,
-                                style = Stroke(width = 4.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                                color = Color(stroke.colorArgb),
+                                style = Stroke(
+                                    width = stroke.widthDp.dp.toPx(),
+                                    cap = StrokeCap.Round,
+                                    join = StrokeJoin.Round
+                                )
                             )
                         }
                     }
@@ -457,14 +554,15 @@ private fun SignatureCaptureDialog(
                 Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
                     TextButton(
                         onClick = { strokes = emptyList() },
-                        enabled = !isSaving
+                        enabled = !isSaving,
+                        modifier = Modifier.testTag("signature_capture_clear")
                     ) { Text(stringResource(R.string.signature_capture_clear)) }
                 }
             }
         },
         confirmButton = {
             TextButton(
-                enabled = !isSaving && signatureName.isNotBlank() && strokes.any { it.size > 0 } &&
+                enabled = !isSaving && signatureName.isNotBlank() && strokes.any { it.points.isNotEmpty() } &&
                     canvasWidth > 0f && canvasHeight > 0f,
                 modifier = Modifier.testTag("signature_capture_save"),
                 onClick = {
@@ -473,22 +571,35 @@ private fun SignatureCaptureDialog(
                     canvas.drawColor(android.graphics.Color.TRANSPARENT, android.graphics.PorterDuff.Mode.CLEAR)
                     val scaleX = bitmap.width / canvasWidth
                     val scaleY = bitmap.height / canvasHeight
-                    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                        color = android.graphics.Color.BLACK
-                        style = android.graphics.Paint.Style.STROKE
-                        strokeCap = android.graphics.Paint.Cap.ROUND
-                        strokeJoin = android.graphics.Paint.Join.ROUND
-                        strokeWidth = 12f
-                    }
-                    strokes.forEach { points ->
-                        if (points.size == 1) {
-                            canvas.drawCircle(points.single().x * scaleX, points.single().y * scaleY, 6f, paint)
-                        } else if (points.size > 1) {
-                            val path = android.graphics.Path().apply {
-                                moveTo(points.first().x * scaleX, points.first().y * scaleY)
-                                points.drop(1).forEach { lineTo(it.x * scaleX, it.y * scaleY) }
+                    val bitmapScale = (scaleX + scaleY) / 2f
+                    strokes.forEach { stroke ->
+                        if (stroke.points.isNotEmpty()) {
+                            val strokeWidth = stroke.widthDp * density * bitmapScale
+                            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                                color = stroke.colorArgb
+                                style = if (stroke.points.size == 1) {
+                                    android.graphics.Paint.Style.FILL
+                                } else {
+                                    android.graphics.Paint.Style.STROKE
+                                }
+                                strokeCap = android.graphics.Paint.Cap.ROUND
+                                strokeJoin = android.graphics.Paint.Join.ROUND
+                                this.strokeWidth = strokeWidth
                             }
-                            canvas.drawPath(path, paint)
+                            if (stroke.points.size == 1) {
+                                canvas.drawCircle(
+                                    stroke.points.single().x * scaleX,
+                                    stroke.points.single().y * scaleY,
+                                    strokeWidth / 2f,
+                                    paint
+                                )
+                            } else {
+                                val path = android.graphics.Path().apply {
+                                    moveTo(stroke.points.first().x * scaleX, stroke.points.first().y * scaleY)
+                                    stroke.points.drop(1).forEach { lineTo(it.x * scaleX, it.y * scaleY) }
+                                }
+                                canvas.drawPath(path, paint)
+                            }
                         }
                     }
                     onSave(signatureName.trim(), bitmap)

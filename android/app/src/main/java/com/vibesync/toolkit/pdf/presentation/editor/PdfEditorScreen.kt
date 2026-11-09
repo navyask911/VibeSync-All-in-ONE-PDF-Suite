@@ -65,7 +65,8 @@ fun PdfEditorScreen(
     viewModel: EditorViewModel,
     onNavigateBack: () -> Unit,
     onExportComplete: (File) -> Unit,
-    onRenameClick: (String) -> Unit = {}
+    onRenameClick: (String) -> Unit = {},
+    savedSignatureRepository: SignatureRepository? = null
 ) {
     val context = LocalContext.current
     val density = LocalDensity.current
@@ -85,7 +86,9 @@ fun PdfEditorScreen(
     var offset by remember(documentUri) { mutableStateOf(Offset.Zero) }
     val snackbarHostState = remember(documentUri) { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-    val signatureRepository = remember(context) { SignatureRepository(context) }
+    val signatureRepository = remember(context, savedSignatureRepository) {
+        savedSignatureRepository ?: SignatureRepository(context)
+    }
 
     DisposableEffect(documentUri) {
         onDispose { viewModel.resetEditorState() }

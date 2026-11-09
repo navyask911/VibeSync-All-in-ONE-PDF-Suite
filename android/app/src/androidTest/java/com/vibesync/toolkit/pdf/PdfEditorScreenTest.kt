@@ -276,9 +276,43 @@ class PdfEditorScreenTest {
             assertEquals(120, selectedBitmap.captured.width)
             assertEquals(48, selectedBitmap.captured.height)
             selectedBitmap.captured.recycle()
+
+            composeTestRule.onNodeWithTag("editor_insert_saved_signature").performScrollTo().performClick()
+            composeTestRule.onNodeWithTag("editor_create_new_signature").assertIsDisplayed().performClick()
+            composeTestRule.onNodeWithTag("signature_capture_canvas").assertIsDisplayed()
+            composeTestRule.onNodeWithText("Cancel").performClick()
         } finally {
             repository.deleteSignature(signatureId)
         }
+    }
+
+    @Test
+    fun insertSavedSignatureFallsBackToCaptureWhenRepositoryIsEmpty() {
+        val repository = mockk<SignatureRepository>()
+        every { repository.listSignatures() } returns emptyList()
+        val viewModel = mockk<EditorViewModel>(relaxed = true)
+        every { viewModel.uiState } returns MutableStateFlow(EditorUiState())
+        coEvery { viewModel.getPageBitmap(any()) } returns null
+
+        composeTestRule.setContent {
+            VibeSyncPdfTheme {
+                PdfEditorScreen(
+                    documentUri = Uri.parse("content://test/empty-signatures.pdf"),
+                    viewModel = viewModel,
+                    onNavigateBack = {},
+                    onExportComplete = {},
+                    savedSignatureRepository = repository
+                )
+            }
+        }
+
+        composeTestRule.onNodeWithTag("editor_insert_saved_signature").performClick()
+        composeTestRule.waitUntil(10_000) {
+            composeTestRule.onAllNodesWithTag("signature_capture_canvas")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeTestRule.onNodeWithTag("signature_capture_name").assertIsDisplayed()
+        composeTestRule.onNodeWithText("Cancel").performClick()
     }
 
     @Test

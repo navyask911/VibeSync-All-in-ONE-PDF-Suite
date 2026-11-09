@@ -32,10 +32,16 @@ class SignatureRepository(
             throw IOException("A signature with that name already exists.")
         }
 
+        val argbBitmap = if (bitmap.config == Bitmap.Config.ARGB_8888) {
+            bitmap
+        } else {
+            bitmap.copy(Bitmap.Config.ARGB_8888, false)
+                ?: throw IOException("Could not preserve the signature's ARGB colour channels.")
+        }
         val source = File.createTempFile("signature_source_", ".png", appContext.cacheDir)
         try {
             FileOutputStream(source).use { output ->
-                if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+                if (!argbBitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
                     throw IOException("Could not encode the signature image.")
                 }
                 output.fd.sync()
@@ -51,6 +57,7 @@ class SignatureRepository(
             throw error
         } finally {
             source.delete()
+            if (argbBitmap !== bitmap && !argbBitmap.isRecycled) argbBitmap.recycle()
         }
     }
 
@@ -66,17 +73,28 @@ class SignatureRepository(
     fun getSignature(id: String): Bitmap? {
         val safeId = safeId(id)
         val encrypted = File(signaturesDirectory, "$safeId$SIGNATURE_SUFFIX")
-        if (!encrypted.isFile) return securityVault.getSignature(safeId)
+        if (!encrypted.isFile) return securityVault.getSignature(safeId)?.let(::ensureArgb8888)
 
         val plaintext = File.createTempFile("signature_read_", ".png", appContext.cacheDir)
         return try {
             securityVault.decryptFile(encrypted, plaintext)
-            BitmapFactory.decodeFile(plaintext.absolutePath)
+            BitmapFactory.decodeFile(
+                plaintext.absolutePath,
+                BitmapFactory.Options().apply { inPreferredConfig = Bitmap.Config.ARGB_8888 }
+            )?.let(::ensureArgb8888)
         } catch (_: Exception) {
             null
         } finally {
             plaintext.delete()
         }
+    }
+
+    private fun ensureArgb8888(bitmap: Bitmap): Bitmap {
+        if (bitmap.config == Bitmap.Config.ARGB_8888) return bitmap
+        val converted = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+            ?: throw IOException("Could not decode the saved signature with ARGB colour channels.")
+        if (!bitmap.isRecycled) bitmap.recycle()
+        return converted
     }
 
     /** Returns the encrypted on-disk file for verification/debugging; null for legacy entries. */

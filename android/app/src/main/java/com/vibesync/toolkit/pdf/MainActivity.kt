@@ -27,6 +27,7 @@ import java.io.File
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.FragmentActivity
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.ActivityResultLauncher
@@ -192,6 +193,7 @@ class MainActivity : AppCompatActivity() {
     private val batchScanViewModel: BatchScanViewModel by viewModels()
     private val scannerHistoryRepository by lazy { ScannerHistoryRepository(File(filesDir, "scans")) }
     private val toolkitEngine by lazy { PdfBoxToolkitEngine(applicationContext, billingManager) }
+    private val vaultStorage by lazy { VaultStorage(applicationContext) }
 
     private lateinit var scannerManager: DocumentScannerManager
     private lateinit var scannerLauncher: ActivityResultLauncher<IntentSenderRequest>
@@ -624,10 +626,12 @@ class MainActivity : AppCompatActivity() {
                         }
 
                         composable("vault") {
-                            val vaultStorage = remember { VaultStorage(applicationContext) }
                             VaultScreen(
-                                storage = vaultStorage,
+                                storage = this@MainActivity.vaultStorage,
                                 onNavigateBack = { navController.popBackStack() },
+                                onOpenPdf = { uri ->
+                                    navController.navigate("viewer/${encodeUriRoute(uri)}")
+                                },
                                 onAuthenticate = { result ->
                                     val host = this@MainActivity as? FragmentActivity
                                     if (host == null) {
@@ -649,10 +653,29 @@ class MainActivity : AppCompatActivity() {
 
                             val isManagedScan = scannerHistoryViewModel.isManagedScanUri(decodedUri)
                             val managedScanFile = scannerHistoryRepository.fileFromUri(decodedUri)
+                            val isVaultDecryptedDocument = decodedUri.scheme == "file" &&
+                                decodedUri.path?.let { path ->
+                                    val file = File(path)
+                                    file.name.startsWith("vault_open_") &&
+                                        file.parentFile?.canonicalFile == File(cacheDir, "pdf_cache").canonicalFile
+                                } == true
+                            BackHandler(enabled = isVaultDecryptedDocument) {
+                                navController.popBackStack()
+                                lifecycleScope.launch(Dispatchers.IO) {
+                                    vaultStorage.clearDecryptedCache()
+                                }
+                            }
                             PdfViewerScreen(
                                 documentUri = decodedUri,
                                 viewModel = viewerViewModel,
-                                onNavigateBack = { navController.popBackStack() },
+                                onNavigateBack = {
+                                    navController.popBackStack()
+                                    if (isVaultDecryptedDocument) {
+                                        lifecycleScope.launch(Dispatchers.IO) {
+                                            vaultStorage.clearDecryptedCache()
+                                        }
+                                    }
+                                },
                                 onRenameClick = { currentName ->
                                     pendingDocumentRenameUri = decodedUri
                                     pendingDocumentRenameRoute = "viewer"

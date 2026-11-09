@@ -1,6 +1,6 @@
 package com.vibesync.toolkit.pdf.presentation.vault
 
-import android.content.Intent
+import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,7 +29,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableFloatStateOf
@@ -42,7 +41,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.data.vault.VaultStorage
 import kotlinx.coroutines.Dispatchers
@@ -57,7 +55,8 @@ fun VaultScreen(
     onNavigateBack: () -> Unit,
     onAuthenticate: (((Boolean) -> Unit) -> Unit),
     storage: VaultStorage,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenPdf: (Uri) -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -146,11 +145,6 @@ fun VaultScreen(
         }
     }
 
-    // Plaintext cache copies exist only while the vault route is active/authenticated.
-    DisposableEffect(storage) {
-        onDispose { storage.clearDecryptedCache() }
-    }
-
     Column(modifier = modifier.fillMaxSize().padding(16.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
             IconButton(onClick = {
@@ -230,17 +224,7 @@ fun VaultScreen(
                                             }
                                             decryptedResult.onSuccess { decrypted ->
                                                 runCatching {
-                                                    val uri = FileProvider.getUriForFile(
-                                                        context,
-                                                        "${context.packageName}.fileprovider",
-                                                        decrypted
-                                                    )
-                                                    val viewIntent = Intent(Intent.ACTION_VIEW)
-                                                        .setDataAndType(uri, "application/pdf")
-                                                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                                    context.startActivity(
-                                                        Intent.createChooser(viewIntent, context.getString(R.string.open_pdf))
-                                                    )
+                                                    onOpenPdf(Uri.fromFile(decrypted))
                                                 }.onFailure {
                                                     decrypted.delete()
                                                     errorMessage = it.localizedMessage ?: context.getString(R.string.failed_to_open_pdf)
