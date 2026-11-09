@@ -4,7 +4,9 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Color
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.performClick
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -87,7 +89,11 @@ class FeatureScreensTest {
         composeRule.waitForIdle()
         composeRule.onNodeWithTag("signature_item_test-signature").assertExists()
         composeRule.onNodeWithTag("signature_select_test-signature").performClick()
-        composeRule.onNodeWithTag("signature_placement_preview").assertExists()
+        composeRule.waitUntil(10_000) {
+            composeRule.onAllNodesWithTag("signature_placement_preview")
+                .fetchSemanticsNodes().isNotEmpty()
+        }
+        composeRule.onNodeWithTag("signature_placement_preview").assertIsDisplayed()
         composeRule.onNodeWithTag("signature_size_slider").assertExists()
         composeRule.onNodeWithTag("signature_rotation_slider").assertExists()
         composeRule.onNodeWithTag("signature_place_button").performClick()
