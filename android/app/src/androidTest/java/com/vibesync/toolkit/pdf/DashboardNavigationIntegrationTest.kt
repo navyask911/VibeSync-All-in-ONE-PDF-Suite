@@ -21,8 +21,14 @@ class DashboardNavigationIntegrationTest {
 
     @Test
     fun allToolkitCardsNavigateAndPrivacyDialogOpens() {
+        // MainActivity performs application setup before publishing its Compose content.
+        // Wait for the real dashboard hierarchy instead of querying a not-yet-attached root.
+        composeRule.waitUntil(15_000) {
+            runCatching {
+                composeRule.onNodeWithTag("dashboard_list").assertIsDisplayed()
+            }.isSuccess
+        }
         composeRule.waitForIdle()
-        composeRule.onNodeWithTag("dashboard_list").assertExists()
 
         composeRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("tool_convert"))
         composeRule.onNodeWithTag("tool_convert").performClick()
