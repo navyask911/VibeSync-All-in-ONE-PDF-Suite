@@ -39,7 +39,7 @@ class BatchScanViewModelTest {
             val firstBatchId = requireNotNull(viewModel.state.value.activeBatchId)
             captureTwo(viewModel, sources)
             val firstPages = viewModel.state.value.pages
-            val firstFolder = firstPages.first().file.parentFile
+            val firstFolder = requireNotNull(firstPages.first().file.parentFile)
             assertTrue(firstFolder.name.startsWith(BatchScanViewModel.BATCH_FOLDER_PREFIX))
             assertTrue(File(firstFolder, "batch_pages.json").isFile)
             assertEquals(2, firstPages.size)

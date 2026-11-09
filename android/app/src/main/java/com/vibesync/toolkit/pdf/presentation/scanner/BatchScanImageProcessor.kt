@@ -2,8 +2,11 @@ package com.vibesync.toolkit.pdf.presentation.scanner
 
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
+import android.graphics.Paint
+import android.graphics.RectF
 import androidx.exifinterface.media.ExifInterface
 import java.io.File
 import java.io.FileOutputStream
@@ -97,7 +100,25 @@ internal object BatchScanImageProcessor {
             ExifInterface.ORIENTATION_ROTATE_270 -> matrix.setRotate(270f)
             else -> return source
         }
-        return Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
+        // Allocate the target explicitly and draw through Canvas. This keeps an initialized
+        // pixel buffer and avoids relying on matrix-create behavior in legacy bitmap providers.
+        val mappedBounds = RectF(0f, 0f, source.width.toFloat(), source.height.toFloat())
+        matrix.mapRect(mappedBounds)
+        val outputWidth = kotlin.math.ceil(mappedBounds.width().toDouble()).toInt().coerceAtLeast(1)
+        val outputHeight = kotlin.math.ceil(mappedBounds.height().toDouble()).toInt().coerceAtLeast(1)
+        matrix.postTranslate(-mappedBounds.left, -mappedBounds.top)
+        val transformed = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.ARGB_8888)
+        try {
+            Canvas(transformed).drawBitmap(
+                source,
+                matrix,
+                Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+            )
+            return transformed
+        } catch (error: Throwable) {
+            if (!transformed.isRecycled) transformed.recycle()
+            throw error
+        }
     }
 
     /** Row-by-row unsharp masking avoids a second full-frame pixel array. */
