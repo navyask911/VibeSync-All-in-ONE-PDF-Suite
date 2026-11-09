@@ -163,7 +163,6 @@ fun DashboardScreen(
 
     val tools = remember {
         listOf(
-            ToolItem(context.getString(R.string.smart_scan_title), context.getString(R.string.smart_scan_subtitle), Icons.Default.FolderOpen, "smart_scan", VibeSyncCrimsonPrimary),
             ToolItem(context.getString(R.string.tool_view_read), context.getString(R.string.tool_view_read_subtitle), Icons.Default.MenuBook, "viewer_picker", VibeSyncCrimsonPrimary),
             ToolItem(context.getString(R.string.tool_edit_sign), context.getString(R.string.tool_edit_sign_subtitle), Icons.Default.Draw, "editor_picker", VibeSyncRubyAccent),
             ToolItem(context.getString(R.string.tool_document_scanner), context.getString(R.string.tool_document_scanner_subtitle), Icons.Default.DocumentScanner, "scanner", Color(0xFFD32F2F)),
@@ -179,7 +178,9 @@ fun DashboardScreen(
             ToolItem(context.getString(R.string.tool_translation_scan), context.getString(R.string.tool_translation_scan_subtitle), Icons.Default.Translate, "translation_scan", VibeSyncRubyAccent),
             ToolItem(context.getString(R.string.manual_crop_title), context.getString(R.string.manual_crop_subtitle), Icons.Default.Crop, "manual_crop", VibeSyncCrimsonPrimary),
             ToolItem(context.getString(R.string.signature_manager_title), context.getString(R.string.signature_manager_subtitle), Icons.Default.Draw, "signature_manager", VibeSyncRubyAccent),
-            ToolItem(context.getString(R.string.vault_title), context.getString(R.string.vault_subtitle), Icons.Default.Lock, "vault", Color(0xFF5F0000))
+            ToolItem(context.getString(R.string.vault_title), context.getString(R.string.vault_subtitle), Icons.Default.Lock, "vault", Color(0xFF5F0000)),
+            // Smart PDF Scanner is intentionally the final card, immediately after Vault.
+            ToolItem(context.getString(R.string.smart_scan_title), context.getString(R.string.smart_scan_subtitle), Icons.Default.FolderOpen, "smart_scan", VibeSyncCrimsonPrimary)
         )
     }
 

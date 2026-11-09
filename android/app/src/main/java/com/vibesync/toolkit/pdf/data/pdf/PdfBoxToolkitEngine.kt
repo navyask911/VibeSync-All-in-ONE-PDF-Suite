@@ -494,6 +494,11 @@ class PdfBoxToolkitEngine(
             require(userPassword.isNotEmpty()) { "User password cannot be empty" }
             require(ownerPassword.isNotEmpty()) { "Owner password cannot be empty" }
 
+            // PDFBox 2.x encodes AES-128 (revision 4) passwords as ISO-8859-1.
+            // Validate the encoding instead of silently replacing unsupported characters.
+            val encodedUserPassword = requireAes128Password(userPassword, "User")
+            val encodedOwnerPassword = requireAes128Password(ownerPassword, "Owner")
+
             ensureBouncyCastleProvider()
 
             sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "encrypt_src_")
@@ -506,10 +511,14 @@ class PdfBoxToolkitEngine(
 
                 applyVibeSyncWatermark(document)
 
-                // Use PDFBox's strongest standard password protection supported by
-                // pdfbox-android 2.0.27.0: AES-256 (revision 6).
-                val policy = StandardProtectionPolicy(ownerPassword, userPassword, permissions)
-                policy.encryptionKeyLength = 256
+                // Use interoperable AES-128 Standard Security Handler revision 4.
+                // StandardProtectionPolicy takes owner password first, then user password.
+                val policy = StandardProtectionPolicy(
+                    encodedOwnerPassword,
+                    encodedUserPassword,
+                    permissions
+                )
+                policy.encryptionKeyLength = 128
                 policy.setPreferAES(true)
                 policy.permissions = permissions
 
@@ -519,7 +528,7 @@ class PdfBoxToolkitEngine(
 
             // Fail the operation immediately if the produced file cannot be reopened
             // with both credentials. This prevents broken encrypted PDFs reaching users.
-            PDDocument.load(outputFile, userPassword).use { userDocument ->
+            PDDocument.load(outputFile, encodedUserPassword).use { userDocument ->
                 check(userDocument.isEncrypted) { "Encrypted output did not retain PDF security" }
                 check(userDocument.currentAccessPermission.canPrint() == allowPrinting) {
                     "Encrypted output printing permission does not match requested policy"
@@ -528,7 +537,7 @@ class PdfBoxToolkitEngine(
                     "Encrypted output extraction permission does not match requested policy"
                 }
             }
-            PDDocument.load(outputFile, ownerPassword).use { ownerDocument ->
+            PDDocument.load(outputFile, encodedOwnerPassword).use { ownerDocument ->
                 check(ownerDocument.isEncrypted) { "Encrypted output did not retain PDF security" }
                 check(ownerDocument.currentAccessPermission.isOwnerPermission) {
                     "Owner password did not grant owner access"
@@ -1137,6 +1146,14 @@ class PdfBoxToolkitEngine(
         } finally {
             if (!mutableBitmap.isRecycled) mutableBitmap.recycle()
         }
+    }
+
+    private fun requireAes128Password(password: String, label: String): String {
+        require(Charsets.ISO_8859_1.newEncoder().canEncode(password)) {
+            "$label password contains characters unsupported by PDF AES-128 (ISO-8859-1). " +
+                "Use Latin-1 characters or ASCII."
+        }
+        return password
     }
 
     companion object {

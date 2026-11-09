@@ -3,6 +3,10 @@ package com.vibesync.toolkit.pdf.presentation.scanner
 import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
@@ -20,6 +24,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
@@ -298,11 +304,14 @@ fun BatchScanScreen(
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("scan_settings_prefs", 0) }
-    var selectedFilterName by remember { androidx.compose.runtime.mutableStateOf(prefs.getString(BatchScanViewModel.KEY_FILTER_ID, "") ?: "") }
-    val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
+    var selectedFilterName by remember {
+        androidx.compose.runtime.mutableStateOf(prefs.getString(BatchScanViewModel.KEY_FILTER_ID, "") ?: "")
+    }
+    val snackbarHostState = androidx.compose.material3.SnackbarHostState()
     val selectedFilter = selectedFilterName.takeIf { it.isNotBlank() }?.let {
         runCatching { FilterId.valueOf(it) }.getOrNull()
     }
+    val activeFolder = state.batchFolders.firstOrNull { it.id == state.activeBatchId }
 
     LaunchedEffect(state.savedFile) {
         state.savedFile?.let { file ->
@@ -328,68 +337,147 @@ fun BatchScanScreen(
         }
     ) { padding ->
         Column(
-            modifier = Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
+            modifier = Modifier.padding(padding).fillMaxSize().padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.batch_mode_title), fontWeight = FontWeight.SemiBold)
-                    Text(stringResource(R.string.batch_mode_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (state.activeBatchId == null) {
+                Button(
+                    onClick = viewModel::startNewBatchScan,
+                    modifier = Modifier.fillMaxWidth().testTag("batch_new_batch")
+                ) {
+                    Text("+ New Batch Scan")
                 }
-                Switch(
-                    checked = state.batchModeEnabled,
-                    onCheckedChange = viewModel::setBatchModeEnabled,
-                    modifier = Modifier.testTag("batch_mode_toggle")
-                )
-            }
-            Text(stringResource(R.string.scan_filter_title), style = MaterialTheme.typography.titleSmall)
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterId.values().forEach { filterId ->
-                    FilterChip(
-                        selected = selectedFilter == filterId,
-                        onClick = {
-                            selectedFilterName = filterId.name
-                            prefs.edit().putString(BatchScanViewModel.KEY_FILTER_ID, filterId.name).apply()
-                        },
-                        label = { Text(stringResource(filterId.labelRes)) },
-                        modifier = Modifier.testTag("batch_filter_" + filterId.name)
-                    )
+                if (state.batchFolders.isEmpty()) {
+                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text(
+                            "No batch scans yet. Start a new batch to capture document pages.",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f).fillMaxWidth().testTag("batch_folder_list"),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(state.batchFolders, key = { it.id }) { folder ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth()
+                                    .clickable { viewModel.openBatch(folder.id) }
+                                    .testTag("batch_folder_${folder.id}"),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                                )
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                    Column(Modifier.weight(1f)) {
+                                        Text(folder.name, fontWeight = FontWeight.SemiBold)
+                                        Text(
+                                            "${folder.pageCount} pages",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            }
+                        }
+                    }
                 }
-                if (selectedFilter != null) {
-                    FilterChip(
-                        selected = false,
-                        onClick = {
-                            selectedFilterName = ""
-                            prefs.edit().remove(BatchScanViewModel.KEY_FILTER_ID).apply()
-                        },
-                        label = { Text(stringResource(R.string.signature_clear_action)) },
-                        modifier = Modifier.testTag("batch_filter_clear")
-                    )
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TextButton(onClick = viewModel::closeBatch, modifier = Modifier.testTag("batch_back_to_folders")) {
+                        Text("All Batches")
+                    }
+                    Spacer(Modifier.weight(1f))
+                    OutlinedButton(
+                        onClick = viewModel::startNewBatchScan,
+                        enabled = !state.isCompiling,
+                        modifier = Modifier.testTag("batch_new_batch")
+                    ) { Text("+ New Batch Scan") }
+                }
+                Text(activeFolder?.name ?: "Batch Scan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Column(
+                    modifier = Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(R.string.batch_mode_title), fontWeight = FontWeight.SemiBold)
+                            Text(stringResource(R.string.batch_mode_description), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Switch(
+                            checked = state.batchModeEnabled,
+                            onCheckedChange = viewModel::setBatchModeEnabled,
+                            modifier = Modifier.testTag("batch_mode_toggle")
+                        )
+                    }
+                    Text(stringResource(R.string.scan_filter_title), style = MaterialTheme.typography.titleSmall)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilterId.values().forEach { filterId ->
+                            FilterChip(
+                                selected = selectedFilter == filterId,
+                                onClick = {
+                                    selectedFilterName = filterId.name
+                                    prefs.edit().putString(BatchScanViewModel.KEY_FILTER_ID, filterId.name).apply()
+                                },
+                                label = { Text(stringResource(filterId.labelRes)) },
+                                modifier = Modifier.testTag("batch_filter_" + filterId.name)
+                            )
+                        }
+                        if (selectedFilter != null) {
+                            FilterChip(
+                                selected = false,
+                                onClick = {
+                                    selectedFilterName = ""
+                                    prefs.edit().remove(BatchScanViewModel.KEY_FILTER_ID).apply()
+                                },
+                                label = { Text(stringResource(R.string.signature_clear_action)) },
+                                modifier = Modifier.testTag("batch_filter_clear")
+                            )
+                        }
+                    }
+                    androidx.compose.material3.OutlinedButton(
+                        onClick = { viewModel.requestCapture(); onStartCapture() },
+                        enabled = state.batchModeEnabled && !state.isCompiling,
+                        modifier = Modifier.fillMaxWidth().testTag("batch_capture")
+                    ) {
+                        Text(stringResource(if (state.pages.isEmpty()) R.string.batch_start_capture else R.string.batch_add_capture))
+                    }
+                    state.messageRes?.let {
+                        Text(stringResource(it), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("batch_error"))
+                    }
+                    if (state.pages.isNotEmpty()) {
+                        BatchReviewSheet(
+                            pages = state.pages,
+                            onMovePage = viewModel::movePage,
+                            onDeletePage = viewModel::deletePage,
+                            onAddPages = { viewModel.requestCapture(); onStartCapture() },
+                            onCompile = viewModel::compileBatch,
+                            isCompiling = state.isCompiling,
+                            onClearAll = viewModel::clearPages,
+                            progress = state.progress
+                        )
+                    }
+                    if (state.fellBack) Text(stringResource(R.string.resolution_profile_memory_fallback), color = MaterialTheme.colorScheme.error)
+                    if (state.isCompiling) {
+                        OutlinedButton(onClick = viewModel::cancelCompile, modifier = Modifier.testTag("batch_cancel_compile")) {
+                            Text(stringResource(R.string.cancel))
+                        }
+                    }
                 }
             }
-            androidx.compose.material3.OutlinedButton(
-                onClick = { viewModel.requestCapture(); onStartCapture() },
-                enabled = state.batchModeEnabled && !state.isCompiling,
-                modifier = Modifier.fillMaxWidth().testTag("batch_capture")
-            ) { Text(stringResource(if (state.pages.isEmpty()) R.string.batch_start_capture else R.string.batch_add_capture)) }
-            state.messageRes?.let { Text(stringResource(it), color = MaterialTheme.colorScheme.error, modifier = Modifier.testTag("batch_error")) }
-            if (state.pages.isNotEmpty()) {
-                BatchReviewSheet(
-                    pages = state.pages,
-                    onMovePage = viewModel::movePage,
-                    onDeletePage = viewModel::deletePage,
-                    onAddPages = { viewModel.requestCapture(); onStartCapture() },
-                    onCompile = viewModel::compileBatch,
-                    isCompiling = state.isCompiling,
-                    onClearAll = viewModel::clearPages,
-                    progress = state.progress
-                )
-            }
-            if (state.fellBack) Text(stringResource(R.string.resolution_profile_memory_fallback), color = MaterialTheme.colorScheme.error)
-            if (state.isCompiling) OutlinedButton(onClick = viewModel::cancelCompile, modifier = Modifier.testTag("batch_cancel_compile")) { Text(stringResource(R.string.cancel)) }
         }
     }
 }

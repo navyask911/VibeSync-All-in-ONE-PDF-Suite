@@ -25,85 +25,217 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.IOException
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class BatchScanViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application.applicationContext
     private val prefs = app.getSharedPreferences(ResolutionProfilePrefs.PREFERENCES_FILE, 0)
     private val scansDirectory = File(app.filesDir, "VibeSyncScans")
-    private val manifestFile = File(scansDirectory, "batch_pages.json")
-    private val batchPdfDirectory = File(app.filesDir, "scans")
     private val engine = PdfBoxToolkitEngine(app)
     private val _state = MutableStateFlow(
         BatchScanState(batchModeEnabled = prefs.getBoolean(KEY_BATCH_ENABLED, false))
     )
     val state: StateFlow<BatchScanState> = _state.asStateFlow()
+
+    private var activeBatchDirectory: File? = null
     private var compileJob: Job? = null
 
-    init { restorePersistedPages() }
+    init {
+        refreshBatchFolders()
+    }
 
-    private fun restorePersistedPages() {
-        if (!scansDirectory.isDirectory) return
-        val restored = runCatching {
-            if (manifestFile.isFile) {
-                val entries = JSONArray(manifestFile.readText())
+    /** Creates a dedicated timestamped folder without changing any existing batch. */
+    fun startNewBatchScan() {
+        try {
+            if (!scansDirectory.exists() && !scansDirectory.mkdirs()) {
+                throw IOException("Could not create the batch scan library.")
+            }
+            val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+            val baseName = "$BATCH_FOLDER_PREFIX$stamp"
+            var directory = File(scansDirectory, baseName)
+            var suffix = 1
+            while (directory.exists()) {
+                directory = File(scansDirectory, "${baseName}_${suffix++}")
+            }
+            if (!directory.mkdirs()) throw IOException("Could not create a new batch folder.")
+
+            activeBatchDirectory = directory
+            prefs.edit().putBoolean(KEY_BATCH_ENABLED, true).apply()
+            _state.value = _state.value.copy(
+                batchModeEnabled = true,
+                awaitingCapture = false,
+                isCompiling = false,
+                progress = 0f,
+                pages = emptyList(),
+                activeBatchId = directory.name,
+                messageRes = null,
+                savedFile = null,
+                fellBack = false
+            )
+            refreshBatchFolders()
+        } catch (error: Exception) {
+            _state.value = _state.value.copy(messageRes = R.string.batch_capture_failed)
+        }
+    }
+
+    /** Opens a saved batch and restores its manifest-backed page order. */
+    fun openBatch(batchId: String) {
+        val directory = if (batchId == LEGACY_BATCH_ID) {
+            scansDirectory
+        } else {
+            File(scansDirectory, batchId)
+        }
+        if (!directory.isDirectory ||
+            (directory != scansDirectory && directory.parentFile?.canonicalFile != scansDirectory.canonicalFile) ||
+            (directory != scansDirectory && !directory.name.startsWith(BATCH_FOLDER_PREFIX))
+        ) return
+
+        activeBatchDirectory = directory
+        _state.value = _state.value.copy(
+            pages = loadBatchPages(directory),
+            activeBatchId = batchId,
+            awaitingCapture = false,
+            isCompiling = false,
+            progress = 0f,
+            savedFile = null,
+            messageRes = null,
+            fellBack = false
+        )
+        refreshBatchFolders()
+    }
+
+    fun closeBatch() {
+        activeBatchDirectory = null
+        _state.value = _state.value.copy(
+            activeBatchId = null,
+            pages = emptyList(),
+            awaitingCapture = false,
+            isCompiling = false,
+            progress = 0f,
+            savedFile = null,
+            messageRes = null
+        )
+        refreshBatchFolders()
+    }
+
+    private fun refreshBatchFolders() {
+        if (!scansDirectory.exists()) {
+            _state.value = _state.value.copy(batchFolders = emptyList())
+            return
+        }
+        val directories = mutableListOf<File>()
+        // Preserve the old single-folder layout as a legacy batch on upgrade.
+        val legacyHasPages = File(scansDirectory, PAGE_MANIFEST).isFile ||
+            scansDirectory.listFiles().orEmpty().any {
+                it.isFile && it.extension.lowercase(Locale.ROOT) in IMAGE_EXTENSIONS
+            }
+        if (legacyHasPages) directories += scansDirectory
+        directories += scansDirectory.listFiles().orEmpty()
+            .filter { it.isDirectory && it.name.startsWith(BATCH_FOLDER_PREFIX) }
+
+        val folders = directories.distinctBy { it.absolutePath }.map { directory ->
+            BatchScanFolder(
+                id = if (directory == scansDirectory) LEGACY_BATCH_ID else directory.name,
+                name = if (directory == scansDirectory) LEGACY_BATCH_NAME else directory.name,
+                directory = directory,
+                pageCount = loadBatchPages(directory).size,
+                lastModified = directory.lastModified()
+            )
+        }.sortedWith(compareByDescending<BatchScanFolder> { it.lastModified }.thenByDescending { it.name })
+        _state.value = _state.value.copy(batchFolders = folders)
+    }
+
+    private fun loadBatchPages(directory: File): List<BatchScanPage> {
+        if (!directory.isDirectory) return emptyList()
+        return runCatching {
+            val manifest = File(directory, PAGE_MANIFEST)
+            if (manifest.isFile) {
+                val entries = JSONArray(manifest.readText())
                 (0 until entries.length()).mapNotNull { index ->
                     val entry = entries.getJSONObject(index)
                     val name = entry.getString("file")
                     if (File(name).name != name) return@mapNotNull null
-                    val file = File(scansDirectory, name)
+                    val file = File(directory, name)
                     if (!file.isFile || file.length() <= 0L) return@mapNotNull null
                     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                     BitmapFactory.decodeFile(file.absolutePath, bounds)
                     val width = entry.optInt("width", bounds.outWidth).takeIf { it > 0 } ?: bounds.outWidth
                     val height = entry.optInt("height", bounds.outHeight).takeIf { it > 0 } ?: bounds.outHeight
                     if (width <= 0 || height <= 0) return@mapNotNull null
-                    BatchScanPage(entry.optString("id", file.name), file, width, height,
-                        entry.optLong("estimatedBytes", width.toLong() * height * 4L))
+                    BatchScanPage(
+                        id = entry.optString("id", file.name),
+                        file = file,
+                        width = width,
+                        height = height,
+                        estimatedBytes = entry.optLong("estimatedBytes", width.toLong() * height * 4L)
+                    )
                 }
             } else {
-                scansDirectory.listFiles().orEmpty()
-                    .filter { it.isFile && it.extension.lowercase() in setOf("jpg", "jpeg") }
+                directory.listFiles().orEmpty()
+                    .filter { it.isFile && it.extension.lowercase(Locale.ROOT) in IMAGE_EXTENSIONS }
                     .sortedWith(compareBy<File> { it.lastModified() }.thenBy { it.name })
                     .mapNotNull { file ->
                         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                         BitmapFactory.decodeFile(file.absolutePath, bounds)
                         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) null else BatchScanPage(
-                            file.name, file, bounds.outWidth, bounds.outHeight,
-                            bounds.outWidth.toLong() * bounds.outHeight * 4L)
+                            id = file.name,
+                            file = file,
+                            width = bounds.outWidth,
+                            height = bounds.outHeight,
+                            estimatedBytes = bounds.outWidth.toLong() * bounds.outHeight * 4L
+                        )
                     }
             }
         }.getOrElse { emptyList() }
-        if (restored.isNotEmpty()) {
-            _state.value = _state.value.copy(pages = restored)
-            if (!manifestFile.isFile) runCatching { persistPageManifest(restored) }
-        }
     }
 
-    private fun persistPageManifest(pages: List<BatchScanPage>) {
-        if (!scansDirectory.exists() && !scansDirectory.mkdirs()) throw IOException("Could not create persistent scan folder.")
+    private fun persistPageManifest(directory: File, pages: List<BatchScanPage>) {
+        if (!directory.exists() && !directory.mkdirs()) {
+            throw IOException("Could not create persistent scan folder.")
+        }
         val entries = JSONArray()
         pages.forEach { page ->
-            entries.put(JSONObject().put("id", page.id).put("file", page.file.name)
-                .put("width", page.width).put("height", page.height).put("estimatedBytes", page.estimatedBytes))
+            entries.put(
+                JSONObject()
+                    .put("id", page.id)
+                    .put("file", page.file.name)
+                    .put("width", page.width)
+                    .put("height", page.height)
+                    .put("estimatedBytes", page.estimatedBytes)
+            )
         }
-        val staging = File(scansDirectory, "batch_pages.json.tmp")
+        val manifest = File(directory, PAGE_MANIFEST)
+        val staging = File(directory, "$PAGE_MANIFEST.tmp")
         staging.writeText(entries.toString())
-        if (manifestFile.exists() && !manifestFile.delete()) {
+        if (manifest.exists() && !manifest.delete()) {
             staging.delete()
             throw IOException("Could not replace saved batch scan order.")
         }
-        if (!staging.renameTo(manifestFile)) {
-            try { staging.copyTo(manifestFile, overwrite = true) } finally { staging.delete() }
+        if (!staging.renameTo(manifest)) {
+            try {
+                staging.copyTo(manifest, overwrite = true)
+            } finally {
+                staging.delete()
+            }
         }
     }
 
     fun setBatchModeEnabled(enabled: Boolean) {
         prefs.edit().putBoolean(KEY_BATCH_ENABLED, enabled).apply()
-        _state.value = _state.value.copy(batchModeEnabled = enabled, messageRes = null)
-        if (!enabled && _state.value.pages.isEmpty()) _state.value = _state.value.copy(awaitingCapture = false)
+        _state.value = _state.value.copy(
+            batchModeEnabled = enabled,
+            messageRes = null,
+            awaitingCapture = if (enabled) _state.value.awaitingCapture else false
+        )
     }
 
     fun requestCapture() {
+        if (_state.value.activeBatchId == null || activeBatchDirectory == null) {
+            startNewBatchScan()
+        }
+        if (activeBatchDirectory == null) return
         if (!_state.value.batchModeEnabled) setBatchModeEnabled(true)
         _state.value = _state.value.copy(awaitingCapture = true, messageRes = null)
     }
@@ -117,106 +249,136 @@ class BatchScanViewModel(application: Application) : AndroidViewModel(applicatio
             _state.value = _state.value.copy(messageRes = R.string.batch_no_pages_captured)
             return true
         }
+
+        val targetDirectory = activeBatchDirectory ?: return true
         viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) { appendPageImages(pageUris) }
-            result.fold(
-                onSuccess = { pages ->
-                    val orderedPages = _state.value.pages + pages
-                    runCatching { persistPageManifest(orderedPages) }
-                        .onSuccess { _state.value = _state.value.copy(pages = orderedPages, messageRes = null) }
-                        .onFailure {
-                            pages.forEach { it.file.delete() }
+            val appended = withContext(Dispatchers.IO) { appendPageImages(pageUris, targetDirectory) }
+            appended.fold(
+                onSuccess = { newPages ->
+                    val existingPages = if (activeBatchDirectory?.absolutePath == targetDirectory.absolutePath) {
+                        _state.value.pages
+                    } else {
+                        withContext(Dispatchers.IO) { loadBatchPages(targetDirectory) }
+                    }
+                    val orderedPages = existingPages + newPages
+                    runCatching {
+                        withContext(Dispatchers.IO) { persistPageManifest(targetDirectory, orderedPages) }
+                    }.onSuccess {
+                        if (activeBatchDirectory?.absolutePath == targetDirectory.absolutePath) {
+                            _state.value = _state.value.copy(pages = orderedPages, messageRes = null)
+                        }
+                        refreshBatchFolders()
+                    }.onFailure {
+                        newPages.forEach { it.file.delete() }
+                        if (activeBatchDirectory?.absolutePath == targetDirectory.absolutePath) {
                             _state.value = _state.value.copy(messageRes = R.string.batch_capture_failed)
                         }
+                        refreshBatchFolders()
+                    }
                 },
                 onFailure = { error ->
-                    _state.value = _state.value.copy(
-                        messageRes = if (error is BatchMemoryLimitException) R.string.batch_memory_limit else R.string.batch_capture_failed
-                    )
+                    if (activeBatchDirectory?.absolutePath == targetDirectory.absolutePath) {
+                        _state.value = _state.value.copy(
+                            messageRes = if (error is BatchMemoryLimitException) {
+                                R.string.batch_memory_limit
+                            } else {
+                                R.string.batch_capture_failed
+                            }
+                        )
+                    }
                 }
             )
         }
         return true
     }
 
-    private fun appendPageImages(uris: List<Uri>): Result<List<BatchScanPage>> = runCatching {
-        if (!scansDirectory.exists() && !scansDirectory.mkdirs()) throw IOException("Could not create persistent scan folder.")
+    private fun appendPageImages(uris: List<Uri>, directory: File): Result<List<BatchScanPage>> {
         val pending = mutableListOf<BatchScanPage>()
-        var totalBytes = _state.value.pages.sumOf { it.estimatedBytes }
-        val memoryLimit = Runtime.getRuntime().maxMemory() / 4L
-        try {
+        return try {
+            if (!directory.exists() && !directory.mkdirs()) {
+                throw IOException("Could not create the batch page folder.")
+            }
             uris.forEachIndexed { index, uri ->
-                val stagingFile = File.createTempFile("batch_capture_", ".jpg", scansDirectory)
+                val sourceFile = File.createTempFile("batch_capture_source_", ".img", directory)
                 var destination: File? = null
                 try {
                     app.contentResolver.openInputStream(uri)?.use { input ->
-                        stagingFile.outputStream().use { output -> input.copyTo(output) }
+                        sourceFile.outputStream().use { output -> input.copyTo(output) }
                     } ?: throw IOException("Unable to read a captured page.")
-                    val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                    BitmapFactory.decodeFile(stagingFile.absolutePath, options)
-                    if (options.outWidth <= 0 || options.outHeight <= 0) throw IOException("Unable to decode a captured page.")
-                    val bytes = options.outWidth.toLong() * options.outHeight.toLong() * 4L
-                    if (bytes > memoryLimit || totalBytes > memoryLimit - bytes) throw BatchMemoryLimitException()
-                    totalBytes += bytes
+
                     val baseName = generateSmartFileName("VibeSync_BatchScan_Page_${index + 1}", "jpg")
-                    var finalFile = File(scansDirectory, baseName)
+                    var finalFile = File(directory, baseName)
                     var suffix = 1
                     while (finalFile.exists()) {
-                        finalFile = File(scansDirectory, baseName.removeSuffix(".jpg") + "_${suffix++}.jpg")
+                        finalFile = File(directory, baseName.removeSuffix(".jpg") + "_${suffix++}.jpg")
                     }
-                    if (!stagingFile.renameTo(finalFile)) throw IOException("Could not persist captured page image.")
-                    finalFile.setLastModified(System.currentTimeMillis() + index)
                     destination = finalFile
-                    pending.add(
-                        BatchScanPage(
-                            id = "${System.nanoTime()}_$index",
-                            file = finalFile,
-                            width = options.outWidth,
-                            height = options.outHeight,
-                            estimatedBytes = bytes
-                        )
+                    val image = BatchScanImageProcessor.process(sourceFile, finalFile)
+                    pending += BatchScanPage(
+                        id = "${System.nanoTime()}_$index",
+                        file = finalFile,
+                        width = image.width,
+                        height = image.height,
+                        estimatedBytes = image.width.toLong() * image.height * 4L
                     )
+                    finalFile.setLastModified(System.currentTimeMillis() + index)
                 } catch (error: Exception) {
-                    stagingFile.delete()
                     destination?.delete()
                     throw error
+                } finally {
+                    sourceFile.delete()
                 }
             }
-            pending
+            Result.success(pending)
+        } catch (cancelled: CancellationException) {
+            pending.forEach { it.file.delete() }
+            throw cancelled
         } catch (error: Exception) {
             pending.forEach { it.file.delete() }
-            throw error
+            Result.failure(error)
         }
     }
 
     fun movePage(from: Int, to: Int) {
+        val directory = activeBatchDirectory ?: return
         val pages = _state.value.pages.toMutableList()
         if (from !in pages.indices || to !in pages.indices || from == to) return
         val moved = pages.removeAt(from)
         pages.add(to, moved)
-        persistPageManifest(pages)
+        persistPageManifest(directory, pages)
         _state.value = _state.value.copy(pages = pages)
+        refreshBatchFolders()
     }
 
     fun deletePage(pageId: String) {
+        val directory = activeBatchDirectory ?: return
         val page = _state.value.pages.firstOrNull { it.id == pageId } ?: return
         val remaining = _state.value.pages.filterNot { it.id == pageId }
         page.file.delete()
-        persistPageManifest(remaining)
+        persistPageManifest(directory, remaining)
         _state.value = _state.value.copy(pages = remaining)
+        refreshBatchFolders()
     }
 
     fun clearPages() {
+        val directory = activeBatchDirectory ?: return
         compileJob?.cancel()
-        // Only this explicit user action removes saved pages and their order manifest.
-        _state.value.pages.forEach { page -> page.file.delete() }
-        manifestFile.delete()
-        File(scansDirectory, "batch_pages.json.tmp").delete()
-        _state.value = _state.value.copy(pages = emptyList(), isCompiling = false, progress = 0f, savedFile = null)
+        _state.value.pages.forEach { it.file.delete() }
+        File(directory, PAGE_MANIFEST).delete()
+        File(directory, "$PAGE_MANIFEST.tmp").delete()
+        _state.value = _state.value.copy(
+            pages = emptyList(),
+            isCompiling = false,
+            progress = 0f,
+            savedFile = null,
+            messageRes = null
+        )
+        refreshBatchFolders()
     }
 
     fun compileBatch(pageRangeInput: String = "All") {
         if (_state.value.isCompiling || _state.value.pages.isEmpty()) return
+        val directory = activeBatchDirectory ?: return
         val pages = _state.value.pages.toList()
         val pageRanges = runCatching { PageRangeParser.parse(pageRangeInput, pages.size) }.getOrElse {
             _state.value = _state.value.copy(messageRes = R.string.batch_compile_failed)
@@ -225,12 +387,14 @@ class BatchScanViewModel(application: Application) : AndroidViewModel(applicatio
         compileJob = viewModelScope.launch {
             _state.value = _state.value.copy(isCompiling = true, progress = 0f, messageRes = null, savedFile = null)
             val output = withContext(Dispatchers.IO) {
-                if (!batchPdfDirectory.exists() && !batchPdfDirectory.mkdirs()) throw IOException("Could not create scan PDF directory.")
-                val baseName = generateSmartFileName("VibeSync_BatchScan", "pdf")
-                var file = File(batchPdfDirectory, baseName)
+                if (!directory.exists() && !directory.mkdirs()) {
+                    throw IOException("Could not create the batch output directory.")
+                }
+                val baseName = generateSmartFileName("VibeSync_BatchScan_Compiled", "pdf")
+                var file = File(directory, baseName)
                 var suffix = 1
                 while (file.exists()) {
-                    file = File(batchPdfDirectory, baseName.removeSuffix(".pdf") + "_${suffix++}.pdf")
+                    file = File(directory, baseName.removeSuffix(".pdf") + "_${suffix++}.pdf")
                 }
                 file
             }
@@ -245,27 +409,47 @@ class BatchScanViewModel(application: Application) : AndroidViewModel(applicatio
                     profile = selectedProfile,
                     filterId = selectedFilter,
                     pageRanges = pageRanges,
-                    onProgress = { progress -> _state.value = _state.value.copy(progress = progress) }
+                    onProgress = { progress ->
+                        if (activeBatchDirectory?.absolutePath == directory.absolutePath) {
+                            _state.value = _state.value.copy(progress = progress)
+                        }
+                    }
                 ).getOrThrow()
-                // Compilation creates a PDF only; saved JPEGs and their order manifest remain until explicitly deleted.
-                _state.value = _state.value.copy(
-                    isCompiling = false,
-                    progress = 1f,
-                    savedFile = result.file,
-                    fellBack = result.fellBack,
-                    messageRes = if (result.fellBack) R.string.resolution_profile_memory_fallback else null
-                )
+                if (activeBatchDirectory?.absolutePath == directory.absolutePath) {
+                    _state.value = _state.value.copy(
+                        isCompiling = false,
+                        progress = 1f,
+                        savedFile = result.file,
+                        fellBack = result.fellBack,
+                        messageRes = if (result.fellBack) {
+                            R.string.resolution_profile_memory_fallback
+                        } else {
+                            null
+                        }
+                    )
+                }
+                refreshBatchFolders()
             } catch (cancelled: CancellationException) {
                 output.delete()
-                _state.value = _state.value.copy(isCompiling = false, progress = 0f, savedFile = null)
+                if (activeBatchDirectory?.absolutePath == directory.absolutePath) {
+                    _state.value = _state.value.copy(isCompiling = false, progress = 0f, savedFile = null)
+                }
                 throw cancelled
             } catch (error: Exception) {
                 output.delete()
-                _state.value = _state.value.copy(
-                    isCompiling = false,
-                    progress = 0f,
-                    messageRes = if (error is BatchMemoryLimitException || error.message == app.getString(R.string.batch_memory_limit)) R.string.batch_memory_limit else R.string.batch_compile_failed
-                )
+                if (activeBatchDirectory?.absolutePath == directory.absolutePath) {
+                    _state.value = _state.value.copy(
+                        isCompiling = false,
+                        progress = 0f,
+                        messageRes = if (error is BatchMemoryLimitException ||
+                            error.message == app.getString(R.string.batch_memory_limit)
+                        ) {
+                            R.string.batch_memory_limit
+                        } else {
+                            R.string.batch_compile_failed
+                        }
+                    )
+                }
             }
         }
     }
@@ -279,13 +463,19 @@ class BatchScanViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     override fun onCleared() {
-        // Persistent batch images survive Activity/ViewModel teardown.
+        compileJob?.cancel()
         super.onCleared()
     }
 
     private class BatchMemoryLimitException : IOException()
+
     companion object {
         const val KEY_BATCH_ENABLED = "batch_mode_enabled"
         const val KEY_FILTER_ID = "scan_filter_id"
+        const val LEGACY_BATCH_ID = "legacy_batch"
+        const val LEGACY_BATCH_NAME = "BatchScan_Legacy"
+        const val BATCH_FOLDER_PREFIX = "BatchScan_"
+        private const val PAGE_MANIFEST = "batch_pages.json"
+        private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg")
     }
 }
