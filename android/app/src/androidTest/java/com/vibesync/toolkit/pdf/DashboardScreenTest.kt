@@ -143,6 +143,11 @@ class DashboardScreenTest {
             }
         }
 
+        composeTestRule.waitUntil(5_000) {
+            runCatching {
+                composeTestRule.onNodeWithTag("dashboard_list").assertIsDisplayed()
+            }.isSuccess
+        }
         composeTestRule.onNodeWithTag("dashboard_list").performScrollToNode(hasTestTag("tool_convert"))
         composeTestRule.onNodeWithText("Images to PDF").assertIsDisplayed()
         composeTestRule.onNodeWithText("Extract Images").assertIsDisplayed()
@@ -306,6 +311,11 @@ class DashboardScreenTest {
             }
         }
 
+        composeTestRule.waitUntil(5_000) {
+            runCatching {
+                composeTestRule.onNodeWithTag("dashboard_list").assertIsDisplayed()
+            }.isSuccess
+        }
         composeTestRule.onNodeWithTag("dashboard_list")
             .performScrollToNode(hasTestTag("tool_smart_scan"))
         composeTestRule.onNodeWithTag("tool_smart_scan").performClick()
