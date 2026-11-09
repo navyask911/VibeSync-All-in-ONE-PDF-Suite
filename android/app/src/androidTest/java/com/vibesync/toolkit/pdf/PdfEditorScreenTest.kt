@@ -306,9 +306,10 @@ class PdfEditorScreenTest {
             }
         }
 
-        composeTestRule.onNodeWithTag("editor_insert_saved_signature").performClick()
+        composeTestRule.onNodeWithTag("editor_insert_saved_signature")
+            .performScrollTo().assertIsDisplayed().performClick()
         composeTestRule.waitUntil(10_000) {
-            composeTestRule.onAllNodesWithTag("signature_capture_canvas")
+            composeTestRule.onAllNodesWithTag("signature_capture_name")
                 .fetchSemanticsNodes().isNotEmpty()
         }
         composeTestRule.onNodeWithTag("signature_capture_name").assertIsDisplayed()
