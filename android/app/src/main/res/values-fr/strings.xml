@@ -479,5 +479,5 @@
     <string name="smart_scan_no_pdfs">Aucun PDF trouvé dans les dossiers sélectionnés.</string>
     <string name="smart_scan_folder_count">%1$d PDF</string>
     <string name="smart_scan_permission_failed">L’accès au dossier n’a pas pu être enregistré. Veuillez sélectionner à nouveau le dossier.</string>
-    <string name="smart_scan_scan_failed">Impossible d'analyser les dossiers sélectionnés. Vérifiez l’accès et réessayez.</string>
+    <string name="smart_scan_scan_failed">Impossible d’analyser les dossiers sélectionnés. Vérifiez l’accès et réessayez.</string>
 </resources>
