@@ -67,6 +67,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
     val uiState: StateFlow<EditorUiState> = _uiState.asStateFlow()
 
     private var activeDocumentUri: Uri? = null
+    private var editorSessionFile: File? = null
     private val pageAnnotationsMap = mutableMapOf<Int, PageAnnotations>()
     private var editorLoadJob: Job? = null
     private var rendererCleanupJob: Job? = null
@@ -86,6 +87,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun initEditor(uri: Uri) {
         activeDocumentUri = uri
+        editorSessionFile = findOwnedEditorSessionFile(uri)
         val previousLoad = editorLoadJob
         previousLoad?.cancel()
         val cleanupBeforeOpen = rendererCleanupJob
@@ -142,6 +144,8 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun resetEditorState() {
         activeDocumentUri = null
+        val sessionFileToDelete = editorSessionFile
+        editorSessionFile = null
         val pendingLoad = editorLoadJob
         val pendingSave = saveJob
         pendingLoad?.cancel()
@@ -174,6 +178,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                     "renderer.reset_failed category=" + error.javaClass.simpleName
                 )
             } finally {
+                sessionFileToDelete?.delete()
                 signatureBitmaps.forEach { bitmap ->
                     if (!bitmap.isRecycled) bitmap.recycle()
                 }
@@ -182,6 +187,16 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                 BitmapCache.getInstance().clear()
             }
         }
+    }
+
+    private fun findOwnedEditorSessionFile(uri: Uri): File? {
+        if (uri.scheme != "file") return null
+        val file = File(uri.path ?: return null)
+        val cacheDirectory = File(getApplication<Application>().cacheDir, "pdf_cache")
+        val owned = file.name.startsWith("editor_session_") &&
+            runCatching { file.canonicalFile.parentFile == cacheDirectory.canonicalFile }
+                .getOrDefault(false)
+        return file.takeIf { owned }
     }
 
     suspend fun getPageBitmap(pageIndex: Int): Bitmap? {
@@ -533,6 +548,8 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
 
     override fun onCleared() {
         activeDocumentUri = null
+        val sessionFileToDelete = editorSessionFile
+        editorSessionFile = null
         val pendingLoad = editorLoadJob
         val pendingSave = saveJob
         pendingLoad?.cancel()
@@ -561,6 +578,7 @@ class EditorViewModel(application: Application) : AndroidViewModel(application) 
                     "renderer.cleanup_failed category=" + error.javaClass.simpleName
                 )
             } finally {
+                sessionFileToDelete?.delete()
                 signatureBitmaps.forEach { bitmap ->
                     if (!bitmap.isRecycled) bitmap.recycle()
                 }

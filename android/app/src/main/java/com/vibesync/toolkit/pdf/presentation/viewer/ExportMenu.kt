@@ -69,6 +69,7 @@ import java.util.zip.ZipOutputStream
 fun ExportMenu(
     sourceUri: Uri,
     currentPageIndex: Int = 0,
+    enabled: Boolean = true,
     modifier: Modifier = Modifier,
     testTag: String = "export_menu",
     onExportSelected: (mimeType: String, displayName: String) -> Unit = { _, _ -> },
@@ -183,7 +184,7 @@ fun ExportMenu(
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Box {
-            IconButton(onClick = { expanded = true }, enabled = !running, modifier = Modifier.testTag(testTag)) {
+            IconButton(onClick = { expanded = true }, enabled = enabled && !running, modifier = Modifier.testTag(testTag)) {
                 Icon(Icons.Default.FileDownload, contentDescription = stringResource(R.string.export_menu_title))
             }
             DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
@@ -393,6 +394,17 @@ private fun showExportError(context: Context, error: Throwable) {
 }
 
 private suspend fun copyPdfToSaf(context: Context, sourceUri: Uri, targetUri: Uri) {
+    val output = context.contentResolver.openOutputStream(targetUri, "wt")
+        ?: throw IOException("The selected destination could not be opened.")
+    output.use { writeWatermarkedPdfToOutput(context, sourceUri, it) }
+}
+
+/** Exact PDF stream writer used by the SAF Download / Save action. */
+internal suspend fun writeWatermarkedPdfToOutput(
+    context: Context,
+    sourceUri: Uri,
+    output: java.io.OutputStream
+) {
     val watermarked = UriUtils.createExportCacheFile(context, "VibeSync_Export")
     try {
         PdfBoxToolkitEngine(context).watermarkPdf(
@@ -401,8 +413,8 @@ private suspend fun copyPdfToSaf(context: Context, sourceUri: Uri, targetUri: Ur
             outputFile = watermarked
         ).getOrThrow()
         watermarked.inputStream().use { source ->
-            context.contentResolver.openOutputStream(targetUri, "wt")?.use { target -> source.copyTo(target) }
-                ?: throw IOException("The selected destination could not be opened.")
+            source.copyTo(output)
+            output.flush()
         }
     } finally {
         watermarked.delete()

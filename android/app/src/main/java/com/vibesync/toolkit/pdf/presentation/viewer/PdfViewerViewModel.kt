@@ -36,6 +36,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.FileOutputStream
 import java.io.FileNotFoundException
 import java.io.IOException
 
@@ -46,6 +47,7 @@ data class ViewerUiState(
     val zoomScale: Float = 1.0f,
     val isLoading: Boolean = true,
     val isPasswordRequired: Boolean = false,
+    val isDocumentUnlocked: Boolean = false,
     val errorMessage: String? = null,
     val pagesMetadata: List<PageMetadata> = emptyList(),
     val isSearchRunning: Boolean = false,
@@ -71,6 +73,8 @@ class PdfViewerViewModel @JvmOverloads constructor(
     private var closeJob: Job? = null
     private var loadSequence: Long = 0L
     private var unlockedDocumentFile: File? = null
+    /** Verified credential is memory-only and scoped to this open viewer document. */
+    private var verifiedSessionPassword: String? = null
     private var preparedPrintFile: File? = null
     private var searchJob: Job? = null
     private var searchSequence: Long = 0L
@@ -82,7 +86,13 @@ class PdfViewerViewModel @JvmOverloads constructor(
     fun printDocument(activity: Activity, fileName: String, attributes: PrintAttributes) {
         val file = preparedPrintFile ?: return
         if (!file.exists() || !file.isFile || !file.canRead() || file.length() == 0L) return
-        val adapter = PdfPrintDocumentAdapter(activity, Uri.fromFile(file), fileName, file)
+        val adapter = PdfPrintDocumentAdapter(
+            activity,
+            Uri.fromFile(file),
+            fileName,
+            file,
+            verifiedSessionPassword
+        )
         printTrigger.triggerPrint(activity, fileName, adapter, attributes)
         preparedPrintFile = null
     }
@@ -90,6 +100,42 @@ class PdfViewerViewModel @JvmOverloads constructor(
     fun updateFileName(fileName: String) {
         if (fileName.isBlank()) return
         _uiState.value = _uiState.value.copy(fileName = fileName)
+    }
+
+    /** Use the decrypted document-session source for Share and Download / Save actions. */
+    fun getDocumentUriForActions(): Uri? {
+        val sessionFile = unlockedDocumentFile?.takeIf { it.isFile && it.canRead() && it.length() > 0L }
+        return if (_uiState.value.isDocumentUnlocked && sessionFile != null) Uri.fromFile(sessionFile) else activeUri
+    }
+
+    /** The editor owns a separate copy because the viewer cache is deleted on viewer disposal. */
+    suspend fun createEditorSessionUri(): Uri? {
+        val sourceFile = if (_uiState.value.isDocumentUnlocked) {
+            unlockedDocumentFile?.takeIf { it.isFile && it.canRead() && it.length() > 0L }
+        } else null
+        if (sourceFile == null) return activeUri
+        return withContext(Dispatchers.IO) {
+            val app = getApplication<Application>()
+            val directory = File(app.cacheDir, "pdf_cache").apply {
+                if (!exists() && !mkdirs()) throw IOException("Unable to prepare the editor session cache.")
+                if (!isDirectory) throw IOException("The editor session cache path is not a directory.")
+            }
+            val editorCopy = File.createTempFile("editor_session_", ".pdf", directory)
+            try {
+                sourceFile.inputStream().use { input ->
+                    FileOutputStream(editorCopy).use { output ->
+                        input.copyTo(output)
+                        output.flush()
+                        output.fd.sync()
+                    }
+                }
+                if (!editorCopy.isFile || editorCopy.length() <= 0L) throw IOException("The unlocked PDF could not be handed to the editor.")
+                Uri.fromFile(editorCopy)
+            } catch (error: Exception) {
+                editorCopy.delete()
+                throw error
+            }
+        }
     }
 
     /**
@@ -103,6 +149,7 @@ class PdfViewerViewModel @JvmOverloads constructor(
         previousLoad?.cancel()
         val previousClose = closeJob
         activeUri = uri
+        verifiedSessionPassword = null
         val app = getApplication<Application>()
         val fallbackName = uri.lastPathSegment
             ?.substringAfterLast('/')
@@ -113,6 +160,7 @@ class PdfViewerViewModel @JvmOverloads constructor(
             fileName = fallbackName,
             isLoading = true,
             isPasswordRequired = false,
+            isDocumentUnlocked = false,
             errorMessage = null,
             pageCount = 0,
             pagesMetadata = emptyList(),
@@ -123,6 +171,7 @@ class PdfViewerViewModel @JvmOverloads constructor(
         loadJob = viewModelScope.launch {
             val startedAt = SystemClock.elapsedRealtime()
             var pendingUnlockedFile: File? = null
+            var pendingVerifiedPassword: String? = null
             Log.i(TAG, "load.start request=" + requestId + " scheme=" + (uri.scheme ?: "unknown"))
             try {
                 // A canceled operation is joined before a replacement touches renderer resources.
@@ -178,6 +227,7 @@ class PdfViewerViewModel @JvmOverloads constructor(
                     }
                     val decryptedFile = decryptResult.getOrThrow()
                     pendingUnlockedFile = decryptedFile
+                    pendingVerifiedPassword = password
                     targetUri = Uri.fromFile(decryptedFile)
                 }
 
@@ -201,12 +251,14 @@ class PdfViewerViewModel @JvmOverloads constructor(
                     unlockedDocumentFile = decryptedFile
                     pendingUnlockedFile = null
                 }
+                verifiedSessionPassword = pendingVerifiedPassword
                 _uiState.value = _uiState.value.copy(
                     fileName = fileName,
                     pageCount = count,
                     pagesMetadata = metadata,
                     isLoading = false,
                     isPasswordRequired = false,
+                    isDocumentUnlocked = pendingVerifiedPassword != null,
                     errorMessage = null,
                     currentPageIndex = 0
                 )
@@ -268,6 +320,8 @@ class PdfViewerViewModel @JvmOverloads constructor(
     /** Called when the viewer leaves composition; cleanup runs off the main thread. */
     fun closeDocument() {
         clearSearch()
+        verifiedSessionPassword = null
+        _uiState.value = _uiState.value.copy(isDocumentUnlocked = false)
         loadSequence += 1
         val previousLoad = loadJob
         previousLoad?.cancel()
@@ -527,6 +581,7 @@ class PdfViewerViewModel @JvmOverloads constructor(
         searchJob?.cancel()
         val fileToDelete = unlockedDocumentFile
         unlockedDocumentFile = null
+        verifiedSessionPassword = null
         super.onCleared()
 
         // Never wait for PdfRenderer's native lock on the main thread during lifecycle teardown.

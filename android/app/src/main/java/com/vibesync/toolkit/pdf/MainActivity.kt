@@ -699,7 +699,7 @@ class MainActivity : AppCompatActivity() {
                                 },
                                 onShareDocument = {
                                     if (isManagedScan && managedScanFile != null) shareScanPdf(managedScanFile)
-                                    else shareViewedDocument(decodedUri)
+                                    else shareViewedDocument(viewerViewModel.getDocumentUriForActions() ?: decodedUri)
                                 },
                                 isManagedScan = isManagedScan && managedScanFile != null,
                                 onRenameScan = { requestedName ->

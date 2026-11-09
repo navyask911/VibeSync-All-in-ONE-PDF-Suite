@@ -335,7 +335,7 @@ fun PdfViewerScreen(
                                     }
                                 }
                             },
-                            enabled = !isPreparingPrint,
+                            enabled = !uiState.isLoading && uiState.pageCount > 0 && !isPreparingPrint,
                             modifier = Modifier.testTag("viewer_print")
                         ) {
                             if (isPreparingPrint) CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
@@ -343,8 +343,12 @@ fun PdfViewerScreen(
                         }
                                         }, onClick = { scanMenuExpanded = false })
                                         DropdownMenuItem(text = { Text("Download / Save") }, leadingIcon = {
-                                            ExportMenu(sourceUri = documentUri, currentPageIndex = uiState.currentPageIndex,
-                                                testTag = "viewer_export_menu")
+                                            ExportMenu(
+                                                sourceUri = viewModel.getDocumentUriForActions() ?: documentUri,
+                                                currentPageIndex = uiState.currentPageIndex,
+                                                enabled = !uiState.isLoading && uiState.pageCount > 0,
+                                                testTag = "viewer_export_menu"
+                                            )
                                         }, onClick = { scanMenuExpanded = false })
                                     }
                                     if (scale > 1.05f) {
@@ -412,11 +416,32 @@ fun PdfViewerScreen(
                             modifier = Modifier.testTag("viewer_next_page")
                         ) { Icon(Icons.Default.NavigateNext, contentDescription = "Next page") }
                         if (!isManagedScan) {
-                            IconButton(onClick = onShareDocument, modifier = Modifier.testTag("viewer_share")) {
+                            IconButton(
+                                onClick = onShareDocument,
+                                enabled = !uiState.isLoading && uiState.pageCount > 0,
+                                modifier = Modifier.testTag("viewer_share")
+                            ) {
                                 Icon(Icons.Default.Share, contentDescription = stringResource(R.string.share_pdf), tint = VibeSyncCrimsonPrimary)
                             }
                         }
-                        IconButton(onClick = { onNavigateToEditor(documentUri) }, modifier = Modifier.testTag("viewer_edit")) {
+                        IconButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    try {
+                                        val editorUri = viewModel.createEditorSessionUri() ?: documentUri
+                                        onNavigateToEditor(editorUri)
+                                    } catch (error: Exception) {
+                                        android.widget.Toast.makeText(
+                                            context,
+                                            error.localizedMessage ?: context.getString(R.string.document_load_error),
+                                            android.widget.Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+                            },
+                            enabled = !uiState.isLoading && uiState.pageCount > 0,
+                            modifier = Modifier.testTag("viewer_edit")
+                        ) {
                             Icon(Icons.Default.Draw, contentDescription = stringResource(R.string.edit_sign_action), tint = VibeSyncCrimsonPrimary)
                         }
                         if (!compactActions) {
@@ -492,14 +517,18 @@ fun PdfViewerScreen(
                                 }
                             }
                         },
-                        enabled = !isPreparingPrint,
+                        enabled = !uiState.isLoading && uiState.pageCount > 0 && !isPreparingPrint,
                         modifier = Modifier.testTag("viewer_print")
                     ) {
                         if (isPreparingPrint) CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
                         else Icon(Icons.Default.Print, contentDescription = "Print")
                     }
-                            ExportMenu(sourceUri = documentUri, currentPageIndex = uiState.currentPageIndex,
-                                testTag = "viewer_export_menu")
+                            ExportMenu(
+                                sourceUri = viewModel.getDocumentUriForActions() ?: documentUri,
+                                currentPageIndex = uiState.currentPageIndex,
+                                enabled = !uiState.isLoading && uiState.pageCount > 0,
+                                testTag = "viewer_export_menu"
+                            )
                         }
                     }
                 }
