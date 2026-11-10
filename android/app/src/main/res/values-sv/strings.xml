@@ -462,4 +462,29 @@
     <string name="viewer_download_save">Ladda ned / Spara</string>
     <string name="viewer_search_description">Sök</string>
     <string name="viewer_print_preparing">Förbereder PDF för utskrift…</string>
+    <string name="language_chinese">Förenklad kinesiska</string>
+    <string name="language_hindi">Hindi</string>
+    <string name="language_arabic">Arabiska</string>
+    <string name="language_bengali">Bengali</string>
+    <string name="language_portuguese">Portugisiska</string>
+    <string name="language_japanese">Japanska</string>
+    <string name="language_indonesian">Indonesiska</string>
+    <string name="language_urdu">Urdu</string>
+    <string name="language_turkish">Turkiska</string>
+    <string name="language_korean">Koreanska</string>
+    <string name="language_italian">Italienska</string>
+    <string name="language_chinese_traditional">Traditionell kinesiska</string>
+    <string name="language_vietnamese">Vietnamesiska</string>
+    <string name="language_tamil">Tamil</string>
+    <string name="language_telugu">Telugu</string>
+    <string name="language_kannada">Kannada</string>
+    <string name="language_marathi">Marathi</string>
+    <string name="language_gujarati">Gujarati</string>
+    <string name="language_hebrew">Hebreiska</string>
+    <string name="language_thai">Thailändska</string>
+    <string name="language_filipino">Filippinska</string>
+    <string name="language_dutch">Nederländska</string>
+    <string name="language_polish">Polska</string>
+    <string name="language_ukrainian">Ukrainska</string>
+    <string name="admob_app_id" translatable="false">ca-app-pub-4783826505860771~4377815936</string>
 </resources>

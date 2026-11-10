@@ -462,4 +462,29 @@
     <string name="viewer_download_save">Pakua / Hifadhi</string>
     <string name="viewer_search_description">Tafuta</string>
     <string name="viewer_print_preparing">Inaandaa PDF kwa ajili ya kuchapisha…</string>
+    <string name="language_chinese">Kichina Kilichorahisishwa</string>
+    <string name="language_hindi">Kihindi</string>
+    <string name="language_arabic">Kiarabu</string>
+    <string name="language_bengali">Kibengali</string>
+    <string name="language_portuguese">Kireno</string>
+    <string name="language_japanese">Kijapani</string>
+    <string name="language_indonesian">Kiindonesia</string>
+    <string name="language_urdu">Kiurdu</string>
+    <string name="language_turkish">Kituruki</string>
+    <string name="language_korean">Kikorea</string>
+    <string name="language_italian">Kiitaliano</string>
+    <string name="language_chinese_traditional">Kichina cha Jadi</string>
+    <string name="language_vietnamese">Kivietinamu</string>
+    <string name="language_tamil">Kitamil</string>
+    <string name="language_telugu">Kitelugu</string>
+    <string name="language_kannada">Kikannada</string>
+    <string name="language_marathi">Kimarathi</string>
+    <string name="language_gujarati">Kigujarati</string>
+    <string name="language_hebrew">Kiebrania</string>
+    <string name="language_thai">Kithai</string>
+    <string name="language_filipino">Kifilipino</string>
+    <string name="language_dutch">Kiholanzi</string>
+    <string name="language_polish">Kipolandi</string>
+    <string name="language_ukrainian">Kiukreni</string>
+    <string name="admob_app_id" translatable="false">ca-app-pub-4783826505860771~4377815936</string>
 </resources>

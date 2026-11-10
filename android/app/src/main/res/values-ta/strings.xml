@@ -462,4 +462,29 @@
     <string name="viewer_download_save">பதிவிறக்கு / சேமி</string>
     <string name="viewer_search_description">தேடு</string>
     <string name="viewer_print_preparing">அச்சிட PDF தயாராகிறது…</string>
+    <string name="language_chinese">எளிய சீனம்</string>
+    <string name="language_hindi">இந்தி</string>
+    <string name="language_arabic">அரபு</string>
+    <string name="language_bengali">வங்காளம்</string>
+    <string name="language_portuguese">போர்த்துகீசியம்</string>
+    <string name="language_japanese">ஜப்பானியம்</string>
+    <string name="language_indonesian">இந்தோனேசியம்</string>
+    <string name="language_urdu">உருது</string>
+    <string name="language_turkish">துருக்கியம்</string>
+    <string name="language_korean">கொரியன்</string>
+    <string name="language_italian">இத்தாலியம்</string>
+    <string name="language_chinese_traditional">பாரம்பரிய சீனம்</string>
+    <string name="language_vietnamese">வியட்நாமியம்</string>
+    <string name="language_tamil">தமிழ்</string>
+    <string name="language_telugu">தெலுங்கு</string>
+    <string name="language_kannada">கன்னடம்</string>
+    <string name="language_marathi">மராத்தி</string>
+    <string name="language_gujarati">குஜராத்தி</string>
+    <string name="language_hebrew">ஹீப்ரு</string>
+    <string name="language_thai">தாய்</string>
+    <string name="language_filipino">பிலிப்பினோ</string>
+    <string name="language_dutch">டச்சு</string>
+    <string name="language_polish">போலிஷ்</string>
+    <string name="language_ukrainian">உக்ரைனியம்</string>
+    <string name="admob_app_id" translatable="false">ca-app-pub-4783826505860771~4377815936</string>
 </resources>
