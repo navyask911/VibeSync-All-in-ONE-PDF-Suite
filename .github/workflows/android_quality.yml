@@ -53,68 +53,74 @@ jobs:
 
           resource_root = pathlib.Path("android/app/src/main/res")
           base_path = resource_root / "values/strings.xml"
-          resource_files = sorted(resource_root.glob("values*/strings.xml"))
+          locale_files = sorted(
+              path for path in resource_root.glob("values*/strings.xml")
+              if path != base_path
+          )
 
-          if base_path not in resource_files:
-              sys.exit("Base values/strings.xml was not found.")
-          if len(resource_files) != 40:
+          if not base_path.is_file():
+              sys.exit("Default strings.xml is missing.")
+          if len(locale_files) != 39:
               sys.exit(
-                  f"Expected exactly 40 strings.xml files (base + 39 locales), "
-                  f"found {len(resource_files)}: {[str(path) for path in resource_files]}"
+                  f"Expected 39 translated locales, found {len(locale_files)}: "
+                  f"{[str(path) for path in locale_files]}"
               )
 
-          def read_strings(path):
+          def load_strings(path):
               try:
                   root = ET.parse(path).getroot()
-              except ET.ParseError as error:
-                  sys.exit(f"{path}: invalid XML: {error}")
+              except ET.ParseError as exc:
+                  sys.exit(f"{path}: invalid XML: {exc}")
 
-              values = {}
+              items = {}
               duplicates = []
               for node in root.findall("string"):
-                  name = node.get("name")
+                  name = node.attrib.get("name")
                   if not name:
-                      sys.exit(f"{path}: a <string> element has no name attribute.")
-                  if name in values:
+                      sys.exit(f"{path}: found a <string> without a name attribute.")
+                  if name in items:
                       duplicates.append(name)
-                  values[name] = "".join(node.itertext())
+                  items[name] = "".join(node.itertext())
 
               if duplicates:
                   sys.exit(f"{path}: duplicate string IDs: {sorted(set(duplicates))}")
-              return values
+              return items
 
-          baseline = read_strings(base_path)
-          expected_key_count = 479
-          if len(baseline) != expected_key_count:
+          baseline = load_strings(base_path)
+          if len(baseline) != 479:
               sys.exit(
-                  f"Base resource key count changed: expected {expected_key_count}, "
-                  f"found {len(baseline)}."
+                  f"Expected 479 default string IDs, found {len(baseline)}. "
+                  "Review the baseline before changing the parity contract."
               )
 
-          placeholder_pattern = re.compile(r"%(?:[0-9]+\$)?[a-zA-Z]")
-          for path in resource_files:
+          placeholder_pattern = re.compile(r"%(?:[0-9]+\\$)?[a-zA-Z]")
+          for path in locale_files:
               locale = path.parent.name
-              translated = read_strings(path)
-              missing = sorted(set(baseline) - set(translated))
-              extra = sorted(set(translated) - set(baseline))
+              localized = load_strings(path)
+              missing = sorted(set(baseline) - set(localized))
+              extra = sorted(set(localized) - set(baseline))
               if missing or extra:
                   sys.exit(
-                      f"{locale}: strict key parity failed; "
+                      f"{locale}: strict localization parity failed; "
                       f"missing={missing}; extra={extra}"
                   )
 
               for name, source in baseline.items():
+                  target = localized[name]
+                  if not target.strip():
+                      sys.exit(f"{locale}: empty translation for {name}")
                   source_args = sorted(placeholder_pattern.findall(source))
-                  target_args = sorted(placeholder_pattern.findall(translated[name]))
+                  target_args = sorted(placeholder_pattern.findall(target))
                   if source_args != target_args:
                       sys.exit(
-                          f"{locale}: placeholder mismatch for {name}: "
+                          f"{locale}: placeholders differ for {name}: "
                           f"{source_args} != {target_args}"
                       )
 
           print(
-              f"Strict localization parity passed: {expected_key_count} unique keys "
-              f"across 39 locales plus the base resource (40 files)."
+              f"Strict localization parity passed: {len(baseline)} keys "
+              f"across {len(locale_files)} locales (39/39); "
+              "no missing, extra, duplicate, empty, or placeholder-mismatched strings."
           )
           PY
 
