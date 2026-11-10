@@ -470,4 +470,27 @@
     <string name="smart_scan_folder_count">%1$dটি PDF</string>
     <string name="smart_scan_permission_failed">ফোল্ডারে প্রবেশের অনুমতি সংরক্ষণ করা যায়নি। অনুগ্রহ করে আবার ফোল্ডারটি বেছে নিন।</string>
     <string name="smart_scan_scan_failed">বেছে নেওয়া ফোল্ডারগুলি স্ক্যান করা যায়নি। অনুমতি পরীক্ষা করে আবার চেষ্টা করুন।</string>
+    <!-- v1.0.30 localization additions -->
+    <string name="pro_title">VibeSync PDF Pro</string>
+    <string name="pro_upgrade_title">VibeSync PDF Pro-এ আপগ্রেড করুন</string>
+    <string name="pro_pass_active_days_remaining">Pro Pass সক্রিয় — %1$d দিন বাকি</string>
+    <string name="pro_subscribe">Pro Pass-এ সাবস্ক্রাইব করুন</string>
+    <string name="editor_previous_page">পূর্ববর্তী পৃষ্ঠা</string>
+    <string name="editor_next_page">পরবর্তী পৃষ্ঠা</string>
+    <string name="editor_zoom_out">জুম কমান</string>
+    <string name="editor_zoom_in">জুম বাড়ান</string>
+    <string name="signature_create_new">নতুন স্বাক্ষর তৈরি করুন</string>
+    <string name="signature_ink_colour">কালির রং</string>
+    <string name="signature_pen_size">পেনের পুরুত্ব</string>
+    <string name="signature_saving">সংরক্ষণ করা হচ্ছে…</string>
+    <string name="batch_clear_all">সব মুছুন</string>
+    <string name="batch_page_range_title">পৃষ্ঠার পরিসর</string>
+    <string name="batch_page_range_hint">‘সব’ নির্বাচন করুন অথবা কমা দিয়ে আলাদা করা পৃষ্ঠার পরিসর লিখুন, যেমন 1-10, 15, 20-25।</string>
+    <string name="batch_compile">PDF তৈরি করুন</string>
+    <string name="batch_image_unavailable">ছবি উপলভ্য নয়</string>
+    <string name="batch_new_scan">+ নতুন ব্যাচ স্ক্যান</string>
+    <string name="batch_all_batches">সব ব্যাচ</string>
+    <string name="viewer_download_save">ডাউনলোড / সংরক্ষণ</string>
+    <string name="viewer_search_description">অনুসন্ধান</string>
+    <string name="viewer_print_preparing">মুদ্রণের জন্য PDF প্রস্তুত করা হচ্ছে…</string>
 </resources>

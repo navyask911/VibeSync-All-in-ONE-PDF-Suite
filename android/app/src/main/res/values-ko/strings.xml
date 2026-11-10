@@ -470,4 +470,27 @@
     <string name="smart_scan_folder_count">PDF %1$d개</string>
     <string name="smart_scan_permission_failed">폴더 접근 권한을 저장하지 못했습니다. 폴더를 다시 선택하세요.</string>
     <string name="smart_scan_scan_failed">선택한 폴더를 스캔하지 못했습니다. 접근 권한을 확인하고 다시 시도하세요.</string>
+    <!-- v1.0.30 localization additions -->
+    <string name="pro_title">VibeSync PDF Pro</string>
+    <string name="pro_upgrade_title">VibeSync PDF Pro로 업그레이드</string>
+    <string name="pro_pass_active_days_remaining">Pro Pass 활성 — %1$d일 남음</string>
+    <string name="pro_subscribe">Pro Pass 구독</string>
+    <string name="editor_previous_page">이전 페이지</string>
+    <string name="editor_next_page">다음 페이지</string>
+    <string name="editor_zoom_out">축소</string>
+    <string name="editor_zoom_in">확대</string>
+    <string name="signature_create_new">새 서명 만들기</string>
+    <string name="signature_ink_colour">잉크 색상</string>
+    <string name="signature_pen_size">펜 굵기</string>
+    <string name="signature_saving">저장 중…</string>
+    <string name="batch_clear_all">모두 지우기</string>
+    <string name="batch_page_range_title">페이지 범위</string>
+    <string name="batch_page_range_hint">모두를 선택하거나 1-10, 15, 20-25와 같이 쉼표로 구분된 페이지 범위를 입력하세요.</string>
+    <string name="batch_compile">PDF 만들기</string>
+    <string name="batch_image_unavailable">이미지를 사용할 수 없음</string>
+    <string name="batch_new_scan">+ 새 일괄 스캔</string>
+    <string name="batch_all_batches">모든 일괄 작업</string>
+    <string name="viewer_download_save">다운로드 / 저장</string>
+    <string name="viewer_search_description">검색</string>
+    <string name="viewer_print_preparing">인쇄할 PDF 준비 중…</string>
 </resources>
