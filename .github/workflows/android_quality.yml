@@ -93,7 +93,7 @@ jobs:
                   "Review the baseline before changing the parity contract."
               )
 
-          placeholder_pattern = re.compile(r"%(?:[0-9]+\\$)?[a-zA-Z]")
+          placeholder_pattern = re.compile(r"%(?:[0-9]+\$)?[a-zA-Z]")
           for path in locale_files:
               locale = path.parent.name
               localized = load_strings(path)
