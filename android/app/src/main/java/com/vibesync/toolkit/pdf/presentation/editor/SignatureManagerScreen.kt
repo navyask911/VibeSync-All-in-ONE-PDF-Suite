@@ -465,7 +465,7 @@ internal fun SignatureCaptureDialog(
                     modifier = Modifier.fillMaxWidth().testTag("signature_capture_name")
                 )
                 Text(stringResource(R.string.signature_capture_hint), style = MaterialTheme.typography.bodySmall)
-                Text("Ink colour", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.signature_ink_colour), style = MaterialTheme.typography.labelMedium)
                 Row(
                     modifier = Modifier.fillMaxWidth()
                         .horizontalScroll(rememberScrollState())
@@ -492,7 +492,7 @@ internal fun SignatureCaptureDialog(
                         )
                     }
                 }
-                Text("Pen size", style = MaterialTheme.typography.labelMedium)
+                Text(stringResource(R.string.signature_pen_size), style = MaterialTheme.typography.labelMedium)
                 Slider(
                     value = penSizeDp,
                     onValueChange = { penSizeDp = it },
@@ -605,7 +605,7 @@ internal fun SignatureCaptureDialog(
                     onSave(signatureName.trim(), bitmap)
                 }
             ) {
-                if (isSaving) Text("Saving…") else Text(stringResource(R.string.signature_capture_save))
+                if (isSaving) Text(stringResource(R.string.signature_saving)) else Text(stringResource(R.string.signature_capture_save))
             }
         },
         dismissButton = {

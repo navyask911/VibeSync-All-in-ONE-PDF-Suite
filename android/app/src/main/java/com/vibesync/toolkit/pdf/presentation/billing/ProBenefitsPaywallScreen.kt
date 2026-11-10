@@ -71,10 +71,10 @@ fun ProBenefitsPaywallScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("VibeSync PDF Pro") },
+                title = { Text(stringResource(R.string.pro_title)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.Default.ArrowBack, contentDescription = stringResource(R.string.back))
                     }
                 }
             )
@@ -85,7 +85,7 @@ fun ProBenefitsPaywallScreen(
                 .verticalScroll(rememberScrollState()).padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Text("Upgrade to VibeSync PDF Pro", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.pro_upgrade_title), style = MaterialTheme.typography.headlineSmall)
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Default.WorkspacePremium, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Text(
@@ -106,7 +106,7 @@ fun ProBenefitsPaywallScreen(
             if (entitlement.isProActive) {
                 Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer)) {
                     Row(modifier = Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Badge { Text("Pro Pass Active — ${entitlement.daysRemaining} days remaining") }
+                        Badge { Text(stringResource(R.string.pro_pass_active_days_remaining, entitlement.daysRemaining)) }
                     }
                 }
             } else {
@@ -114,7 +114,7 @@ fun ProBenefitsPaywallScreen(
                     onClick = { billingManager.launchPurchase(activity) },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = connected && productDetails != null
-                ) { Text("Subscribe to Pro Pass") }
+                ) { Text(stringResource(R.string.pro_subscribe)) }
             }
 
             if (pending) {

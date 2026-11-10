@@ -176,7 +176,7 @@ fun PdfEditorScreen(
                         onClick = { viewModel.setPage((uiState.currentPageIndex - 1).coerceAtLeast(0)) },
                         enabled = uiState.currentPageIndex > 0
                     ) {
-                        Icon(Icons.Default.NavigateBefore, contentDescription = "Previous page")
+                        Icon(Icons.Default.NavigateBefore, contentDescription = stringResource(R.string.editor_previous_page))
                     }
                     Text(
                         stringResource(R.string.page_position, uiState.currentPageIndex + 1, uiState.totalPages),
@@ -187,20 +187,20 @@ fun PdfEditorScreen(
                         onClick = { viewModel.setPage((uiState.currentPageIndex + 1).coerceAtMost(uiState.totalPages - 1)) },
                         enabled = uiState.currentPageIndex < uiState.totalPages - 1
                     ) {
-                        Icon(Icons.Default.NavigateNext, contentDescription = "Next page")
+                        Icon(Icons.Default.NavigateNext, contentDescription = stringResource(R.string.editor_next_page))
                     }
                     IconButton(
                         onClick = { scale = (scale / 1.25f).coerceAtLeast(1f).also { if (it == 1f) offset = Offset.Zero } },
                         enabled = scale > 1f
                     ) {
-                        Icon(Icons.Default.ZoomOut, contentDescription = "Zoom out")
+                        Icon(Icons.Default.ZoomOut, contentDescription = stringResource(R.string.editor_zoom_out))
                     }
                     IconButton(onClick = { scale = (scale * 1.25f).coerceAtMost(5f) }) {
-                        Icon(Icons.Default.ZoomIn, contentDescription = "Zoom in")
+                        Icon(Icons.Default.ZoomIn, contentDescription = stringResource(R.string.editor_zoom_in))
                     }
                     if (scale > 1f) {
                         IconButton(onClick = { scale = 1f; offset = Offset.Zero }) {
-                            Icon(Icons.Default.ZoomOutMap, contentDescription = "Reset zoom")
+                            Icon(Icons.Default.ZoomOutMap, contentDescription = stringResource(R.string.reset_zoom))
                         }
                     }
                     IconButton(
@@ -650,7 +650,7 @@ fun PdfEditorScreen(
                     },
                     modifier = Modifier.testTag("editor_create_new_signature")
                 ) {
-                    Text("Create New Signature")
+                    Text(stringResource(R.string.signature_create_new))
                 }
             },
             dismissButton = {

@@ -262,7 +262,7 @@ fun PdfViewerScreen(
                                 }
                                 DropdownMenu(expanded = scanMenuExpanded, onDismissRequest = { scanMenuExpanded = false }) {
                                     if (compactActions) {
-                                        DropdownMenuItem(text = { Text("Print") }, trailingIcon = {
+                                        DropdownMenuItem(text = { Text(stringResource(R.string.print_action)) }, trailingIcon = {
                         IconButton(
                             onClick = {
                                 if (isPreparingPrint) return@IconButton
@@ -339,10 +339,10 @@ fun PdfViewerScreen(
                             modifier = Modifier.testTag("viewer_print")
                         ) {
                             if (isPreparingPrint) CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                            else Icon(Icons.Default.Print, contentDescription = "Print")
+                            else Icon(Icons.Default.Print, contentDescription = stringResource(R.string.print_action))
                         }
                                         }, onClick = { scanMenuExpanded = false })
-                                        DropdownMenuItem(text = { Text("Download / Save") }, leadingIcon = {
+                                        DropdownMenuItem(text = { Text(stringResource(R.string.viewer_download_save)) }, leadingIcon = {
                                             ExportMenu(
                                                 sourceUri = viewModel.getDocumentUriForActions() ?: documentUri,
                                                 currentPageIndex = uiState.currentPageIndex,
@@ -352,7 +352,7 @@ fun PdfViewerScreen(
                                         }, onClick = { scanMenuExpanded = false })
                                     }
                                     if (scale > 1.05f) {
-                                        DropdownMenuItem(text = { Text("Reset zoom") },
+                                        DropdownMenuItem(text = { Text(stringResource(R.string.reset_zoom)) },
                                             leadingIcon = { Icon(Icons.Default.ZoomOutMap, contentDescription = stringResource(R.string.reset_zoom)) },
                                             onClick = { scale = 1f; offsetX = 0f; offsetY = 0f; scanMenuExpanded = false })
                                     }
@@ -386,7 +386,7 @@ fun PdfViewerScreen(
                         horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                         if (!isSearchActive) {
                             IconButton(onClick = { isSearchActive = true }, modifier = Modifier.testTag("viewer_search")) {
-                                Icon(Icons.Default.Search, contentDescription = "Search")
+                                Icon(Icons.Default.Search, contentDescription = stringResource(R.string.viewer_search_description))
                             }
                         }
                         IconButton(
@@ -406,7 +406,7 @@ fun PdfViewerScreen(
                                 coroutineScope.launch { listState.scrollToItem(target) }
                             }, enabled = uiState.currentPageIndex > 0,
                             modifier = Modifier.testTag("viewer_previous_page")
-                        ) { Icon(Icons.Default.NavigateBefore, contentDescription = "Previous page") }
+                        ) { Icon(Icons.Default.NavigateBefore, contentDescription = stringResource(R.string.editor_previous_page)) }
                         IconButton(
                             onClick = {
                                 val target = (uiState.currentPageIndex + 1).coerceAtMost(uiState.pageCount - 1)
@@ -414,7 +414,7 @@ fun PdfViewerScreen(
                                 coroutineScope.launch { listState.scrollToItem(target) }
                             }, enabled = uiState.pageCount > 0 && uiState.currentPageIndex < uiState.pageCount - 1,
                             modifier = Modifier.testTag("viewer_next_page")
-                        ) { Icon(Icons.Default.NavigateNext, contentDescription = "Next page") }
+                        ) { Icon(Icons.Default.NavigateNext, contentDescription = stringResource(R.string.editor_next_page)) }
                         if (!isManagedScan) {
                             IconButton(
                                 onClick = onShareDocument,
@@ -521,7 +521,7 @@ fun PdfViewerScreen(
                         modifier = Modifier.testTag("viewer_print")
                     ) {
                         if (isPreparingPrint) CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                        else Icon(Icons.Default.Print, contentDescription = "Print")
+                        else Icon(Icons.Default.Print, contentDescription = stringResource(R.string.print_action))
                     }
                             ExportMenu(
                                 sourceUri = viewModel.getDocumentUriForActions() ?: documentUri,
@@ -757,7 +757,7 @@ fun PdfViewerScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     CircularProgressIndicator(color = VibeSyncCrimsonPrimary)
-                    Text("Preparing PDF for printing…", style = MaterialTheme.typography.bodyLarge)
+                    Text(stringResource(R.string.viewer_print_preparing), style = MaterialTheme.typography.bodyLarge)
                 }
             }
         }

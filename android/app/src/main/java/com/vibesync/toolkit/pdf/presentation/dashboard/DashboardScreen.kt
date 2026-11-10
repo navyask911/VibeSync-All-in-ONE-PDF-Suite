@@ -232,7 +232,7 @@ fun DashboardScreen(
                             Icon(Icons.Default.Language, contentDescription = stringResource(R.string.language_settings), tint = VibeSyncCrimsonPrimary)
                         }
                         IconButton(onClick = onNavigateToPro, modifier = Modifier.testTag("dashboard_action_pro")) {
-                            Icon(Icons.Default.WorkspacePremium, contentDescription = "VibeSync PDF Pro", tint = MaterialTheme.colorScheme.primary)
+                            Icon(Icons.Default.WorkspacePremium, contentDescription = stringResource(R.string.pro_title), tint = MaterialTheme.colorScheme.primary)
                         }
                         IconButton(onClick = { launchPickerSafely { folderPickerLauncher.launch(null) } }, modifier = Modifier.testTag("dashboard_action_folder")) {
                             Icon(Icons.Default.FolderOpen, contentDescription = stringResource(R.string.choose_pdf_folder), tint = VibeSyncCrimsonPrimary)

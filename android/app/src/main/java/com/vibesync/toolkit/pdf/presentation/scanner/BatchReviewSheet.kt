@@ -133,19 +133,19 @@ fun BatchReviewSheet(
             enabled = pages.isNotEmpty() && !isCompiling,
             modifier = Modifier.fillMaxWidth().testTag("batch_clear_all")
         ) {
-            Text("Clear All")
+            Text(stringResource(R.string.batch_clear_all))
         }
         if (showPageRangeDialog) {
             AlertDialog(
                 onDismissRequest = { showPageRangeDialog = false },
-                title = { Text("Page Range") },
+                title = { Text(stringResource(R.string.batch_page_range_title)) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Use All or a comma-separated range such as 1-10, 15, 20-25.")
+                        Text(stringResource(R.string.batch_page_range_hint))
                         OutlinedTextField(
                             value = pageRangeInput,
                             onValueChange = { pageRangeInput = it; pageRangeError = null },
-                            label = { Text("Page Range") },
+                            label = { Text(stringResource(R.string.batch_page_range_title)) },
                             singleLine = true,
                             modifier = Modifier.testTag("batch_page_range_input")
                         )
@@ -164,10 +164,10 @@ fun BatchReviewSheet(
                             .onFailure {
                                 pageRangeError = "Enter All or valid page numbers from 1 to ${pages.size}."
                             }
-                    }, modifier = Modifier.testTag("batch_page_range_confirm")) { Text("Compile") }
+                    }, modifier = Modifier.testTag("batch_page_range_confirm")) { Text(stringResource(R.string.batch_compile)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showPageRangeDialog = false }) { Text("Cancel") }
+                    TextButton(onClick = { showPageRangeDialog = false }) { Text(stringResource(R.string.cancel)) }
                 }
             )
         }
@@ -237,7 +237,7 @@ private fun BatchPageThumbnail(
                             verticalArrangement = Arrangement.Center
                         ) {
                             Icon(Icons.Default.Close, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("Image unavailable", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(R.string.batch_image_unavailable), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                     }
                 }
@@ -342,7 +342,7 @@ fun BatchScanScreen(
                     onClick = viewModel::startNewBatchScan,
                     modifier = Modifier.fillMaxWidth().testTag("batch_new_batch")
                 ) {
-                    Text("+ New Batch Scan")
+                    Text(stringResource(R.string.batch_new_scan))
                 }
                 if (state.batchFolders.isEmpty()) {
                     Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -392,14 +392,14 @@ fun BatchScanScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     TextButton(onClick = viewModel::closeBatch, modifier = Modifier.testTag("batch_back_to_folders")) {
-                        Text("All Batches")
+                        Text(stringResource(R.string.batch_all_batches))
                     }
                     Spacer(Modifier.weight(1f))
                     OutlinedButton(
                         onClick = viewModel::startNewBatchScan,
                         enabled = !state.isCompiling,
                         modifier = Modifier.testTag("batch_new_batch")
-                    ) { Text("+ New Batch Scan") }
+                    ) { Text(stringResource(R.string.batch_new_scan)) }
                 }
                 Text(activeFolder?.name ?: "Batch Scan", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Column(

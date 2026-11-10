@@ -489,4 +489,26 @@
     <string name="smart_scan_folder_count">%1$d PDFs</string>
     <string name="smart_scan_permission_failed">Folder access could not be saved. Please choose the folder again.</string>
     <string name="smart_scan_scan_failed">Could not scan the selected folders. Check access and try again.</string>
+    <string name="pro_title">VibeSync PDF Pro</string>
+    <string name="pro_upgrade_title">Upgrade to VibeSync PDF Pro</string>
+    <string name="pro_pass_active_days_remaining">Pro Pass Active — %1$d days remaining</string>
+    <string name="pro_subscribe">Subscribe to Pro Pass</string>
+    <string name="editor_previous_page">Previous page</string>
+    <string name="editor_next_page">Next page</string>
+    <string name="editor_zoom_out">Zoom out</string>
+    <string name="editor_zoom_in">Zoom in</string>
+    <string name="signature_create_new">Create New Signature</string>
+    <string name="signature_ink_colour">Ink colour</string>
+    <string name="signature_pen_size">Pen size</string>
+    <string name="signature_saving">Saving…</string>
+    <string name="batch_clear_all">Clear All</string>
+    <string name="batch_page_range_title">Page Range</string>
+    <string name="batch_page_range_hint">Use All or a comma-separated range such as 1-10, 15, 20-25.</string>
+    <string name="batch_compile">Compile</string>
+    <string name="batch_image_unavailable">Image unavailable</string>
+    <string name="batch_new_scan">+ New Batch Scan</string>
+    <string name="batch_all_batches">All Batches</string>
+    <string name="viewer_download_save">Download / Save</string>
+    <string name="viewer_search_description">Search</string>
+    <string name="viewer_print_preparing">Preparing PDF for printing…</string>
 </resources>
