@@ -470,4 +470,27 @@
     <string name="smart_scan_folder_count">%1$d PDF</string>
     <string name="smart_scan_permission_failed">Klasör erişimi kaydedilemedi. Lütfen klasörü yeniden seçin.</string>
     <string name="smart_scan_scan_failed">Seçilen klasörler taranamadı. Erişimi kontrol edip tekrar deneyin.</string>
+    <!-- v1.0.30 localization additions -->
+    <string name="pro_title">VibeSync PDF Pro</string>
+    <string name="pro_upgrade_title">VibeSync PDF Pro&apos;ya yükselt</string>
+    <string name="pro_pass_active_days_remaining">Pro Pass etkin — %1$d gün kaldı</string>
+    <string name="pro_subscribe">Pro Pass&apos;e abone ol</string>
+    <string name="editor_previous_page">Önceki sayfa</string>
+    <string name="editor_next_page">Sonraki sayfa</string>
+    <string name="editor_zoom_out">Uzaklaştır</string>
+    <string name="editor_zoom_in">Yakınlaştır</string>
+    <string name="signature_create_new">Yeni imza oluştur</string>
+    <string name="signature_ink_colour">Mürekkep rengi</string>
+    <string name="signature_pen_size">Kalem kalınlığı</string>
+    <string name="signature_saving">Kaydediliyor…</string>
+    <string name="batch_clear_all">Tümünü temizle</string>
+    <string name="batch_page_range_title">Sayfa aralığı</string>
+    <string name="batch_page_range_hint">“Tümü” seçeneğini kullanın veya 1-10, 15, 20-25 gibi virgülle ayrılmış sayfa aralıkları girin.</string>
+    <string name="batch_compile">PDF oluştur</string>
+    <string name="batch_image_unavailable">Görsel kullanılamıyor</string>
+    <string name="batch_new_scan">+ Yeni toplu tarama</string>
+    <string name="batch_all_batches">Tüm gruplar</string>
+    <string name="viewer_download_save">İndir / Kaydet</string>
+    <string name="viewer_search_description">Ara</string>
+    <string name="viewer_print_preparing">PDF yazdırma için hazırlanıyor…</string>
 </resources>

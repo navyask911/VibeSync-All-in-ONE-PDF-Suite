@@ -470,4 +470,27 @@
     <string name="smart_scan_folder_count">%1$d PDF</string>
     <string name="smart_scan_permission_failed">Impossibile salvare l’accesso alla cartella. Selezionala di nuovo.</string>
     <string name="smart_scan_scan_failed">Impossibile scansionare le cartelle selezionate. Verifica l’accesso e riprova.</string>
+    <!-- v1.0.30 localization additions -->
+    <string name="pro_title">VibeSync PDF Pro</string>
+    <string name="pro_upgrade_title">Passa a VibeSync PDF Pro</string>
+    <string name="pro_pass_active_days_remaining">Pro Pass attivo — restano %1$d giorni</string>
+    <string name="pro_subscribe">Abbonati a Pro Pass</string>
+    <string name="editor_previous_page">Pagina precedente</string>
+    <string name="editor_next_page">Pagina successiva</string>
+    <string name="editor_zoom_out">Riduci zoom</string>
+    <string name="editor_zoom_in">Aumenta zoom</string>
+    <string name="signature_create_new">Crea una nuova firma</string>
+    <string name="signature_ink_colour">Colore dell&apos;inchiostro</string>
+    <string name="signature_pen_size">Spessore della penna</string>
+    <string name="signature_saving">Salvataggio…</string>
+    <string name="batch_clear_all">Cancella tutto</string>
+    <string name="batch_page_range_title">Intervallo di pagine</string>
+    <string name="batch_page_range_hint">Seleziona «Tutte» o inserisci intervalli separati da virgole, ad esempio 1-10, 15, 20-25.</string>
+    <string name="batch_compile">Crea PDF</string>
+    <string name="batch_image_unavailable">Immagine non disponibile</string>
+    <string name="batch_new_scan">+ Nuova scansione batch</string>
+    <string name="batch_all_batches">Tutti i batch</string>
+    <string name="viewer_download_save">Scarica / Salva</string>
+    <string name="viewer_search_description">Cerca</string>
+    <string name="viewer_print_preparing">Preparazione del PDF per la stampa…</string>
 </resources>
