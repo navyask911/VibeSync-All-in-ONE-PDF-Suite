@@ -364,7 +364,7 @@
     <string  name="restart_to_update">รีสตาร์ทและติดตั้ง</string>
     <string  name="offline_support_title">เชื่อมต่ออินเทอร์เน็ตเพื่อสนับสนุน VibeSync</string>
     <string  name="offline_support_message">ขณะนี้คุณออฟไลน์อยู่ การเชื่อมต่ออินเทอร์เน็ตช่วยให้เราโหลดโฆษณาที่สนับสนุนการพัฒนา VibeSync และช่วยให้เรามีกำลังใจในการปรับปรุงแอปต่อไป\n\nความเป็นส่วนตัวของคุณสำคัญกับเรา: ไฟล์ PDF จะยังคงอยู่ในอุปกรณ์ของคุณ และการเชื่อมต่ออินเทอร์เน็ตไม่ได้หมายความว่าเอกสารของคุณจะถูกอัปโหลด</string>
-    <string  name="connect_to_internet">連接อินเทอร์เน็ต</string>
+    <string  name="connect_to_internet">เชื่อมต่ออินเทอร์เน็ต</string>
     <string  name="not_now">ไม่ใช่ตอนนี้</string>
     <string  name="update_store_unavailable">เปิดหน้ารายการ Google Play ไม่ได้ โปรดลองอีกครั้งเมื่อมีอินเทอร์เน็ต</string>
     <string  name="internet_settings_unavailable">เปิดการตั้งค่าเครือข่ายไม่ได้ โปรดเปิดการตั้งค่า Wi-Fi ด้วยตนเอง</string>
