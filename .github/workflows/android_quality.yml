@@ -91,7 +91,7 @@ jobs:
                   f"found {len(baseline)}."
               )
 
-          placeholder_pattern = re.compile(r"%(?:[0-9]+\\$)?[a-zA-Z]")
+          placeholder_pattern = re.compile(r"%(?:[0-9]+\$)?[a-zA-Z]")
           for path in resource_files:
               locale = path.parent.name
               translated = read_strings(path)
