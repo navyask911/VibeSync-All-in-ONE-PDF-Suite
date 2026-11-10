@@ -459,4 +459,32 @@
     <string name="viewer_download_save">Letöltés / Mentés</string>
     <string name="viewer_search_description">Keresés</string>
     <string name="viewer_print_preparing">PDF előkészítése nyomtatáshoz…</string>
+    <string name="app_name" translatable="false">VibeSync All in ONE PDF Suite</string>
+    <string name="admob_app_id" translatable="false">ca-app-pub-4783826505860771~4377815936</string>
+    <string name="default_pdf_filename" translatable="false">document.pdf</string>
+    <string name="language_chinese">Egyszerűsített kínai</string>
+    <string name="language_hindi">Hindi</string>
+    <string name="language_arabic">Arab</string>
+    <string name="language_bengali">Bengáli</string>
+    <string name="language_portuguese">Portugál</string>
+    <string name="language_japanese">Japán</string>
+    <string name="language_indonesian">Indonéz</string>
+    <string name="language_urdu">Urdu</string>
+    <string name="language_turkish">Török</string>
+    <string name="language_korean">Koreai</string>
+    <string name="language_italian">Olasz</string>
+    <string name="language_chinese_traditional">Hagyományos kínai</string>
+    <string name="language_vietnamese">Vietnámi</string>
+    <string name="language_tamil">Tamil</string>
+    <string name="language_telugu">Telugu</string>
+    <string name="language_kannada">Kannada</string>
+    <string name="language_marathi">Marathi</string>
+    <string name="language_gujarati">Gudzsaráti</string>
+    <string name="language_hebrew">Héber</string>
+    <string name="language_thai">Thai</string>
+    <string name="language_filipino">Filippínó</string>
+    <string name="language_dutch">Holland</string>
+    <string name="language_polish">Lengyel</string>
+    <string name="language_ukrainian">Ukrán</string>
+    <string name="language_persian">Perzsa</string>
 </resources>

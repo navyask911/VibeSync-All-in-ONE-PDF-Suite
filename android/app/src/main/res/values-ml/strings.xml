@@ -459,4 +459,32 @@
     <string name="viewer_download_save">ഡൗൺലോഡ് / സംരക്ഷിക്കുക</string>
     <string name="viewer_search_description">തിരയുക</string>
     <string name="viewer_print_preparing">പ്രിന്റിംഗിനായി PDF തയ്യാറാക്കുന്നു…</string>
+    <string name="app_name" translatable="false">VibeSync All in ONE PDF Suite</string>
+    <string name="admob_app_id" translatable="false">ca-app-pub-4783826505860771~4377815936</string>
+    <string name="default_pdf_filename" translatable="false">document.pdf</string>
+    <string name="language_chinese">ലളിത ചൈനീസ്</string>
+    <string name="language_hindi">ഹിന്ദി</string>
+    <string name="language_arabic">അറബിക്</string>
+    <string name="language_bengali">ബംഗാളി</string>
+    <string name="language_portuguese">പോർച്ചുഗീസ്</string>
+    <string name="language_japanese">ജാപ്പനീസ്</string>
+    <string name="language_indonesian">ഇന്തോനേഷ്യൻ</string>
+    <string name="language_urdu">ഉർദു</string>
+    <string name="language_turkish">ടർക്കിഷ്</string>
+    <string name="language_korean">കൊറിയൻ</string>
+    <string name="language_italian">ഇറ്റാലിയൻ</string>
+    <string name="language_chinese_traditional">പരമ്പരാഗത ചൈനീസ്</string>
+    <string name="language_vietnamese">വിയറ്റ്നാമീസ്</string>
+    <string name="language_tamil">തമിഴ്</string>
+    <string name="language_telugu">തെലുങ്ക്</string>
+    <string name="language_kannada">കന്നഡ</string>
+    <string name="language_marathi">മറാത്തി</string>
+    <string name="language_gujarati">ഗുജറാത്തി</string>
+    <string name="language_hebrew">ഹീബ്രു</string>
+    <string name="language_thai">തായ്</string>
+    <string name="language_filipino">ഫിലിപ്പിനോ</string>
+    <string name="language_dutch">ഡച്ച്</string>
+    <string name="language_polish">പോളിഷ്</string>
+    <string name="language_ukrainian">യുക്രേനിയൻ</string>
+    <string name="language_persian">പേർഷ്യൻ</string>
 </resources>

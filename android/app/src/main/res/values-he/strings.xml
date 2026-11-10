@@ -459,4 +459,32 @@
     <string name="viewer_download_save">הורדה / שמירה</string>
     <string name="viewer_search_description">חיפוש</string>
     <string name="viewer_print_preparing">מכין PDF להדפסה…</string>
+    <string name="app_name" translatable="false">VibeSync All in ONE PDF Suite</string>
+    <string name="admob_app_id" translatable="false">ca-app-pub-4783826505860771~4377815936</string>
+    <string name="default_pdf_filename" translatable="false">document.pdf</string>
+    <string name="language_chinese">סינית מפושטת</string>
+    <string name="language_hindi">הינדי</string>
+    <string name="language_arabic">ערבית</string>
+    <string name="language_bengali">בנגלית</string>
+    <string name="language_portuguese">פורטוגזית</string>
+    <string name="language_japanese">יפנית</string>
+    <string name="language_indonesian">אינדונזית</string>
+    <string name="language_urdu">אורדו</string>
+    <string name="language_turkish">טורקית</string>
+    <string name="language_korean">קוריאנית</string>
+    <string name="language_italian">איטלקית</string>
+    <string name="language_chinese_traditional">סינית מסורתית</string>
+    <string name="language_vietnamese">וייטנאמית</string>
+    <string name="language_tamil">טמילית</string>
+    <string name="language_telugu">טלוגו</string>
+    <string name="language_kannada">קנאדה</string>
+    <string name="language_marathi">מראטהית</string>
+    <string name="language_gujarati">גוג׳ראטית</string>
+    <string name="language_hebrew">עברית</string>
+    <string name="language_thai">תאית</string>
+    <string name="language_filipino">פיליפינית</string>
+    <string name="language_dutch">הולנדית</string>
+    <string name="language_polish">פולנית</string>
+    <string name="language_ukrainian">אוקראינית</string>
+    <string name="language_persian">פרסית</string>
 </resources>

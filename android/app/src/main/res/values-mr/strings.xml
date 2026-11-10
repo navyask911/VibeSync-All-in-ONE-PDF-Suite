@@ -459,4 +459,32 @@
     <string name="viewer_download_save">डाउनलोड / जतन करा</string>
     <string name="viewer_search_description">शोधा</string>
     <string name="viewer_print_preparing">प्रिंटसाठी PDF तयार करत आहे…</string>
+    <string name="app_name" translatable="false">VibeSync All in ONE PDF Suite</string>
+    <string name="admob_app_id" translatable="false">ca-app-pub-4783826505860771~4377815936</string>
+    <string name="default_pdf_filename" translatable="false">document.pdf</string>
+    <string name="language_chinese">सरलीकृत चिनी</string>
+    <string name="language_hindi">हिंदी</string>
+    <string name="language_arabic">अरबी</string>
+    <string name="language_bengali">बंगाली</string>
+    <string name="language_portuguese">पोर्तुगीज</string>
+    <string name="language_japanese">जपानी</string>
+    <string name="language_indonesian">इंडोनेशियन</string>
+    <string name="language_urdu">उर्दू</string>
+    <string name="language_turkish">तुर्की</string>
+    <string name="language_korean">कोरियन</string>
+    <string name="language_italian">इटालियन</string>
+    <string name="language_chinese_traditional">पारंपरिक चिनी</string>
+    <string name="language_vietnamese">व्हिएतनामी</string>
+    <string name="language_tamil">तमिळ</string>
+    <string name="language_telugu">तेलुगू</string>
+    <string name="language_kannada">कन्नड</string>
+    <string name="language_marathi">मराठी</string>
+    <string name="language_gujarati">गुजराती</string>
+    <string name="language_hebrew">हिब्रू</string>
+    <string name="language_thai">थाई</string>
+    <string name="language_filipino">फिलिपिनो</string>
+    <string name="language_dutch">डच</string>
+    <string name="language_polish">पोलिश</string>
+    <string name="language_ukrainian">युक्रेनियन</string>
+    <string name="language_persian">फारसी</string>
 </resources>
