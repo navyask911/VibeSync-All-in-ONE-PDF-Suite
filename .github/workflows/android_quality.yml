@@ -51,158 +51,71 @@ jobs:
           import sys
           import xml.etree.ElementTree as ET
 
-          root = pathlib.Path("android/app/src/main/res")
-          buckets = {
-              "default": root / "values/strings.xml",
-              "es": root / "values-es/strings.xml",
-              "zh-CN": root / "values-zh-rCN/strings.xml",
-              "hi": root / "values-hi/strings.xml",
-              "ar": root / "values-ar/strings.xml",
-              "bn": root / "values-bn/strings.xml",
-              "pt": root / "values-pt/strings.xml",
-              "ru": root / "values-ru/strings.xml",
-              "ja": root / "values-ja/strings.xml",
-              "fr": root / "values-fr/strings.xml",
-              "de": root / "values-de/strings.xml",
-              "id": root / "values-id/strings.xml",
-              "ur": root / "values-ur/strings.xml",
-              "tr": root / "values-tr/strings.xml",
-              "ko": root / "values-ko/strings.xml",
-              "it": root / "values-it/strings.xml",
-          }
-          parsed = {}
-          for locale, path in buckets.items():
-              nodes = ET.parse(path).getroot().findall("string")
-              items = {}
+          resource_root = pathlib.Path("android/app/src/main/res")
+          base_path = resource_root / "values/strings.xml"
+          resource_files = sorted(resource_root.glob("values*/strings.xml"))
+
+          if base_path not in resource_files:
+              sys.exit("Base values/strings.xml was not found.")
+          if len(resource_files) != 40:
+              sys.exit(
+                  f"Expected exactly 40 strings.xml files (base + 39 locales), "
+                  f"found {len(resource_files)}: {[str(path) for path in resource_files]}"
+              )
+
+          def read_strings(path):
+              try:
+                  root = ET.parse(path).getroot()
+              except ET.ParseError as error:
+                  sys.exit(f"{path}: invalid XML: {error}")
+
+              values = {}
               duplicates = []
-              for node in nodes:
-                  name = node.attrib["name"]
-                  if name in items:
+              for node in root.findall("string"):
+                  name = node.get("name")
+                  if not name:
+                      sys.exit(f"{path}: a <string> element has no name attribute.")
+                  if name in values:
                       duplicates.append(name)
-                  items[name] = "".join(node.itertext())
+                  values[name] = "".join(node.itertext())
+
               if duplicates:
-                  sys.exit(f"{locale}: duplicate string IDs: {sorted(set(duplicates))}")
-              parsed[locale] = items
+                  sys.exit(f"{path}: duplicate string IDs: {sorted(set(duplicates))}")
+              return values
 
-          baseline = parsed["default"]
-          for locale, items in parsed.items():
-              missing = sorted(set(baseline) - set(items))
-              extra = sorted(set(items) - set(baseline))
-              if missing or extra:
-                  sys.exit(f"{locale}: missing={missing}; extra={extra}")
-              for name, source in baseline.items():
-                  source_args = sorted(re.findall(r"%(?:[0-9]+\$)?[a-zA-Z]", source))
-                  target_args = sorted(re.findall(r"%(?:[0-9]+\$)?[a-zA-Z]", items[name]))
-                  if source_args != target_args:
-                      sys.exit(f"{locale}: placeholders differ for {name}: {source_args} != {target_args}")
-          print(f"Localization resource audit passed: {len(baseline)} keys across {len(buckets)} established locales.")
+          baseline = read_strings(base_path)
+          expected_key_count = 479
+          if len(baseline) != expected_key_count:
+              sys.exit(
+                  f"Base resource key count changed: expected {expected_key_count}, "
+                  f"found {len(baseline)}."
+              )
 
-          # Partial locales rely on base-resource fallbacks for existing keys. Require all new
-          # profile keys, unique IDs and matching placeholders in every shipped strings bucket.
-          required_profile_keys = [
-              "resolution_profile_title",
-              "resolution_profile_smallest",
-              "resolution_profile_smallest_description",
-              "resolution_profile_standard",
-              "resolution_profile_standard_description",
-              "resolution_profile_largest",
-              "resolution_profile_largest_description",
-              "resolution_profile_hd_auto",
-              "resolution_profile_hd_auto_description",
-              "resolution_profile_memory_fallback",
-          ]
-          required_filter_keys = [
-              "scan_filter_title",
-              "scan_filter_magic_color",
-              "scan_filter_bw",
-              "scan_filter_lighten",
-              "scan_filter_no_shadow",
-              "scan_filter_screen",
-              "scan_filter_clean_marks",
-          ]
-          required_step4_keys = [
-              "compression_progress_pages",
-              "compression_before_size",
-              "compression_after_size",
-              "compression_size_change",
-              "compression_page_count",
-              "compression_password_incorrect",
-              "compression_password_label",
-              "compression_password_message",
-              "compression_password_title",
-              "compression_try_again",
-              "compression_use_output",
-              "export_failed",
-              "export_jpg_current",
-              "export_jpg_separate",
-              "export_jpg_zip",
-              "export_menu_title",
-              "export_password_message",
-              "export_password_title",
-              "export_pdf",
-              "export_progress_pages",
-              "export_saved_jpg",
-              "export_saved_pdf",
-              "export_saved_txt",
-              "export_saved_zip",
-              "export_txt",
-              "print_action",
-              "print_failed",
-              "print_job_name",
-              "tool_translation_scan",
-              "tool_translation_scan_subtitle",
-              "translation_complete",
-              "translation_export_pdf",
-              "translation_export_saved",
-              "translation_export_txt",
-              "translation_failed",
-              "translation_import",
-              "translation_language_auto",
-              "translation_model_download_consent",
-              "translation_model_download_declined",
-              "translation_model_download_title",
-              "translation_ocr_complete",
-              "translation_original",
-              "translation_result",
-              "translation_scan_description",
-              "translation_scan_title",
-              "translation_source_language",
-              "translation_target_language",
-              "translation_translate_action",
-          ]
-          required_d2_keys = [
-              "pdf_folder_picker_title",
-              "pdf_folder_picker_message",
-              "pdf_folder_picker_hint",
-          ]
-          required_scan_keys = required_profile_keys + required_filter_keys + required_step4_keys + required_d2_keys
-          all_string_files = sorted(root.glob("values*/strings.xml"))
-          if root / "values/strings.xml" not in all_string_files:
-              sys.exit("Base strings.xml was not found by the all-locale audit.")
-          if len(all_string_files) != 40:
-              sys.exit(f"Expected 40 strings.xml files, found {len(all_string_files)}: {[str(p) for p in all_string_files]}")
-
-          base_nodes = ET.parse(root / "values/strings.xml").getroot().findall("string")
-          base_items = {node.attrib["name"]: "".join(node.itertext()) for node in base_nodes}
-          for path in all_string_files:
+          placeholder_pattern = re.compile(r"%(?:[0-9]+\\$)?[a-zA-Z]")
+          for path in resource_files:
               locale = path.parent.name
-              nodes = ET.parse(path).getroot().findall("string")
-              items = {}
-              for node in nodes:
-                  name = node.attrib["name"]
-                  if name in items:
-                      sys.exit(f"{locale}: duplicate string ID: {name}")
-                  items[name] = "".join(node.itertext())
-              for name in required_scan_keys:
-                  if name not in items:
-                      sys.exit(f"{locale}: missing required scan string: {name}")
-                  if name not in base_items:
-                      sys.exit(f"default: required profile string missing: {name}")
-                  source_args = sorted(re.findall(r"%(?:[0-9]+\$)?[a-zA-Z]", base_items[name]))
-                  target_args = sorted(re.findall(r"%(?:[0-9]+\$)?[a-zA-Z]", items[name]))
+              translated = read_strings(path)
+              missing = sorted(set(baseline) - set(translated))
+              extra = sorted(set(translated) - set(baseline))
+              if missing or extra:
+                  sys.exit(
+                      f"{locale}: strict key parity failed; "
+                      f"missing={missing}; extra={extra}"
+                  )
+
+              for name, source in baseline.items():
+                  source_args = sorted(placeholder_pattern.findall(source))
+                  target_args = sorted(placeholder_pattern.findall(translated[name]))
                   if source_args != target_args:
-                      sys.exit(f"{locale}: placeholders differ for {name}: {source_args} != {target_args}")
-          print(f"All-locale resource audit passed: {len(required_profile_keys)} profile keys, {len(required_filter_keys)} filter keys, and {len(required_d2_keys)} SAF-only discovery keys across {len(all_string_files)} strings.xml files.")
+                      sys.exit(
+                          f"{locale}: placeholder mismatch for {name}: "
+                          f"{source_args} != {target_args}"
+                      )
+
+          print(
+              f"Strict localization parity passed: {expected_key_count} unique keys "
+              f"across 39 locales plus the base resource (40 files)."
+          )
           PY
 
       - name: Verify PDF discovery uses SAF only
