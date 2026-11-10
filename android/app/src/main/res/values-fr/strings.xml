@@ -503,4 +503,18 @@
     <string name="viewer_download_save">Télécharger / Enregistrer</string>
     <string name="viewer_search_description">Rechercher</string>
     <string name="viewer_print_preparing">Préparation du PDF pour l’impression…</string>
+
+    <!-- About Us and developer app ecosystem -->
+    <string name="about_us_title">À propos de nous</string>
+    <string name="about_us_mission">Créer des produits et rapprocher les personnes grâce à la confidentialité et à la sécurité. Nous concevons des applications Android réfléchies et explorons les idées de nouvelle génération en intelligence artificielle, confidentialité et sécurité, afin de créer une technologie qui place les personnes au premier plan.</string>
+    <string name="about_us_ecosystem">Notre écosystème d’applications mobiles</string>
+    <string name="app_pdf_name">VibeSync All in ONE PDF Suite</string>
+    <string name="app_pdf_desc">Un outil PDF Android pratique qui facilite les tâches documentaires du quotidien, même en déplacement.</string>
+    <string name="app_kids_name">Kids Drawing Studio</string>
+    <string name="app_kids_desc">Une expérience ludique de dessin et de peinture qui offre aux enfants un espace simple pour explorer leur créativité.</string>
+    <string name="app_dev_name">Developer Options Shortcut</string>
+    <string name="app_dev_desc">Un raccourci Android pratique pour accéder plus rapidement aux options pour les développeurs de son appareil.</string>
+    <string name="app_av_name">SafeMobile Antivirus</string>
+    <string name="app_av_desc">Une application mobile de sécurité et antivirus de nouvelle génération actuellement en développement. Restez à l’écoute !</string>
+    <string name="about_us_website">Visiter notre site web</string>
 </resources>

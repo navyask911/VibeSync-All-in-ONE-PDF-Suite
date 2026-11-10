@@ -487,4 +487,18 @@
     <string name="language_polish">Lengyel</string>
     <string name="language_ukrainian">Ukrán</string>
     <string name="language_persian">Perzsa</string>
+
+    <!-- About Us and developer app ecosystem -->
+    <string name="about_us_title">Rólunk</string>
+    <string name="about_us_mission">Termékeket készítünk, és az adatvédelem és biztonság segítségével kapcsolatot teremtünk az emberek között. Átgondolt Android-alkalmazásokat fejlesztünk, és a mesterséges intelligencia, az adatvédelem és a biztonság következő generációs ötleteit kutatjuk – olyan technológiát alkotva, amely az embereket helyezi előtérbe.</string>
+    <string name="about_us_ecosystem">Mobilalkalmazásaink ökoszisztémája</string>
+    <string name="app_pdf_name">VibeSync All in ONE PDF Suite</string>
+    <string name="app_pdf_desc">Praktikus Android PDF-eszköz, amely útközben is megkönnyíti a mindennapi dokumentumkezelést.</string>
+    <string name="app_kids_name">Kids Drawing Studio</string>
+    <string name="app_kids_desc">Játékos rajzolási és festési élmény, amely egyszerű teret ad a gyerekeknek kreativitásuk felfedezéséhez.</string>
+    <string name="app_dev_name">Developer Options Shortcut</string>
+    <string name="app_dev_desc">Kényelmes Android-parancsikon azoknak, akik gyorsabban szeretnék elérni készülékük Fejlesztői beállításait.</string>
+    <string name="app_av_name">SafeMobile Antivirus</string>
+    <string name="app_av_desc">Új generációs mobilbiztonsági és vírusirtó alkalmazás, amely jelenleg fejlesztés alatt áll. Maradjon velünk!</string>
+    <string name="about_us_website">Weboldalunk felkeresése</string>
 </resources>

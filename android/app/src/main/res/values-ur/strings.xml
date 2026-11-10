@@ -493,4 +493,18 @@
     <string name="viewer_download_save">ڈاؤن لوڈ / محفوظ کریں</string>
     <string name="viewer_search_description">تلاش</string>
     <string name="viewer_print_preparing">پرنٹنگ کے لیے PDF تیار کی جا رہی ہے…</string>
+
+    <!-- About Us and developer app ecosystem -->
+    <string name="about_us_title">ہمارے بارے میں</string>
+    <string name="about_us_mission">ہم رازداری اور سیکیورٹی کو اہمیت دیتے ہوئے مصنوعات بناتے اور لوگوں کو آپس میں جوڑتے ہیں۔ ہم سوچ سمجھ کر Android ایپس تیار کرتے ہیں اور مصنوعی ذہانت، رازداری اور سیکیورٹی کے اگلی نسل کے خیالات پر کام کرتے ہیں—ایسی ٹیکنالوجی بنانے کے لیے جو لوگوں کو سب سے پہلے رکھتی ہے۔</string>
+    <string name="about_us_ecosystem">ہماری موبائل ایپس کا نظام</string>
+    <string name="app_pdf_name">VibeSync All in ONE PDF Suite</string>
+    <string name="app_pdf_desc">ایک کارآمد Android PDF ٹول جو سفر کے دوران روزمرہ دستاویزی کاموں کو آسان بناتا ہے۔</string>
+    <string name="app_kids_name">Kids Drawing Studio</string>
+    <string name="app_kids_desc">ڈرائنگ اور رنگ بھرنے کا ایک پُرلطف تجربہ جو بچوں کو اپنی تخلیقی صلاحیتیں دریافت کرنے کے لیے سادہ جگہ دیتا ہے۔</string>
+    <string name="app_dev_name">Developer Options Shortcut</string>
+    <string name="app_dev_desc">ان صارفین کے لیے آسان Android شارٹ کٹ جو اپنے آلے میں Developer Options تک تیزی سے پہنچنا چاہتے ہیں۔</string>
+    <string name="app_av_name">SafeMobile Antivirus</string>
+    <string name="app_av_desc">اگلی نسل کی موبائل سیکیورٹی اور اینٹی وائرس ایپ اس وقت تیار کی جا رہی ہے۔ مزید خبروں کے لیے ہمارے ساتھ رہیں!</string>
+    <string name="about_us_website">ہماری ویب سائٹ ملاحظہ کریں</string>
 </resources>

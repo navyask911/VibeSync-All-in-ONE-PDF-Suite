@@ -487,4 +487,18 @@
     <string name="language_polish">Kipolandi</string>
     <string name="language_ukrainian">Kiukreni</string>
     <string name="admob_app_id" translatable="false">ca-app-pub-4783826505860771~4377815936</string>
+
+    <!-- About Us and developer app ecosystem -->
+    <string name="about_us_title">Kuhusu Sisi</string>
+    <string name="about_us_mission">Tunatengeneza bidhaa na kuwaunganisha watu kwa kuzingatia faragha na usalama. Tunaunda programu za Android zilizofikiriwa kwa makini na kuchunguza mawazo ya kizazi kijacho katika akili bandia, faragha na usalama—ili kuunda teknolojia inayoweka watu mbele.</string>
+    <string name="about_us_ecosystem">Mfumo wa Programu Zetu za Simu</string>
+    <string name="app_pdf_name">VibeSync All in ONE PDF Suite</string>
+    <string name="app_pdf_desc">Zana ya vitendo ya PDF ya Android inayorahisisha kazi za kawaida za hati ukiwa safarini.</string>
+    <string name="app_kids_name">Kids Drawing Studio</string>
+    <string name="app_kids_desc">Uzoefu wa kufurahisha wa kuchora na kupaka rangi unaowapa watoto nafasi rahisi ya kuchunguza ubunifu wao.</string>
+    <string name="app_dev_name">Developer Options Shortcut</string>
+    <string name="app_dev_desc">Njia ya mkato ya Android inayowafaa watumiaji wanaotaka kufikia Chaguo za Wasanidi kwa haraka zaidi kwenye vifaa vyao.</string>
+    <string name="app_av_name">SafeMobile Antivirus</string>
+    <string name="app_av_desc">Programu ya kizazi kijacho ya usalama wa simu na kingavirusi ambayo bado inatengenezwa. Endelea kufuatilia!</string>
+    <string name="about_us_website">Tembelea Tovuti Yetu</string>
 </resources>

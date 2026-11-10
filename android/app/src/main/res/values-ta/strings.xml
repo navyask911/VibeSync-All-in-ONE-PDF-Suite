@@ -487,4 +487,18 @@
     <string name="language_polish">போலிஷ்</string>
     <string name="language_ukrainian">உக்ரைனியம்</string>
     <string name="admob_app_id" translatable="false">ca-app-pub-4783826505860771~4377815936</string>
+
+    <!-- About Us and developer app ecosystem -->
+    <string name="about_us_title">எங்களைப் பற்றி</string>
+    <string name="about_us_mission">தனியுரிமை மற்றும் பாதுகாப்பை மையமாகக் கொண்டு தயாரிப்புகளை உருவாக்கி மக்களை இணைக்கிறோம். சிந்தனையுடன் வடிவமைக்கப்பட்ட Android செயலிகளை உருவாக்கி, செயற்கை நுண்ணறிவு, தனியுரிமை மற்றும் பாதுகாப்பு துறைகளில் அடுத்த தலைமுறை யோசனைகளை ஆராய்கிறோம்—மக்களுக்கு முன்னுரிமை அளிக்கும் தொழில்நுட்பத்தை உருவாக்குவதற்காக.</string>
+    <string name="about_us_ecosystem">எங்கள் மொபைல் செயலிகளின் சூழல்</string>
+    <string name="app_pdf_name">VibeSync All in ONE PDF Suite</string>
+    <string name="app_pdf_desc">பயணத்தின்போதும் அன்றாட ஆவணப் பணிகளை எளிதாக்க வடிவமைக்கப்பட்ட பயனுள்ள Android PDF கருவி.</string>
+    <string name="app_kids_name">Kids Drawing Studio</string>
+    <string name="app_kids_desc">குழந்தைகள் தங்கள் படைப்பாற்றலை ஆராய எளிய இடத்தை வழங்கும் மகிழ்ச்சியான ஓவியம் மற்றும் வண்ணம் தீட்டும் அனுபவம்.</string>
+    <string name="app_dev_name">Developer Options Shortcut</string>
+    <string name="app_dev_desc">தங்கள் சாதனத்தில் Developer Options-ஐ விரைவாக அணுக விரும்புவோருக்கான வசதியான Android குறுக்குவழி.</string>
+    <string name="app_av_name">SafeMobile Antivirus</string>
+    <string name="app_av_desc">அடுத்த தலைமுறை மொபைல் பாதுகாப்பு மற்றும் வைரஸ் தடுப்பு செயலி தற்போது உருவாக்கத்தில் உள்ளது. தொடர்ந்து கவனியுங்கள்!</string>
+    <string name="about_us_website">எங்கள் இணையதளத்தைப் பார்வையிடுங்கள்</string>
 </resources>

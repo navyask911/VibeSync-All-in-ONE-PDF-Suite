@@ -487,4 +487,18 @@
     <string name="language_polish">Polska</string>
     <string name="language_ukrainian">Ukrainska</string>
     <string name="admob_app_id" translatable="false">ca-app-pub-4783826505860771~4377815936</string>
+
+    <!-- About Us and developer app ecosystem -->
+    <string name="about_us_title">Om oss</string>
+    <string name="about_us_mission">Vi skapar produkter och för människor närmare varandra med integritet och säkerhet i fokus. Vi utvecklar genomtänkta Android-appar och utforskar nästa generations idéer inom artificiell intelligens, integritet och säkerhet — teknik som sätter människor först.</string>
+    <string name="about_us_ecosystem">Vårt ekosystem av mobilappar</string>
+    <string name="app_pdf_name">VibeSync All in ONE PDF Suite</string>
+    <string name="app_pdf_desc">Ett praktiskt PDF-verktyg för Android som gör vardagliga dokumentuppgifter enklare när du är på språng.</string>
+    <string name="app_kids_name">Kids Drawing Studio</string>
+    <string name="app_kids_desc">En lekfull upplevelse med teckning och målning som ger barn en enkel plats att utforska sin kreativitet.</string>
+    <string name="app_dev_name">Developer Options Shortcut</string>
+    <string name="app_dev_desc">En smidig Android-genväg för användare som vill komma snabbare åt utvecklaralternativen på sina enheter.</string>
+    <string name="app_av_name">SafeMobile Antivirus</string>
+    <string name="app_av_desc">En mobil säkerhets- och antivirusapp av nästa generation som för närvarande utvecklas. Håll utkik!</string>
+    <string name="about_us_website">Besök vår webbplats</string>
 </resources>

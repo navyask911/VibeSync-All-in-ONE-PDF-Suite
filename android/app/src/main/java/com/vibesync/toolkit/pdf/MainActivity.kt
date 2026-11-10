@@ -84,6 +84,7 @@ import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.core.security.EncryptedBillingPreferences
 import com.vibesync.toolkit.pdf.data.billing.LocalAdBillingManager
 import com.vibesync.toolkit.pdf.presentation.billing.ProBenefitsPaywallScreen
+import com.vibesync.toolkit.pdf.presentation.about.AboutScreen
 import com.vibesync.toolkit.pdf.core.util.EngagementPolicy
 import com.vibesync.toolkit.pdf.core.util.ReviewEligibilityTracker
 import com.vibesync.toolkit.pdf.core.util.UriUtils
@@ -473,8 +474,13 @@ class MainActivity : AppCompatActivity() {
                                     navController.navigate("$route/${encodeUriRoute(uri)}")
                                 },
                                 onNavigateToPro = { navController.navigate("pro") },
-                                onNavigateToSmartScan = { navController.navigate("smart_scan") }
+                                onNavigateToSmartScan = { navController.navigate("smart_scan") },
+                                onNavigateToAbout = { navController.navigate("about_us") }
                             )
+                        }
+
+                        composable("about_us") {
+                            AboutScreen(onNavigateBack = { navController.popBackStack() })
                         }
 
                         composable("smart_scan") {

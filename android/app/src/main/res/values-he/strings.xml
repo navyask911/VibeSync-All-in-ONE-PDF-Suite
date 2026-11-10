@@ -487,4 +487,18 @@
     <string name="language_polish">פולנית</string>
     <string name="language_ukrainian">אוקראינית</string>
     <string name="language_persian">פרסית</string>
+
+    <!-- About Us and developer app ecosystem -->
+    <string name="about_us_title">עלינו</string>
+    <string name="about_us_mission">אנחנו יוצרים מוצרים ומחברים בין אנשים באמצעות פרטיות ואבטחה. אנחנו מפתחים אפליקציות Android מוקפדות וחוקרים רעיונות מהדור הבא בתחום הבינה המלאכותית, הפרטיות והאבטחה — כדי ליצור טכנולוגיה שמעמידה אנשים במקום הראשון.</string>
+    <string name="about_us_ecosystem">מערכת האפליקציות לנייד שלנו</string>
+    <string name="app_pdf_name">VibeSync All in ONE PDF Suite</string>
+    <string name="app_pdf_desc">כלי PDF שימושי ל-Android שמקל על משימות מסמכים יומיומיות גם כשנמצאים בדרכים.</string>
+    <string name="app_kids_name">Kids Drawing Studio</string>
+    <string name="app_kids_desc">חוויית ציור וצביעה מהנה שמעניקה לילדים מרחב פשוט לגלות את היצירתיות שלהם.</string>
+    <string name="app_dev_name">Developer Options Shortcut</string>
+    <string name="app_dev_desc">קיצור דרך נוח ב-Android למי שרוצה להגיע מהר יותר לאפשרויות למפתחים במכשיר שלו.</string>
+    <string name="app_av_name">SafeMobile Antivirus</string>
+    <string name="app_av_desc">אפליקציית אבטחה ואנטי-וירוס לנייד מהדור הבא שנמצאת כעת בפיתוח. הישארו מעודכנים!</string>
+    <string name="about_us_website">בקרו באתר שלנו</string>
 </resources>

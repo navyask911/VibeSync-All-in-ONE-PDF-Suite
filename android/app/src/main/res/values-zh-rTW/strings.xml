@@ -488,4 +488,18 @@
     <string  name="viewer_download_save">下載／儲存</string>
     <string  name="viewer_search_description">搜尋</string>
     <string  name="viewer_print_preparing">正在準備 PDF 以供列印…</string>
+
+    <!-- About Us and developer app ecosystem -->
+    <string name="about_us_title">關於我們</string>
+    <string name="about_us_mission">我們以隱私權與安全為基礎打造產品、連結人與人。我們用心開發 Android 應用程式，並探索人工智慧、隱私權與安全領域的下一代創意，創造以人為本的科技。</string>
+    <string name="about_us_ecosystem">我們的行動應用程式生態系</string>
+    <string name="app_pdf_name">VibeSync All in ONE PDF Suite</string>
+    <string name="app_pdf_desc">一款實用的 Android PDF 工具，讓您隨時隨地輕鬆處理日常文件工作。</string>
+    <string name="app_kids_name">Kids Drawing Studio</string>
+    <string name="app_kids_desc">充滿樂趣的繪圖與著色體驗，為孩子提供簡單的空間來探索創造力。</string>
+    <string name="app_dev_name">Developer Options Shortcut</string>
+    <string name="app_dev_desc">為想要更快速存取裝置開發人員選項的使用者提供方便的 Android 捷徑。</string>
+    <string name="app_av_name">SafeMobile Antivirus</string>
+    <string name="app_av_desc">新一代行動安全與防毒應用程式目前正在開發中，敬請期待！</string>
+    <string name="about_us_website">造訪我們的網站</string>
 </resources>

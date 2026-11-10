@@ -487,4 +487,18 @@
     <string name="viewer_download_save">Stáhnout / uložit</string>
     <string name="viewer_search_description">Hledat</string>
     <string name="viewer_print_preparing">Příprava PDF k tisku…</string>
+
+    <!-- About Us and developer app ecosystem -->
+    <string name="about_us_title">O nás</string>
+    <string name="about_us_mission">Vytváříme produkty a propojujeme lidi díky soukromí a bezpečnosti. Vyvíjíme promyšlené aplikace pro Android a zkoumáme nové možnosti umělé inteligence, soukromí a zabezpečení, abychom tvořili technologie, které staví lidi na první místo.</string>
+    <string name="about_us_ecosystem">Ekosystém našich mobilních aplikací</string>
+    <string name="app_pdf_name">VibeSync All in ONE PDF Suite</string>
+    <string name="app_pdf_desc">Praktický nástroj PDF pro Android, který usnadňuje každodenní práci s dokumenty i na cestách.</string>
+    <string name="app_kids_name">Kids Drawing Studio</string>
+    <string name="app_kids_desc">Hravé kreslení a malování, které dětem nabízí jednoduchý prostor pro rozvoj kreativity.</string>
+    <string name="app_dev_name">Developer Options Shortcut</string>
+    <string name="app_dev_desc">Praktická zkratka v systému Android pro uživatele, kteří chtějí rychlejší přístup k možnostem pro vývojáře.</string>
+    <string name="app_av_name">SafeMobile Antivirus</string>
+    <string name="app_av_desc">Mobilní bezpečnostní a antivirová aplikace nové generace, která je právě ve vývoji. Sledujte novinky!</string>
+    <string name="about_us_website">Navštívit náš web</string>
 </resources>

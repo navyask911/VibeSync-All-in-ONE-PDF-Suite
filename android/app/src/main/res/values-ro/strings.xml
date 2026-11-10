@@ -487,4 +487,18 @@
     <string name="viewer_download_save">Descarcă / Salvează</string>
     <string name="viewer_search_description">Caută</string>
     <string name="viewer_print_preparing">Se pregătește PDF-ul pentru imprimare…</string>
+
+    <!-- About Us and developer app ecosystem -->
+    <string name="about_us_title">Despre noi</string>
+    <string name="about_us_mission">Creăm produse și conectăm oamenii prin respectarea confidențialității și securității. Dezvoltăm aplicații Android atent gândite și explorăm idei de nouă generație în inteligență artificială, confidențialitate și securitate — construind tehnologie care pune oamenii pe primul loc.</string>
+    <string name="about_us_ecosystem">Ecosistemul nostru de aplicații mobile</string>
+    <string name="app_pdf_name">VibeSync All in ONE PDF Suite</string>
+    <string name="app_pdf_desc">Un utilitar PDF practic pentru Android, conceput pentru a simplifica activitățile zilnice cu documente, oriunde te-ai afla.</string>
+    <string name="app_kids_name">Kids Drawing Studio</string>
+    <string name="app_kids_desc">O experiență distractivă de desen și pictură, care le oferă copiilor un spațiu simplu pentru a-și explora creativitatea.</string>
+    <string name="app_dev_name">Developer Options Shortcut</string>
+    <string name="app_dev_desc">O scurtătură Android utilă pentru cei care doresc acces mai rapid la Opțiunile pentru dezvoltatori ale dispozitivului.</string>
+    <string name="app_av_name">SafeMobile Antivirus</string>
+    <string name="app_av_desc">O aplicație de securitate mobilă și antivirus de nouă generație, aflată în prezent în dezvoltare. Rămâneți aproape!</string>
+    <string name="about_us_website">Vizitează site-ul nostru</string>
 </resources>

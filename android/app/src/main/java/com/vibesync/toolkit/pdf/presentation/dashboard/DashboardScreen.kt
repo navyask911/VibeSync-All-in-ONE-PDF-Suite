@@ -74,7 +74,8 @@ fun DashboardScreen(
     onDeleteDocument: (Uri) -> Unit = {},
     onNavigateToPdfTool: (String, Uri) -> Unit = { route, _ -> onNavigateToTool(route) },
     onNavigateToPro: () -> Unit = {},
-    onNavigateToSmartScan: () -> Unit = {}
+    onNavigateToSmartScan: () -> Unit = {},
+    onNavigateToAbout: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val uiState by viewModel.uiState.collectAsState()
@@ -242,6 +243,9 @@ fun DashboardScreen(
                         }
                         IconButton(onClick = { launchPickerSafely { viewerPickerLauncher.launch(arrayOf("application/pdf")) } }, modifier = Modifier.testTag("dashboard_action_import")) {
                             Icon(Icons.Default.FileOpen, contentDescription = stringResource(R.string.open_document), tint = VibeSyncCrimsonPrimary)
+                        }
+                        IconButton(onClick = onNavigateToAbout, modifier = Modifier.testTag("dashboard_action_about")) {
+                            Icon(Icons.Default.Info, contentDescription = stringResource(R.string.about_us_title), tint = VibeSyncCrimsonPrimary)
                         }
                     }
                 }

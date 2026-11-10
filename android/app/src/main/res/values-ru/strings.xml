@@ -503,4 +503,18 @@
     <string name="viewer_download_save">Скачать / Сохранить</string>
     <string name="viewer_search_description">Поиск</string>
     <string name="viewer_print_preparing">Подготовка PDF к печати…</string>
+
+    <!-- About Us and developer app ecosystem -->
+    <string name="about_us_title">О нас</string>
+    <string name="about_us_mission">Мы создаём продукты и объединяем людей, уделяя особое внимание конфиденциальности и безопасности. Мы разрабатываем продуманные приложения для Android и исследуем идеи нового поколения в области искусственного интеллекта, конфиденциальности и безопасности, создавая технологии, в центре которых находится человек.</string>
+    <string name="about_us_ecosystem">Экосистема наших мобильных приложений</string>
+    <string name="app_pdf_name">VibeSync All in ONE PDF Suite</string>
+    <string name="app_pdf_desc">Практичный инструмент для работы с PDF на Android, который упрощает повседневные задачи с документами в дороге.</string>
+    <string name="app_kids_name">Kids Drawing Studio</string>
+    <string name="app_kids_desc">Увлекательное приложение для рисования и раскрашивания, которое помогает детям раскрывать свои творческие способности.</string>
+    <string name="app_dev_name">Developer Options Shortcut</string>
+    <string name="app_dev_desc">Удобный ярлык Android для быстрого доступа к параметрам разработчика на устройстве.</string>
+    <string name="app_av_name">SafeMobile Antivirus</string>
+    <string name="app_av_desc">Мобильное приложение нового поколения для защиты и борьбы с вирусами находится в разработке. Следите за обновлениями!</string>
+    <string name="about_us_website">Посетить наш сайт</string>
 </resources>
