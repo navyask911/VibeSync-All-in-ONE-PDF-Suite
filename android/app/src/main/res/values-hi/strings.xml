@@ -470,4 +470,27 @@
     <string name="smart_scan_folder_count">%1$d PDF</string>
     <string name="smart_scan_permission_failed">फ़ोल्डर की पहुँच सहेजी नहीं जा सकी। कृपया फ़ोल्डर फिर चुनें।</string>
     <string name="smart_scan_scan_failed">चुने गए फ़ोल्डर स्कैन नहीं हो सके। पहुँच जाँचें और फिर प्रयास करें।</string>
+    <!-- v1.0.30 localization additions -->
+    <string name="pro_title">VibeSync PDF Pro</string>
+    <string name="pro_upgrade_title">VibeSync PDF Pro में अपग्रेड करें</string>
+    <string name="pro_pass_active_days_remaining">Pro Pass सक्रिय है — %1$d दिन शेष</string>
+    <string name="pro_subscribe">Pro Pass की सदस्यता लें</string>
+    <string name="editor_previous_page">पिछला पृष्ठ</string>
+    <string name="editor_next_page">अगला पृष्ठ</string>
+    <string name="editor_zoom_out">ज़ूम कम करें</string>
+    <string name="editor_zoom_in">ज़ूम बढ़ाएँ</string>
+    <string name="signature_create_new">नया हस्ताक्षर बनाएँ</string>
+    <string name="signature_ink_colour">स्याही का रंग</string>
+    <string name="signature_pen_size">पेन की मोटाई</string>
+    <string name="signature_saving">सहेजा जा रहा है…</string>
+    <string name="batch_clear_all">सभी हटाएँ</string>
+    <string name="batch_page_range_title">पृष्ठ सीमा</string>
+    <string name="batch_page_range_hint">‘सभी’ चुनें या कॉमा से अलग की गई पृष्ठ सीमाएँ लिखें, जैसे 1-10, 15, 20-25।</string>
+    <string name="batch_compile">PDF बनाएँ</string>
+    <string name="batch_image_unavailable">छवि उपलब्ध नहीं है</string>
+    <string name="batch_new_scan">+ नया बैच स्कैन</string>
+    <string name="batch_all_batches">सभी बैच</string>
+    <string name="viewer_download_save">डाउनलोड / सहेजें</string>
+    <string name="viewer_search_description">खोजें</string>
+    <string name="viewer_print_preparing">प्रिंट के लिए PDF तैयार हो रही है…</string>
 </resources>

@@ -480,4 +480,27 @@
     <string name="smart_scan_folder_count">%1$d PDFs</string>
     <string name="smart_scan_permission_failed">Der Ordnerzugriff konnte nicht gespeichert werden. Bitte wähle den Ordner erneut aus.</string>
     <string name="smart_scan_scan_failed">Die ausgewählten Ordner konnten nicht gescannt werden. Prüfe den Zugriff und versuche es erneut.</string>
+    <!-- v1.0.30 localization additions -->
+    <string name="pro_title">VibeSync PDF Pro</string>
+    <string name="pro_upgrade_title">Auf VibeSync PDF Pro upgraden</string>
+    <string name="pro_pass_active_days_remaining">Pro Pass aktiv — noch %1$d Tage</string>
+    <string name="pro_subscribe">Pro Pass abonnieren</string>
+    <string name="editor_previous_page">Vorherige Seite</string>
+    <string name="editor_next_page">Nächste Seite</string>
+    <string name="editor_zoom_out">Verkleinern</string>
+    <string name="editor_zoom_in">Vergrößern</string>
+    <string name="signature_create_new">Neue Signatur erstellen</string>
+    <string name="signature_ink_colour">Tintenfarbe</string>
+    <string name="signature_pen_size">Stiftstärke</string>
+    <string name="signature_saving">Wird gespeichert…</string>
+    <string name="batch_clear_all">Alle löschen</string>
+    <string name="batch_page_range_title">Seitenbereich</string>
+    <string name="batch_page_range_hint">Wählen Sie „Alle“ oder einen kommagetrennten Seitenbereich, z. B. 1-10, 15, 20-25.</string>
+    <string name="batch_compile">PDF erstellen</string>
+    <string name="batch_image_unavailable">Bild nicht verfügbar</string>
+    <string name="batch_new_scan">+ Neuer Stapelscan</string>
+    <string name="batch_all_batches">Alle Stapel</string>
+    <string name="viewer_download_save">Herunterladen / Speichern</string>
+    <string name="viewer_search_description">Suchen</string>
+    <string name="viewer_print_preparing">PDF wird für den Druck vorbereitet…</string>
 </resources>
