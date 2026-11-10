@@ -472,9 +472,9 @@
     <string name="smart_scan_scan_failed">Seçilen klasörler taranamadı. Erişimi kontrol edip tekrar deneyin.</string>
     <!-- v1.0.30 localization additions -->
     <string name="pro_title">VibeSync PDF Pro</string>
-    <string name="pro_upgrade_title">VibeSync PDF Pro&apos;ya yükselt</string>
+    <string name="pro_upgrade_title">VibeSync PDF Pro’ya yükselt</string>
     <string name="pro_pass_active_days_remaining">Pro Pass etkin — %1$d gün kaldı</string>
-    <string name="pro_subscribe">Pro Pass&apos;e abone ol</string>
+    <string name="pro_subscribe">Pro Pass’e abone ol</string>
     <string name="editor_previous_page">Önceki sayfa</string>
     <string name="editor_next_page">Sonraki sayfa</string>
     <string name="editor_zoom_out">Uzaklaştır</string>

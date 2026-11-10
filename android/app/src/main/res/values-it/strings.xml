@@ -480,7 +480,7 @@
     <string name="editor_zoom_out">Riduci zoom</string>
     <string name="editor_zoom_in">Aumenta zoom</string>
     <string name="signature_create_new">Crea una nuova firma</string>
-    <string name="signature_ink_colour">Colore dell&apos;inchiostro</string>
+    <string name="signature_ink_colour">Colore dell’inchiostro</string>
     <string name="signature_pen_size">Spessore della penna</string>
     <string name="signature_saving">Salvataggio…</string>
     <string name="batch_clear_all">Cancella tutto</string>
