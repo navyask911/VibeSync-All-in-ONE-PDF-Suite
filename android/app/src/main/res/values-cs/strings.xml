@@ -501,4 +501,6 @@
     <string name="app_av_name">SafeMobile Antivirus</string>
     <string name="app_av_desc">Mobilní bezpečnostní a antivirová aplikace nové generace, která je právě ve vývoji. Sledujte novinky!</string>
     <string name="about_us_website">Navštívit náš web</string>
+    <string name="update_title">Aktualizace je k dispozici</string>
+    <string name="update_message">Je k dispozici nová verze aplikace VibeSync s novými funkcemi a opravami chyb. Chcete-li pokračovat, aktualizujte aplikaci.</string>
 </resources>

@@ -2,7 +2,6 @@ package com.vibesync.toolkit.pdf
 
 import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import android.app.Activity
-import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ContentValues
 import android.content.Intent
@@ -74,12 +73,9 @@ import com.google.android.play.core.appupdate.AppUpdateInfo
 import com.google.android.play.core.appupdate.AppUpdateManager
 import com.google.android.play.core.appupdate.AppUpdateManagerFactory
 import com.google.android.play.core.appupdate.AppUpdateOptions
-import com.google.android.play.core.install.InstallStateUpdatedListener
 import com.google.android.play.core.install.model.AppUpdateType
-import com.google.android.play.core.install.model.InstallStatus
 import com.google.android.play.core.install.model.UpdateAvailability
 import com.google.android.play.core.review.ReviewManagerFactory
-import com.vibesync.toolkit.pdf.BuildConfig
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.core.security.EncryptedBillingPreferences
 import com.vibesync.toolkit.pdf.data.billing.LocalAdBillingManager
@@ -136,10 +132,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var appUpdateManager: AppUpdateManager
     private lateinit var billingManager: LocalAdBillingManager
     private lateinit var updateFlowLauncher: ActivityResultLauncher<IntentSenderRequest>
-    private var pendingUpdateInfo: AppUpdateInfo? = null
-    private var updatePromptVisible by mutableStateOf(false)
-    private var updateDownloaded by mutableStateOf(false)
-    private var updateReadyDialogVisible by mutableStateOf(false)
     private var offlinePromptVisible by mutableStateOf(false)
     private var internetAvailable by mutableStateOf(false)
     private var activeRoute by mutableStateOf("dashboard")
@@ -159,22 +151,6 @@ class MainActivity : AppCompatActivity() {
     private var reviewFlowLaunching = false
     private var connectivityCallbackRegistered = false
     private var hasShownOfflinePromptThisSession = false
-
-    private val updateInstallStateListener = InstallStateUpdatedListener { state ->
-        when (state.installStatus()) {
-            InstallStatus.DOWNLOADED -> runOnUiThread {
-                updateDownloaded = true
-                updatePromptVisible = false
-                updateReadyDialogVisible = true
-                updateFlowStarted = false
-            }
-            InstallStatus.FAILED -> {
-                Log.w(TAG, "Google Play in-app update download failed.")
-                runOnUiThread { updateFlowStarted = false }
-            }
-            else -> Unit
-        }
-    }
 
     private val connectivityCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(network: Network) = refreshInternetStatus()
@@ -216,18 +192,17 @@ class MainActivity : AppCompatActivity() {
             ActivityResultContracts.StartIntentSenderForResult()
         ) { result ->
             updateFlowStarted = false
-            if (result.resultCode != Activity.RESULT_OK) {
-                engagementPreferences.edit()
-                    .putBoolean(KEY_IMMEDIATE_UPDATE_IN_PROGRESS, false)
-                    .putLong(KEY_UPDATE_SNOOZE_UNTIL, System.currentTimeMillis() + UPDATE_PROMPT_COOLDOWN_MS)
-                    .apply()
-                pendingUpdateInfo = null
-                updatePromptVisible = false
+            updateCheckInProgress = false
+            when (result.resultCode) {
+                Activity.RESULT_OK -> Log.i(TAG, "Google Play immediate update completed.")
+                Activity.RESULT_CANCELED -> {
+                    Log.i(TAG, "User canceled the immediate update; the next app launch will prompt again.")
+                    finish()
+                }
+                else -> Log.w(TAG, "Google Play immediate update returned result code ${result.resultCode}.")
             }
         }
         appUpdateManager = AppUpdateManagerFactory.create(this)
-        runCatching { appUpdateManager.registerListener(updateInstallStateListener) }
-            .onFailure { Log.w(TAG, "Could not register Play update listener.", it) }
 
         // 1. Initialize ML Kit Document Scanner
         scannerManager = DocumentScannerManager(this)
@@ -408,16 +383,12 @@ class MainActivity : AppCompatActivity() {
                             engagementPreferences.edit().putLong(KEY_OFFLINE_PROMPT_LAST_SHOWN, System.currentTimeMillis()).apply()
                         }
                     }
-                    LaunchedEffect(activeRoute, internetAvailable, reviewEligibilityRevision, updatePromptVisible,
-                        offlinePromptVisible, updateDownloaded, updateReadyDialogVisible) {
-                        if (activeRoute == "dashboard" && internetAvailable) {
-                            showPendingUpdatePrompt()
-                            if (!updatePromptVisible && !offlinePromptVisible && !updateDownloaded &&
-                                !updateReadyDialogVisible && reviewEligibilityTracker.isEligible()
-                            ) {
-                                delay(30_000L)
-                                maybeLaunchReviewIfEligible()
-                            }
+                    LaunchedEffect(activeRoute, internetAvailable, reviewEligibilityRevision, offlinePromptVisible) {
+                        if (activeRoute == "dashboard" && internetAvailable && !offlinePromptVisible &&
+                            reviewEligibilityTracker.isEligible()
+                        ) {
+                            delay(30_000L)
+                            maybeLaunchReviewIfEligible()
                         }
                     }
 
@@ -901,24 +872,6 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
 
-                    if (updatePromptVisible && activeRoute == "dashboard" && !updateDownloaded) {
-                        AlertDialog(
-                            onDismissRequest = { deferUpdatePrompt() },
-                            title = { Text(getString(R.string.update_available_title)) },
-                            text = { Text(getString(R.string.update_available_message)) },
-                            confirmButton = { TextButton(onClick = { beginUpdateFlow() }) { Text(getString(R.string.update_now)) } },
-                            dismissButton = { TextButton(onClick = { deferUpdatePrompt() }) { Text(getString(R.string.update_later)) } }
-                        )
-                    }
-                    if (updateReadyDialogVisible && updateDownloaded && activeRoute == "dashboard") {
-                        AlertDialog(
-                            onDismissRequest = { updateReadyDialogVisible = false },
-                            title = { Text(getString(R.string.update_ready_title)) },
-                            text = { Text(getString(R.string.update_ready_message)) },
-                            confirmButton = { TextButton(onClick = { completeDownloadedUpdate() }) { Text(getString(R.string.restart_to_update)) } },
-                            dismissButton = { TextButton(onClick = { updateReadyDialogVisible = false }) { Text(getString(R.string.update_later)) } }
-                        )
-                    }
                     if (offlinePromptVisible && !internetAvailable && activeRoute == "dashboard") {
                         AlertDialog(
                             onDismissRequest = { dismissOfflinePrompt() },
@@ -1531,11 +1484,10 @@ class MainActivity : AppCompatActivity() {
         reviewEligibilityRevision += 1
         dashboardViewModel.refreshCurrentSource()
         refreshInternetStatus()
-        maybeCheckForUpdate()
+        checkForImmediateUpdate()
     }
 
     override fun onDestroy() {
-        if (::appUpdateManager.isInitialized) runCatching { appUpdateManager.unregisterListener(updateInstallStateListener) }
         if (::billingManager.isInitialized) billingManager.endConnection()
         super.onDestroy()
     }
@@ -1572,57 +1524,43 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyConnectivityState(available: Boolean) {
-        val wasAvailable = internetAvailable
         internetAvailable = available
         AdMobManager.onConnectivityChanged(applicationContext, available)
         if (available) {
             offlinePromptVisible = false
-            if (!wasAvailable) maybeCheckForUpdate(force = true)
             reviewEligibilityRevision += 1
-        } else updatePromptVisible = false
+        }
     }
 
-    private fun maybeCheckForUpdate(force: Boolean = false) {
-        if (!::appUpdateManager.isInitialized || !internetAvailable || isFinishing || isDestroyed || updateCheckInProgress) return
-        val now = System.currentTimeMillis()
-        val lastCheck = engagementPreferences.getLong(KEY_LAST_UPDATE_CHECK, 0L)
-        val immediateInProgress = engagementPreferences.getBoolean(KEY_IMMEDIATE_UPDATE_IN_PROGRESS, false)
-        if (!EngagementPolicy.shouldCheckForUpdate(
-                isInternetValidated = internetAvailable,
-                nowMs = now,
-                lastCheckMs = lastCheck,
-                force = force,
-                immediateUpdateInProgress = immediateInProgress
-            )
-        ) {
-            showPendingUpdatePrompt()
-            return
-        }
+    /**
+     * Checks Play availability on every foreground entry. Immediate updates are intentionally
+     * never deferred or redirected to a custom Play Store link.
+     */
+    private fun checkForImmediateUpdate() {
+        if (
+            !::appUpdateManager.isInitialized ||
+            isFinishing ||
+            isDestroyed ||
+            updateCheckInProgress ||
+            updateFlowStarted
+        ) return
+
         updateCheckInProgress = true
-        engagementPreferences.edit().putLong(KEY_LAST_UPDATE_CHECK, now).apply()
         appUpdateManager.appUpdateInfo
             .addOnSuccessListener { info ->
                 updateCheckInProgress = false
-                if (info.installStatus() == InstallStatus.DOWNLOADED) {
-                    updateDownloaded = true
-                    updateReadyDialogVisible = true
-                    updatePromptVisible = false
-                    return@addOnSuccessListener
-                }
+                if (isFinishing || isDestroyed) return@addOnSuccessListener
+
                 when (info.updateAvailability()) {
+                    UpdateAvailability.UPDATE_AVAILABLE,
                     UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS -> {
-                        if (info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) beginUpdateFlow(info, AppUpdateType.IMMEDIATE)
+                        if (info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) {
+                            startImmediateUpdate(info)
+                        } else {
+                            Log.w(TAG, "Play reports an update, but the immediate update flow is not allowed.")
+                        }
                     }
-                    UpdateAvailability.UPDATE_AVAILABLE -> {
-                        // Show the confirmed availability even if an update flow type cannot be started;
-                        // beginUpdateFlow() will safely fall back to the Play Store listing in that case.
-                        pendingUpdateInfo = info
-                        showPendingUpdatePrompt()
-                    }
-                    else -> {
-                        pendingUpdateInfo = null
-                        updatePromptVisible = false
-                    }
+                    else -> Unit
                 }
             }
             .addOnFailureListener { error ->
@@ -1631,99 +1569,22 @@ class MainActivity : AppCompatActivity() {
             }
     }
 
-    private fun showPendingUpdatePrompt() {
-        val shouldPrompt = EngagementPolicy.shouldPromptForUpdate(
-            updateAvailable = pendingUpdateInfo != null,
-            isInternetValidated = internetAvailable,
-            nowMs = System.currentTimeMillis(),
-            snoozeUntilMs = engagementPreferences.getLong(KEY_UPDATE_SNOOZE_UNTIL, 0L)
-        )
-        if (shouldPrompt && activeRoute == "dashboard" && !updateDownloaded) {
-            updatePromptVisible = true
-        }
-    }
-
-    private fun deferUpdatePrompt() {
-        updatePromptVisible = false
-        engagementPreferences.edit()
-            .putBoolean(KEY_IMMEDIATE_UPDATE_IN_PROGRESS, false)
-            .putLong(KEY_UPDATE_SNOOZE_UNTIL, System.currentTimeMillis() + UPDATE_PROMPT_COOLDOWN_MS)
-            .apply()
-    }
-
-    private fun beginUpdateFlow() {
-        if (!internetAvailable) {
-            updatePromptVisible = false
-            return
-        }
-        val info = pendingUpdateInfo ?: run {
-            updatePromptVisible = false
-            maybeCheckForUpdate(force = true)
-            return
-        }
-        val type = when {
-            info.isUpdateTypeAllowed(AppUpdateType.FLEXIBLE) -> AppUpdateType.FLEXIBLE
-            info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE) -> AppUpdateType.IMMEDIATE
-            else -> null
-        }
-        if (type == null) fallbackToPlayStoreAndSnooze() else beginUpdateFlow(info, type)
-    }
-
-    private fun beginUpdateFlow(info: AppUpdateInfo, type: Int) {
-        if (updateFlowStarted) return
+    private fun startImmediateUpdate(info: AppUpdateInfo) {
+        if (updateFlowStarted || isFinishing || isDestroyed) return
         updateFlowStarted = true
-        updatePromptVisible = false
-        if (type == AppUpdateType.IMMEDIATE) engagementPreferences.edit().putBoolean(KEY_IMMEDIATE_UPDATE_IN_PROGRESS, true).apply()
         try {
-            val started = appUpdateManager.startUpdateFlowForResult(info, updateFlowLauncher, AppUpdateOptions.newBuilder(type).build())
+            val started = appUpdateManager.startUpdateFlowForResult(
+                info,
+                updateFlowLauncher,
+                AppUpdateOptions.newBuilder(AppUpdateType.IMMEDIATE).build()
+            )
             if (!started) {
                 updateFlowStarted = false
-                fallbackToPlayStoreAndSnooze()
-            } else {
-                // Play documents AppUpdateInfo as single-use for starting an update flow.
-                pendingUpdateInfo = null
+                Log.w(TAG, "Google Play did not start the immediate update flow.")
             }
         } catch (error: Exception) {
             updateFlowStarted = false
-            Log.w(TAG, "Could not start Google Play in-app update.", error)
-            fallbackToPlayStoreAndSnooze()
-        }
-    }
-
-    private fun completeDownloadedUpdate() {
-        appUpdateManager.completeUpdate()
-            .addOnSuccessListener {
-                updateReadyDialogVisible = false
-                updateDownloaded = false
-                pendingUpdateInfo = null
-                engagementPreferences.edit()
-                    .putBoolean(KEY_IMMEDIATE_UPDATE_IN_PROGRESS, false)
-                    .putLong(KEY_UPDATE_SNOOZE_UNTIL, 0L)
-                    .apply()
-            }
-            .addOnFailureListener { error -> Log.w(TAG, "Could not complete the downloaded update.", error) }
-    }
-
-    private fun fallbackToPlayStoreAndSnooze() {
-        pendingUpdateInfo = null
-        updatePromptVisible = false
-        engagementPreferences.edit()
-            .putBoolean(KEY_IMMEDIATE_UPDATE_IN_PROGRESS, false)
-            .putLong(KEY_UPDATE_SNOOZE_UNTIL, System.currentTimeMillis() + UPDATE_PROMPT_COOLDOWN_MS)
-            .apply()
-        try {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=${BuildConfig.APPLICATION_ID}")))
-            return
-        } catch (_: ActivityNotFoundException) {
-            // Try the HTTPS Play listing.
-        } catch (error: Exception) {
-            Log.w(TAG, "Could not open Play Store.", error)
-        }
-        try {
-            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=${BuildConfig.APPLICATION_ID}")))
-        } catch (error: Exception) {
-            Log.w(TAG, "Could not open Play listing.", error)
-            Toast.makeText(this, getString(R.string.update_store_unavailable), Toast.LENGTH_LONG).show()
+            Log.w(TAG, "Could not start the Google Play immediate update flow.", error)
         }
     }
 
@@ -1752,10 +1613,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun maybeLaunchReviewIfEligible() {
-        if (reviewFlowLaunching || !internetAvailable || activeRoute != "dashboard" || updatePromptVisible ||
-            offlinePromptVisible || updateDownloaded || updateReadyDialogVisible
+        if (
+            reviewFlowLaunching ||
+            updateCheckInProgress ||
+            updateFlowStarted ||
+            !internetAvailable ||
+            activeRoute != "dashboard" ||
+            offlinePromptVisible
         ) return
-        if (pendingUpdateInfo != null) return
         if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) return
         val now = System.currentTimeMillis()
         if (!reviewEligibilityTracker.isEligible(now)) return
@@ -1788,10 +1653,6 @@ class MainActivity : AppCompatActivity() {
 
     private companion object {
         const val TAG = "VibeSyncMainActivity"
-        const val KEY_LAST_UPDATE_CHECK = "last_update_check_ms"
-        const val KEY_UPDATE_SNOOZE_UNTIL = "update_snooze_until_ms"
-        const val KEY_IMMEDIATE_UPDATE_IN_PROGRESS = "immediate_update_in_progress"
         const val KEY_OFFLINE_PROMPT_LAST_SHOWN = "offline_prompt_last_shown_ms"
-        const val UPDATE_PROMPT_COOLDOWN_MS = 24L * 60L * 60L * 1000L
     }
 }

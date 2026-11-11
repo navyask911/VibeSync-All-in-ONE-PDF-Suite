@@ -507,4 +507,6 @@
     <string name="app_av_name">SafeMobile Antivirus</string>
     <string name="app_av_desc">اگلی نسل کی موبائل سیکیورٹی اور اینٹی وائرس ایپ اس وقت تیار کی جا رہی ہے۔ مزید خبروں کے لیے ہمارے ساتھ رہیں!</string>
     <string name="about_us_website">ہماری ویب سائٹ ملاحظہ کریں</string>
+    <string name="update_title">اپ ڈیٹ دستیاب ہے</string>
+    <string name="update_message">نئی خصوصیات اور بگ کی اصلاحات کے ساتھ VibeSync کا نیا ورژن دستیاب ہے۔ جاری رکھنے کے لیے براہِ کرم اپ ڈیٹ کریں۔</string>
 </resources>

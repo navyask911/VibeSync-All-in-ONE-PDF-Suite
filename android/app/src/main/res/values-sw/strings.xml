@@ -501,4 +501,6 @@
     <string name="app_av_name">SafeMobile Antivirus</string>
     <string name="app_av_desc">Programu ya kizazi kijacho ya usalama wa simu na kingavirusi ambayo bado inatengenezwa. Endelea kufuatilia!</string>
     <string name="about_us_website">Tembelea Tovuti Yetu</string>
+    <string name="update_title">Sasisho Linapatikana</string>
+    <string name="update_message">Toleo jipya la VibeSync lenye vipengele vipya na marekebisho ya hitilafu linapatikana. Tafadhali sasisha ili uendelee.</string>
 </resources>

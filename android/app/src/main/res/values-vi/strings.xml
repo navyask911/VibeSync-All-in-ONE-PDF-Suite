@@ -502,4 +502,6 @@
     <string name="app_av_name">SafeMobile Antivirus</string>
     <string name="app_av_desc">Ứng dụng bảo mật di động và chống vi-rút thế hệ mới hiện đang được phát triển. Hãy đón chờ nhé!</string>
     <string name="about_us_website">Truy cập trang web của chúng tôi</string>
+    <string name="update_title">Có bản cập nhật</string>
+    <string name="update_message">Đã có phiên bản VibeSync mới với các tính năng mới và bản sửa lỗi. Vui lòng cập nhật để tiếp tục.</string>
 </resources>

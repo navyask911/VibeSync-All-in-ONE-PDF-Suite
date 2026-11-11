@@ -507,4 +507,6 @@
     <string name="app_av_name">SafeMobile Antivirus</string>
     <string name="app_av_desc">Yeni nesil mobil güvenlik ve antivirüs uygulaması şu anda geliştirme aşamasındadır. Takipte kalın!</string>
     <string name="about_us_website">Web Sitemizi Ziyaret Edin</string>
+    <string name="update_title">Güncelleme mevcut</string>
+    <string name="update_message">Yeni özellikler ve hata düzeltmeleri içeren yeni bir VibeSync sürümü mevcut. Devam etmek için lütfen güncelleyin.</string>
 </resources>

@@ -501,4 +501,6 @@
     <string name="app_av_name">SafeMobile Antivirus</string>
     <string name="app_av_desc">אפליקציית אבטחה ואנטי-וירוס לנייד מהדור הבא שנמצאת כעת בפיתוח. הישארו מעודכנים!</string>
     <string name="about_us_website">בקרו באתר שלנו</string>
+    <string name="update_title">עדכון זמין</string>
+    <string name="update_message">גרסה חדשה של VibeSync עם תכונות חדשות ותיקוני באגים זמינה. יש לעדכן כדי להמשיך.</string>
 </resources>
