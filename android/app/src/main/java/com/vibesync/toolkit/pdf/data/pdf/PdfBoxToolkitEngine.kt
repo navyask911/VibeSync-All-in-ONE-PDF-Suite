@@ -39,6 +39,7 @@ import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.encryption.AccessPermission
+import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
 import com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy
 import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
 import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
@@ -487,7 +488,8 @@ class PdfBoxToolkitEngine(
         ownerPassword: String,
         allowPrinting: Boolean,
         allowCopying: Boolean,
-        outputFile: File
+        outputFile: File,
+        oldPassword: String? = null
     ): Result<File> = withContext(Dispatchers.IO) {
         var sourceFile: File? = null
         try {
@@ -502,28 +504,20 @@ class PdfBoxToolkitEngine(
             ensureBouncyCastleProvider()
 
             sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "encrypt_src_")
-            PDDocument.load(sourceFile).use { document ->
-                val permissions = AccessPermission().apply {
-                    setCanPrint(allowPrinting)
-                    setCanExtractContent(allowCopying)
-                    setCanModify(!allowPrinting && !allowCopying)
-                }
-
-                applyVibeSyncWatermark(document)
-
-                // Use interoperable AES-128 Standard Security Handler revision 4.
-                // StandardProtectionPolicy takes owner password first, then user password.
-                val policy = StandardProtectionPolicy(
-                    encodedOwnerPassword,
-                    encodedUserPassword,
-                    permissions
+            val permissions = AccessPermission().apply {
+                setCanPrint(allowPrinting)
+                setCanExtractContent(allowCopying)
+                setCanModify(!allowPrinting && !allowCopying)
+            }
+            sourceFile.inputStream().use { inputStream ->
+                encryptPdfOverwritingExisting(
+                    inputStream = inputStream,
+                    outputFile = outputFile,
+                    oldPassword = oldPassword,
+                    newPassword = encodedUserPassword,
+                    ownerPassword = encodedOwnerPassword,
+                    permissions = permissions
                 )
-                policy.encryptionKeyLength = 128
-                policy.setPreferAES(true)
-                policy.permissions = permissions
-
-                document.protect(policy)
-                document.save(outputFile)
             }
 
             // Fail the operation immediately if the produced file cannot be reopened
@@ -554,6 +548,54 @@ class PdfBoxToolkitEngine(
             Result.failure(e)
         } finally {
             sourceFile?.delete()
+        }
+    }
+
+    /**
+     * Reads all source bytes once so PDFBox can safely retry loading with a blank password.
+     */
+    private fun loadPdfFromInputStream(inputStream: InputStream, oldPassword: String?): PDDocument {
+        val bytes = inputStream.readBytes()
+        return try {
+            PDDocument.load(bytes, oldPassword ?: "")
+        } catch (error: InvalidPasswordException) {
+            if (oldPassword != null) {
+                PDDocument.load(bytes, "")
+            } else {
+                throw error
+            }
+        }
+    }
+
+    /**
+     * Watermarks the decrypted source, clears prior security, then applies the replacement
+     * AES-128 policy. PDDocument.protect() re-enables encryption for the final save.
+     */
+    private fun encryptPdfOverwritingExisting(
+        inputStream: InputStream,
+        outputFile: File,
+        oldPassword: String?,
+        newPassword: String,
+        ownerPassword: String = newPassword,
+        permissions: AccessPermission? = null
+    ) {
+        val document = loadPdfFromInputStream(inputStream, oldPassword)
+        try {
+            document.isAllSecurityToBeRemoved = true
+            applyVibeSyncWatermark(document)
+
+            val protectionPolicy = StandardProtectionPolicy(
+                ownerPassword,
+                newPassword,
+                permissions ?: document.currentAccessPermission
+            ).apply {
+                encryptionKeyLength = 128
+                setPreferAES(true)
+            }
+            document.protect(protectionPolicy)
+            document.save(outputFile)
+        } finally {
+            document.close()
         }
     }
 
@@ -632,9 +674,11 @@ class PdfBoxToolkitEngine(
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "watermark_src_")
             sourceFileToDelete = sourceFile
-            PDDocument.load(sourceFile).use { document ->
-                applyVibeSyncWatermark(document, watermarkText, opacity, angleDegrees)
-                document.save(outputFile)
+            sourceFile.inputStream().use { inputStream ->
+                loadPdfFromInputStream(inputStream, oldPassword = null).use { document ->
+                    applyVibeSyncWatermark(document, watermarkText, opacity, angleDegrees)
+                    document.save(outputFile)
+                }
             }
             Result.success(outputFile)
         } catch (cancelled: CancellationException) {

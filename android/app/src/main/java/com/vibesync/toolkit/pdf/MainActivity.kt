@@ -799,7 +799,7 @@ class MainActivity : AppCompatActivity() {
                                 initialUri = initialUri,
                                 onSuccess = { encryptedFile ->
                                     recordSuccessfulPdfOperation()
-                                    shareFiles(listOf(encryptedFile), "application/pdf", "VibeSync_Protected_Document")
+                                    shareFilesPrepared(listOf(encryptedFile), "application/pdf", "VibeSync_Protected_Document", false)
                                     navController.popBackStack()
                                 }
                             )
@@ -811,7 +811,7 @@ class MainActivity : AppCompatActivity() {
                                 onNavigateBack = { navController.popBackStack() },
                                 onSuccess = { encryptedFile ->
                                     recordSuccessfulPdfOperation()
-                                    shareFiles(listOf(encryptedFile), "application/pdf", "VibeSync_Protected_Document")
+                                    shareFilesPrepared(listOf(encryptedFile), "application/pdf", "VibeSync_Protected_Document", false)
                                     navController.popBackStack()
                                 }
                             )

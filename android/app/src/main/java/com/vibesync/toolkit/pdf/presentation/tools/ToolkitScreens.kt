@@ -34,6 +34,7 @@ import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncCrimsonPrimary
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.presentation.common.rememberUriDisplayName
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
+import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
 import com.vibesync.toolkit.pdf.presentation.settings.ResolutionProfilePreferencePanel
 import com.vibesync.toolkit.pdf.presentation.monetization.AdMobManager
 import kotlinx.coroutines.launch
@@ -339,6 +340,8 @@ fun EncryptScreen(
 
     var selectedUri by remember(initialUri) { mutableStateOf(initialUri) }
     var password by rememberSaveable { mutableStateOf("") }
+    var sourcePassword by rememberSaveable { mutableStateOf("") }
+    var sourcePasswordRequired by rememberSaveable { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var passwordVisible by rememberSaveable { mutableStateOf(false) }
     var allowPrinting by remember { mutableStateOf(true) }
@@ -351,6 +354,9 @@ fun EncryptScreen(
         uri?.let {
             UriUtils.persistReadPermission(context, it)
             selectedUri = it
+            sourcePassword = ""
+            sourcePasswordRequired = false
+            errorMessage = null
         }
     }
 
@@ -398,6 +404,21 @@ fun EncryptScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            if (sourcePasswordRequired) {
+                OutlinedTextField(
+                    value = sourcePassword,
+                    onValueChange = {
+                        sourcePassword = it
+                        errorMessage = null
+                    },
+                    label = { Text(stringResource(R.string.password)) },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
             errorMessage?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
             }
@@ -427,7 +448,8 @@ fun EncryptScreen(
                             ownerPassword = password + "_admin",
                             allowPrinting = allowPrinting,
                             allowCopying = allowCopying,
-                            outputFile = output
+                            outputFile = output,
+                            oldPassword = sourcePassword.takeIf { sourcePasswordRequired }
                         )
                         isEncrypting = false
                         result.fold(
@@ -436,11 +458,25 @@ fun EncryptScreen(
                                     AdMobManager.showInterstitial(act) { onSuccess(file) }
                                 } ?: onSuccess(file)
                             },
-                            onFailure = { errorMessage = it.localizedMessage ?: context.getString(R.string.tool_failed_encrypt) }
+                            onFailure = { error ->
+                                val invalidPassword = generateSequence(error) { cause -> cause.cause }
+                                    .any { cause -> cause is InvalidPasswordException }
+                                if (invalidPassword) {
+                                    if (sourcePasswordRequired) {
+                                        errorMessage = context.getString(R.string.invalid_password)
+                                    } else {
+                                        sourcePasswordRequired = true
+                                        errorMessage = context.getString(R.string.password_protected_message)
+                                    }
+                                } else {
+                                    errorMessage = error.localizedMessage ?: context.getString(R.string.tool_failed_encrypt)
+                                }
+                            }
                         )
                     }
                 },
-                enabled = selectedUri != null && password.isNotBlank() && !isEncrypting,
+                enabled = selectedUri != null && password.isNotBlank() &&
+                    (!sourcePasswordRequired || sourcePassword.isNotBlank()) && !isEncrypting,
                 modifier = Modifier.fillMaxWidth().height(50.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = VibeSyncCrimsonPrimary)
             ) {
