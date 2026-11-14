@@ -690,12 +690,35 @@ class PdfBoxToolkitEngine(
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "watermark_src_")
             sourceFileToDelete = sourceFile
+            var copyOriginalBytes = false
             sourceFile.inputStream().use { inputStream ->
                 loadPdfFromInputStream(inputStream, oldPassword = null).use { document ->
-                    applyVibeSyncWatermark(document, watermarkText, opacity, angleDegrees)
-                    document.save(outputFile)
+                    val alreadyWatermarked =
+                        document.documentInformation.getCustomMetadataValue(WATERMARK_METADATA_KEY) == WATERMARK_METADATA_VALUE ||
+                            (document.numberOfPages > 0 && document.pages.all { page ->
+                                page.cosObject.getString(WATERMARK_PAGE_METADATA_COS_KEY) == WATERMARK_METADATA_VALUE
+                            })
+                    if (alreadyWatermarked) {
+                        // A VibeSync-generated PDF already contains the entitlement-aware watermark.
+                        // Do not serialize it again during sharing: preserve original page geometry,
+                        // rotation, metadata, and all existing PDF objects byte-for-byte.
+                        copyOriginalBytes = true
+                    } else {
+                        applyVibeSyncWatermark(document, watermarkText, opacity, angleDegrees)
+                        val watermarkWasApplied =
+                            document.documentInformation.getCustomMetadataValue(WATERMARK_METADATA_KEY) == WATERMARK_METADATA_VALUE
+                        if (watermarkWasApplied) {
+                            document.save(outputFile)
+                        } else {
+                            // Active Pro users may share an unwatermarked document when no custom
+                            // watermark was requested. Preserve that source rather than needlessly
+                            // rewriting it.
+                            copyOriginalBytes = true
+                        }
+                    }
                 }
             }
+            if (copyOriginalBytes) sourceFile.copyTo(outputFile, overwrite = true)
             Result.success(outputFile)
         } catch (cancelled: CancellationException) {
             outputFile.delete()

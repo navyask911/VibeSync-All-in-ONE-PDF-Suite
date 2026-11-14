@@ -1290,11 +1290,32 @@ class MainActivity : AppCompatActivity() {
             return
         }
         if (mimeType == "application/pdf") {
-            // PDF-producing toolkit operations already apply their required watermark before this
-            // point. Re-opening and saving every PDF here applied a second watermark pass, rewrote
-            // page geometry/metadata, and could reject password-protected source PDFs. Sharing is
-            // a transport operation: preserve the prepared PDF bytes exactly.
-            shareFilesPrepared(validFiles, mimeType, defaultBaseName, forceMultiple)
+            lifecycleScope.launch {
+                val preparedResult = withContext(Dispatchers.IO) {
+                    runCatching {
+                        val prepared = mutableListOf<File>()
+                        try {
+                            validFiles.forEach { source ->
+                                val output = UriUtils.createExportCacheFile(this@MainActivity, "VibeSync_Shared")
+                                toolkitEngine.watermarkPdf(
+                                    sourceUri = Uri.fromFile(source),
+                                    watermarkText = getString(R.string.pdf_watermark_text),
+                                    outputFile = output
+                                ).getOrThrow()
+                                prepared.add(output)
+                            }
+                            prepared
+                        } catch (error: Exception) {
+                            prepared.forEach { it.delete() }
+                            throw error
+                        }
+                    }
+                }
+                preparedResult.onSuccess { shareFilesPrepared(it, mimeType, defaultBaseName, forceMultiple) }
+                    .onFailure { error ->
+                        Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.error_prepare_pdf_sharing), Toast.LENGTH_LONG).show()
+                    }
+            }
             return
         }
         shareFilesPrepared(validFiles, mimeType, defaultBaseName, forceMultiple)

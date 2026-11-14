@@ -10,6 +10,7 @@ import com.tom_roush.pdfbox.pdmodel.PDPage
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -55,6 +56,24 @@ class PdfWatermarkIdempotencyTest {
         }
         assertEquals(1, firstXObjectCount)
 
+
+        val shareCopy = File(testDirectory, "share_copy.pdf")
+        val shareCopyResult = engine.watermarkPdf(
+            Uri.fromFile(firstPass),
+            PdfBoxToolkitEngine.DEFAULT_FOOTER_WATERMARK_TEXT,
+            shareCopy
+        )
+        assertTrue("Preparing an already watermarked PDF for sharing failed: ${shareCopyResult.exceptionOrNull()}", shareCopyResult.isSuccess)
+        assertArrayEquals(
+            "An already VibeSync-watermarked PDF must be passed to the share target byte-for-byte.",
+            firstPass.readBytes(),
+            shareCopy.readBytes()
+        )
+        PDDocument.load(shareCopy).use { copied ->
+            assertEquals(PDRectangle.A4.width, copied.getPage(0).mediaBox.width, 0.01f)
+            assertEquals(PDRectangle.A4.height, copied.getPage(0).mediaBox.height, 0.01f)
+        }
+
         val splitResult = engine.splitPdf(Uri.fromFile(firstPass), listOf(1..1))
         assertTrue("Split failed: ${splitResult.exceptionOrNull()}", splitResult.isSuccess)
         val splitFile = requireNotNull(splitResult.getOrThrow().single())
@@ -80,6 +99,6 @@ class PdfWatermarkIdempotencyTest {
         }
         assertEquals(firstXObjectCount, PDDocument.load(secondPass).use { it.getPage(0).resources?.xObjectNames?.count() ?: 0 })
 
-        listOf(original, firstPass, secondPass, splitFile).forEach { it.delete() }
+        listOf(original, firstPass, secondPass, splitFile, shareCopy).forEach { it.delete() }
     }
 }
