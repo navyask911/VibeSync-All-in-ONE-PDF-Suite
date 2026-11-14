@@ -84,6 +84,8 @@ import com.vibesync.toolkit.pdf.presentation.about.AboutScreen
 import com.vibesync.toolkit.pdf.core.util.EngagementPolicy
 import com.vibesync.toolkit.pdf.core.util.ReviewEligibilityTracker
 import com.vibesync.toolkit.pdf.core.util.UriUtils
+import com.vibesync.toolkit.pdf.presentation.common.PdfShareHelper
+import com.vibesync.toolkit.pdf.presentation.common.WatermarkCustomizationViewModel
 import com.vibesync.toolkit.pdf.core.util.generateSmartFileName
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.data.pdf.createWhiteBackgroundBitmap
@@ -167,6 +169,12 @@ class MainActivity : AppCompatActivity() {
     private val dashboardViewModel: DashboardViewModel by viewModels()
     private val viewerViewModel: PdfViewerViewModel by viewModels()
     private val editorViewModel: EditorViewModel by viewModels()
+    private val watermarkCustomizationViewModel: WatermarkCustomizationViewModel by viewModels {
+        val entitlementManager = billingManager
+        WatermarkCustomizationViewModel.Factory(applicationContext) {
+            entitlementManager.checkAdStatusForThisDevice()
+        }
+    }
     private val scannerHistoryViewModel: ScannerHistoryViewModel by viewModels()
     private val batchScanViewModel: BatchScanViewModel by viewModels()
     private val scannerHistoryRepository by lazy { ScannerHistoryRepository(File(filesDir, "scans")) }
@@ -360,6 +368,11 @@ class MainActivity : AppCompatActivity() {
                     val navController = rememberNavController()
                     val currentBackStackEntry by navController.currentBackStackEntryAsState()
                     val pendingPdfUri by pendingPdfUriState.collectAsState()
+                    val proEntitlement by billingManager.state.collectAsState()
+                    val isProActive = proEntitlement.isProActive && billingManager.checkAdStatusForThisDevice()
+                    val saveWatermarkSettings: (String, Float, Float) -> Boolean = { text, opacity, angle ->
+                        watermarkCustomizationViewModel.saveCustomWatermark(text, opacity, angle)
+                    }
 
                     LaunchedEffect(currentBackStackEntry?.destination?.route) {
                         activeRoute = currentBackStackEntry?.destination?.route ?: "dashboard"
@@ -412,6 +425,8 @@ class MainActivity : AppCompatActivity() {
                         composable("dashboard") {
                             DashboardScreen(
                                 viewModel = dashboardViewModel,
+                                isProActive = isProActive,
+                                onSaveWatermarkSettings = saveWatermarkSettings,
                                 onNavigateToViewer = { uri ->
                                     val encoded = encodeUriRoute(uri)
                                     navController.navigate("viewer/$encoded")
@@ -441,7 +456,6 @@ class MainActivity : AppCompatActivity() {
                                 onRenameDocument = { uri, name -> renamePdfDocument(uri, name) },
                                 onDeleteDocument = { uri -> deletePdfDocument(uri) },
                                 onNavigateToPdfTool = { route, uri ->
-                                    if (route == "watermark") getSharedPreferences("pdf_watermark_options", MODE_PRIVATE).edit().putBoolean("watermark_custom_enabled", true).apply()
                                     navController.navigate("$route/${encodeUriRoute(uri)}")
                                 },
                                 onNavigateToPro = { navController.navigate("pro") },
@@ -475,6 +489,9 @@ class MainActivity : AppCompatActivity() {
                         composable("scan_history") {
                             ScanHistoryScreen(
                                 viewModel = scannerHistoryViewModel,
+                                isProActive = isProActive,
+                                onNavigateToPro = { navController.navigate("pro") },
+                                onSaveWatermarkSettings = saveWatermarkSettings,
                                 onNavigateBack = { navController.popBackStack() },
                                 onNewScan = {
                                     scannerManager.startScan(scannerLauncher) { error ->
@@ -493,7 +510,6 @@ class MainActivity : AppCompatActivity() {
                                 onSaveToDownloads = { file -> saveScanToDownloads(file) },
                                 onNavigateToEditor = { uri -> navController.navigate("editor/${encodeUriRoute(uri)}") },
                                 onNavigateToPdfTool = { route, uri ->
-                                    if (route == "watermark") getSharedPreferences("pdf_watermark_options", MODE_PRIVATE).edit().putBoolean("watermark_custom_enabled", true).apply()
                                     navController.navigate("$route/${encodeUriRoute(uri)}")
                                 },
                                 onSplitBook = { imageUri -> navController.navigate("book_split/${encodeUriRoute(imageUri)}") }
@@ -1010,13 +1026,20 @@ class MainActivity : AppCompatActivity() {
         saveScanLauncher.launch(scanFile.name)
     }
 
-    private fun shareDocumentPdf(uri: Uri) {
+    private fun shareDocumentPdf(
+        uri: Uri,
+        defaultBaseName: String = "VibeSync_Shared_Document",
+        recordOperation: Boolean = false
+    ) {
         lifecycleScope.launch(Dispatchers.IO) {
             val staged = runCatching {
                 UriUtils.copyUriToCacheFile(this@MainActivity, uri, "share_pdf")
             }
             withContext(Dispatchers.Main) {
-                staged.onSuccess { file -> shareFiles(listOf(file), "application/pdf", "VibeSync_Shared_Document") }
+                staged.onSuccess { file ->
+                    if (recordOperation) recordSuccessfulPdfOperation()
+                    shareFiles(listOf(file), "application/pdf", defaultBaseName)
+                }
                     .onFailure { error ->
                         Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.document_action_failed), Toast.LENGTH_LONG).show()
                     }
@@ -1207,20 +1230,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun shareScanPdf(scanFile: File) {
-        if (!scanFile.isFile || scanFile.length() <= 0L) {
-            Toast.makeText(this, getString(R.string.scan_operation_failed), Toast.LENGTH_LONG).show()
-            return
-        }
-        try {
-            val uri = UriUtils.getShareableUri(this, scanFile)
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "application/pdf"
-                putExtra(Intent.EXTRA_STREAM, uri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                clipData = ClipData.newUri(contentResolver, scanFile.name, uri)
-            }
-            startActivity(Intent.createChooser(intent, getString(R.string.share_pdf)))
-        } catch (error: Exception) {
+        runCatching {
+            PdfShareHelper.sharePdf(this, scanFile, getString(R.string.share_pdf))
+        }.onFailure { error ->
             Toast.makeText(this, error.localizedMessage ?: getString(R.string.scan_operation_failed), Toast.LENGTH_LONG).show()
         }
     }
@@ -1263,22 +1275,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun shareViewedDocument(sourceUri: Uri) {
-        lifecycleScope.launch(Dispatchers.IO) {
-            val output = UriUtils.createExportCacheFile(this@MainActivity, "VibeSync_Viewed_Document")
-            val result = toolkitEngine.watermarkPdf(
-                sourceUri = sourceUri,
-                watermarkText = getString(R.string.pdf_watermark_text),
-                outputFile = output
-            )
-            launch(Dispatchers.Main) {
-                result.onSuccess {
-                    recordSuccessfulPdfOperation()
-                    shareFiles(listOf(output), "application/pdf", "VibeSync_Viewed_Document")
-                }.onFailure { error ->
-                    Toast.makeText(this@MainActivity, error.localizedMessage ?: getString(R.string.error_prepare_pdf_sharing), Toast.LENGTH_LONG).show()
-                }
-            }
-        }
+        // Route through the same staging/export path as every other PDF to avoid a second watermark pass.
+        shareDocumentPdf(sourceUri, "VibeSync_Viewed_Document", recordOperation = true)
     }
     private fun shareFiles(
         files: List<File>,
@@ -1356,6 +1354,19 @@ class MainActivity : AppCompatActivity() {
         forceMultiple: Boolean = false
     ) {
         if (isFinishing || isDestroyed || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
+        if (mimeType == "application/pdf") {
+            runCatching {
+                PdfShareHelper.sharePdfs(
+                    context = this,
+                    files = files,
+                    chooserTitle = getString(R.string.share_vibesync_output),
+                    forceMultiple = forceMultiple
+                )
+            }.onFailure { error ->
+                Toast.makeText(this, error.localizedMessage ?: getString(R.string.error_prepare_pdf_sharing), Toast.LENGTH_LONG).show()
+            }
+            return
+        }
         val uris = files.map { UriUtils.getShareableUri(this, it) }
         val clipData = ClipData.newUri(contentResolver, "VibeSync output", uris.first())
         uris.drop(1).forEach { clipData.addItem(ClipData.Item(it)) }

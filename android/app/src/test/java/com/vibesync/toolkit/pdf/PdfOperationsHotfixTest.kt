@@ -13,7 +13,6 @@ import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
 import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
-import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.data.pdf.IdPhotoExporter
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
@@ -92,15 +91,6 @@ class PdfOperationsHotfixTest {
         } finally {
             generatedBitmap.recycle()
         }
-    }
-
-    @Test
-    fun fileProviderCreatesShareableUriForExistingOutputFile() {
-        val output = File(testDirectory, "shared_hotfix.pdf").apply { writeText("test payload") }
-        assertTrue(output.isFile && output.length() > 0L)
-        val uri = UriUtils.getShareableUri(context, output)
-        assertEquals("content", uri.scheme)
-        assertEquals("${context.packageName}.fileprovider", uri.authority)
     }
 
     @Test

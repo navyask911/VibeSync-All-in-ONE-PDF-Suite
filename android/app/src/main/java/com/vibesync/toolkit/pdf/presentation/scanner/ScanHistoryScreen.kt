@@ -95,7 +95,10 @@ fun ScanHistoryScreen(
     onSaveToDownloads: (File) -> Unit,
     onNavigateToEditor: (Uri) -> Unit = {},
     onNavigateToPdfTool: (String, Uri) -> Unit = { _, _ -> },
-    onSplitBook: (Uri) -> Unit = {}
+    onSplitBook: (Uri) -> Unit = {},
+    isProActive: Boolean = false,
+    onNavigateToPro: () -> Unit = {},
+    onSaveWatermarkSettings: (String, Float, Float) -> Boolean = { _, _, _ -> false }
 ) {
     val context = LocalContext.current
     val state by viewModel.uiState.collectAsState()
@@ -179,6 +182,9 @@ fun ScanHistoryScreen(
                         ScanHistoryCard(
                             entry = scan,
                             repository = repository,
+                            isProActive = isProActive,
+                            onNavigateToPro = onNavigateToPro,
+                            onSaveWatermarkSettings = onSaveWatermarkSettings,
                             onOpen = { onOpenScan(Uri.fromFile(scan.file)) },
                             onSharePdf = { onSharePdf(scan.file) },
                             onShareImages = { onShareImages(scan.file) },
@@ -237,7 +243,10 @@ private fun ScanHistoryCard(
     onSplitBook: (Uri) -> Unit,
     onRename: (File, String) -> Unit,
     onDelete: (File) -> Unit,
-    onPrint: (File) -> Unit
+    onPrint: (File) -> Unit,
+    isProActive: Boolean,
+    onNavigateToPro: () -> Unit,
+    onSaveWatermarkSettings: (String, Float, Float) -> Boolean
 ) {
     var showActionsSheet by rememberSaveable(entry.file.absolutePath) { mutableStateOf(false) }
     var showRenameDialog by rememberSaveable(entry.file.absolutePath) { mutableStateOf(false) }
@@ -335,6 +344,9 @@ private fun ScanHistoryCard(
     if (showActionsSheet) {
         PdfDocumentActionsSheet(
             documentName = entry.file.name,
+            isProActive = isProActive,
+            onNavigateToPro = onNavigateToPro,
+            onSaveWatermarkSettings = onSaveWatermarkSettings,
             onDismissRequest = { showActionsSheet = false },
             onOpen = onOpen,
             onEdit = onEdit,
