@@ -119,6 +119,8 @@ class BatchReviewSheetTest {
                 )
             }
 
+            composeRule.onNodeWithTag("batch_folder_list")
+                .performScrollToNode(hasTestTag("batch_folder_menu_${folder.name}"))
             composeRule.onNodeWithTag("batch_folder_menu_${folder.name}")
                 .assertIsDisplayed()
                 .performClick()
@@ -162,17 +164,23 @@ class BatchReviewSheetTest {
                 )
             }
 
-            composeRule.onNodeWithTag("batch_folder_menu_$batchId").performClick()
+            fun openFolderMenu() {
+                composeRule.onNodeWithTag("batch_folder_list")
+                    .performScrollToNode(hasTestTag("batch_folder_menu_$batchId"))
+                composeRule.onNodeWithTag("batch_folder_menu_$batchId").performClick()
+            }
+
+            openFolderMenu()
             composeRule.onNodeWithTag("batch_rename_folder_$batchId").performClick()
-            composeRule.onNodeWithTag("batch_folder_rename_field")
-                .performTextClearance()
-                .performTextInput("Client Records")
+            val renameField = composeRule.onNodeWithTag("batch_folder_rename_field")
+            renameField.performTextClearance()
+            renameField.performTextInput("Client Records")
             composeRule.onNodeWithTag("batch_folder_rename_confirm").performClick()
             composeRule.waitUntil(5_000L) {
                 viewModel.state.value.batchFolders.firstOrNull { it.id == batchId }?.name == "Client Records"
             }
 
-            composeRule.onNodeWithTag("batch_folder_menu_$batchId").performClick()
+            openFolderMenu()
             composeRule.onNodeWithTag("batch_duplicate_folder_$batchId")
                 .assertIsDisplayed()
                 .performClick()
@@ -181,7 +189,7 @@ class BatchReviewSheetTest {
                     viewModel.state.value.batchFolders.any { it.name == "Client Records (Copy)" }
             }
 
-            composeRule.onNodeWithTag("batch_folder_menu_$batchId").performClick()
+            openFolderMenu()
             composeRule.onNodeWithTag("batch_share_folder_$batchId").assertIsDisplayed()
         } finally {
             viewModel.state.value.batchFolders
