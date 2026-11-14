@@ -104,6 +104,21 @@ class PdfOperationsHotfixTest {
     }
 
     @Test
+    fun fileProviderSupportsBatchScanLibraryOutputs() {
+        val batchDirectory = File(context.filesDir, "VibeSyncScans").apply { mkdirs() }
+        val output = File(batchDirectory, "batch_scan_output.pdf").apply { writeText("%PDF-1.4 test") }
+        try {
+            assertTrue(output.isFile && output.length() > 0L)
+            val uri = UriUtils.getShareableUri(context, output)
+            assertEquals("content", uri.scheme)
+            assertEquals("${context.packageName}.fileprovider", uri.authority)
+        } finally {
+            output.delete()
+            batchDirectory.delete()
+        }
+    }
+
+    @Test
     fun mergeKeepsImageStreamsUsableAndWritesActualDestinationFile() = runBlocking {
         val first = File(testDirectory, "merge_first.pdf")
         val second = File(testDirectory, "merge_second.pdf")
