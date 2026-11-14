@@ -31,7 +31,12 @@ class PdfShareHelperTest {
     fun chooserAndTargetBothCarryReadGrantAndClipDataForSinglePdf() {
         val pdf = File(shareDirectory, "single.pdf").apply { writeBytes(byteArrayOf(0x25, 0x50, 0x44, 0x46)) }
 
-        val chooser = PdfShareHelper.createChooserIntent(context, listOf(pdf), "Share PDF")
+        val chooser = PdfShareHelper.createChooserIntent(
+            context,
+            listOf(pdf),
+            "Share PDF",
+            uriProvider = { _, file -> Uri.parse("content://test.provider/${file.name}") }
+        )
         @Suppress("DEPRECATION")
         val target = chooser.getParcelableExtra(Intent.EXTRA_INTENT) as? Intent
 
@@ -59,7 +64,8 @@ class PdfShareHelperTest {
             context,
             listOf(first, second),
             "Share PDFs",
-            forceMultiple = true
+            forceMultiple = true,
+            uriProvider = { _, file -> Uri.parse("content://test.provider/${file.name}") }
         )
         @Suppress("DEPRECATION")
         val target = requireNotNull(chooser.getParcelableExtra(Intent.EXTRA_INTENT) as? Intent)
@@ -75,6 +81,11 @@ class PdfShareHelperTest {
     @Test(expected = java.io.IOException::class)
     fun emptyPdfIsRejectedBeforeFileProviderUriCreation() {
         val empty = File(shareDirectory, "empty.pdf").apply { writeBytes(byteArrayOf()) }
-        PdfShareHelper.createChooserIntent(context, listOf(empty), "Share PDF")
+        PdfShareHelper.createChooserIntent(
+            context,
+            listOf(empty),
+            "Share PDF",
+            uriProvider = { _, file -> Uri.parse("content://test.provider/${file.name}") }
+        )
     }
 }

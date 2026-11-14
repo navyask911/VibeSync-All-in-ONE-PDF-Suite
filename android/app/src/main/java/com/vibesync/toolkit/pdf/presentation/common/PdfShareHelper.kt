@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import java.io.File
 import java.io.IOException
@@ -34,7 +35,8 @@ object PdfShareHelper {
         context: Context,
         files: List<File>,
         chooserTitle: String,
-        forceMultiple: Boolean = false
+        forceMultiple: Boolean = false,
+        uriProvider: (Context, File) -> Uri = UriUtils::getShareableUri
     ): Intent {
         require(files.isNotEmpty()) { "At least one PDF is required for sharing." }
 
@@ -51,7 +53,7 @@ object PdfShareHelper {
             if (file.length() != lengthBeforeRead) {
                 throw IOException("The PDF changed while it was being prepared: ${file.name}")
             }
-            UriUtils.getShareableUri(context, file)
+            uriProvider(context, file)
         }
 
         val clipData = ClipData.newUri(context.contentResolver, files.first().name, uris.first())
