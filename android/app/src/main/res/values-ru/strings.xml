@@ -519,4 +519,8 @@
     <string name="about_us_website">Посетить наш сайт</string>
     <string name="update_title">Доступно обновление</string>
     <string name="update_message">Доступна новая версия VibeSync с новыми функциями и исправлениями ошибок. Обновите приложение, чтобы продолжить.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">Дублировать пакет</string>
+    <string name="batch_duplicate_success">Пакет дублирован.</string>
+    <string name="batch_rename_success">Пакет переименован.</string>
 </resources>

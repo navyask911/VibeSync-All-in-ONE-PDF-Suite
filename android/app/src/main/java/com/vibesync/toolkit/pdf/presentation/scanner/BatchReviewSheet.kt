@@ -24,6 +24,10 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DriveFileRenameOutline
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
@@ -66,6 +70,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.ImageBitmap
 import com.vibesync.toolkit.pdf.R
+import com.vibesync.toolkit.pdf.presentation.common.PdfShareHelper
 import com.vibesync.toolkit.pdf.data.pdf.filters.FilterId
 import com.vibesync.toolkit.pdf.data.pdf.PageRangeParser
 import kotlinx.coroutines.Dispatchers
@@ -313,6 +318,9 @@ fun BatchScanScreen(
     }
     val activeFolder = state.batchFolders.firstOrNull { it.id == state.activeBatchId }
     var folderPendingDeletion by remember { mutableStateOf<BatchScanFolder?>(null) }
+    var folderPendingRename by remember { mutableStateOf<BatchScanFolder?>(null) }
+    var renameFolderName by remember { mutableStateOf("") }
+    var expandedFolderMenu by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     LaunchedEffect(state.savedFile) {
@@ -390,15 +398,79 @@ fun BatchScanScreen(
                                         }
                                         Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
-                                    IconButton(
-                                        onClick = { folderPendingDeletion = folder },
-                                        modifier = Modifier.testTag("batch_delete_folder_${folder.id}")
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Delete,
-                                            contentDescription = stringResource(R.string.signature_manager_delete),
-                                            tint = MaterialTheme.colorScheme.error
-                                        )
+                                    val compiledPdf = folder.directory.listFiles().orEmpty()
+                                        .filter { it.isFile && it.extension.equals("pdf", ignoreCase = true) }
+                                        .maxByOrNull { it.lastModified() }
+                                    Box {
+                                        IconButton(
+                                            onClick = { expandedFolderMenu = folder.id },
+                                            modifier = Modifier.testTag("batch_folder_menu_${folder.id}")
+                                        ) {
+                                            Icon(
+                                                Icons.Default.MoreVert,
+                                                contentDescription = stringResource(R.string.document_actions_title)
+                                            )
+                                        }
+                                        DropdownMenu(
+                                            expanded = expandedFolderMenu == folder.id,
+                                            onDismissRequest = { expandedFolderMenu = null }
+                                        ) {
+                                            if (folder.id != BatchScanViewModel.LEGACY_BATCH_ID) {
+                                                DropdownMenuItem(
+                                                    text = { Text(stringResource(R.string.scan_rename)) },
+                                                    leadingIcon = { Icon(Icons.Default.DriveFileRenameOutline, contentDescription = null) },
+                                                    onClick = {
+                                                        expandedFolderMenu = null
+                                                        renameFolderName = folder.name
+                                                        folderPendingRename = folder
+                                                    },
+                                                    modifier = Modifier.testTag("batch_rename_folder_${folder.id}")
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text(stringResource(R.string.batch_duplicate)) },
+                                                    leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+                                                    onClick = {
+                                                        expandedFolderMenu = null
+                                                        scope.launch {
+                                                            val message = viewModel.duplicateBatchFolder(folder.id).fold(
+                                                                onSuccess = { context.getString(R.string.batch_duplicate_success) },
+                                                                onFailure = { context.getString(R.string.scan_operation_failed) }
+                                                            )
+                                                            snackbarHostState.showSnackbar(message)
+                                                        }
+                                                    },
+                                                    modifier = Modifier.testTag("batch_duplicate_folder_${folder.id}")
+                                                )
+                                            }
+                                            if (compiledPdf != null) {
+                                                DropdownMenuItem(
+                                                    text = { Text(stringResource(R.string.share_pdf)) },
+                                                    leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                                                    onClick = {
+                                                        expandedFolderMenu = null
+                                                        runCatching {
+                                                            PdfShareHelper.sharePdf(context, compiledPdf, context.getString(R.string.share_pdf))
+                                                        }.onFailure {
+                                                            scope.launch {
+                                                                snackbarHostState.showSnackbar(context.getString(R.string.scan_operation_failed))
+                                                            }
+                                                        }
+                                                    },
+                                                    modifier = Modifier.testTag("batch_share_folder_${folder.id}")
+                                                )
+                                            }
+                                            if (folder.id != BatchScanViewModel.LEGACY_BATCH_ID) {
+                                                DropdownMenuItem(
+                                                    text = { Text(stringResource(R.string.signature_manager_delete)) },
+                                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                                                    onClick = {
+                                                        expandedFolderMenu = null
+                                                        folderPendingDeletion = folder
+                                                    },
+                                                    modifier = Modifier.testTag("batch_delete_folder_${folder.id}")
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -496,6 +568,47 @@ fun BatchScanScreen(
                 }
             }
         }
+    }
+
+
+    folderPendingRename?.let { folder ->
+        AlertDialog(
+            onDismissRequest = { folderPendingRename = null },
+            title = { Text(stringResource(R.string.rename_document_title)) },
+            text = {
+                OutlinedTextField(
+                    value = renameFolderName,
+                    onValueChange = { renameFolderName = it },
+                    label = { Text(stringResource(R.string.rename_document_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.testTag("batch_folder_rename_field")
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val requestedName = renameFolderName
+                        folderPendingRename = null
+                        scope.launch {
+                            val message = viewModel.renameBatchFolder(folder.id, requestedName).fold(
+                                onSuccess = { context.getString(R.string.batch_rename_success) },
+                                onFailure = { context.getString(R.string.scan_operation_failed) }
+                            )
+                            snackbarHostState.showSnackbar(message)
+                        }
+                    },
+                    enabled = renameFolderName.isNotBlank(),
+                    modifier = Modifier.testTag("batch_folder_rename_confirm")
+                ) {
+                    Text(stringResource(R.string.scan_rename))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { folderPendingRename = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
     }
 
     folderPendingDeletion?.let { folder ->

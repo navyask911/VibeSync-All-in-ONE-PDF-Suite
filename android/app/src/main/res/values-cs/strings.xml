@@ -503,4 +503,8 @@
     <string name="about_us_website">Navštívit náš web</string>
     <string name="update_title">Aktualizace je k dispozici</string>
     <string name="update_message">Je k dispozici nová verze aplikace VibeSync s novými funkcemi a opravami chyb. Chcete-li pokračovat, aktualizujte aplikaci.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">Duplikovat dávku</string>
+    <string name="batch_duplicate_success">Dávka byla duplikována.</string>
+    <string name="batch_rename_success">Dávka byla přejmenována.</string>
 </resources>

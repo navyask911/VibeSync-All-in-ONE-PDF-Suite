@@ -87,9 +87,9 @@ jobs:
               return items
 
           baseline = load_strings(base_path)
-          if len(baseline) != 493:
+          if len(baseline) != 496:
               sys.exit(
-                  f"Expected 493 default string IDs, found {len(baseline)}. "
+                  f"Expected 496 default string IDs, found {len(baseline)}. "
                   "Review the baseline before changing the parity contract."
               )
 

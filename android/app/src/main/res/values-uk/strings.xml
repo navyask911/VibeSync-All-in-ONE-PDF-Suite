@@ -504,4 +504,8 @@
     <string name="about_us_website">Відвідати наш вебсайт</string>
     <string name="update_title">Доступне оновлення</string>
     <string name="update_message">Доступна нова версія VibeSync із новими функціями та виправленнями помилок. Оновіть додаток, щоб продовжити.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">Дублювати пакет</string>
+    <string name="batch_duplicate_success">Пакет продубльовано.</string>
+    <string name="batch_rename_success">Пакет перейменовано.</string>
 </resources>

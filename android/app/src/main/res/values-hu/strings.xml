@@ -503,4 +503,8 @@
     <string name="about_us_website">Weboldalunk felkeresése</string>
     <string name="update_title">Frissítés érhető el</string>
     <string name="update_message">A VibeSync új verziója új funkciókkal és hibajavításokkal érhető el. A folytatáshoz frissítsen.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">Köteg másolása</string>
+    <string name="batch_duplicate_success">A köteg másolata elkészült.</string>
+    <string name="batch_rename_success">A köteg átnevezve.</string>
 </resources>

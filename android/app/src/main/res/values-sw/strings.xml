@@ -503,4 +503,8 @@
     <string name="about_us_website">Tembelea Tovuti Yetu</string>
     <string name="update_title">Sasisho Linapatikana</string>
     <string name="update_message">Toleo jipya la VibeSync lenye vipengele vipya na marekebisho ya hitilafu linapatikana. Tafadhali sasisha ili uendelee.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">Nakili kundi</string>
+    <string name="batch_duplicate_success">Kundi limenakiliwa.</string>
+    <string name="batch_rename_success">Jina la kundi limebadilishwa.</string>
 </resources>

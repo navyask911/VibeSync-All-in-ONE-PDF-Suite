@@ -138,7 +138,7 @@ class BatchScanViewModel(application: Application) : AndroidViewModel(applicatio
         val folders = directories.distinctBy { it.absolutePath }.map { directory ->
             BatchScanFolder(
                 id = if (directory == scansDirectory) LEGACY_BATCH_ID else directory.name,
-                name = if (directory == scansDirectory) LEGACY_BATCH_NAME else directory.name,
+                name = if (directory == scansDirectory) LEGACY_BATCH_NAME else readBatchDisplayName(directory) ?: directory.name.removePrefix(BATCH_FOLDER_PREFIX).replace('_', ' '),
                 directory = directory,
                 pageCount = loadBatchPages(directory).size,
                 lastModified = directory.lastModified()
@@ -433,6 +433,132 @@ class BatchScanViewModel(application: Application) : AndroidViewModel(applicatio
         return Result.success(Unit)
     }
 
+
+    /** Saves a user-facing label without changing the folder ID or any page-file paths. */
+    suspend fun renameBatchFolder(batchId: String, requestedName: String): Result<Unit> {
+        if (batchId == LEGACY_BATCH_ID) {
+            return Result.failure(IllegalArgumentException("The legacy scan collection cannot be renamed."))
+        }
+        if (compileJob?.isActive == true) {
+            return Result.failure(IOException("Wait for the current batch PDF compilation to finish before renaming a folder."))
+        }
+        val folder = _state.value.batchFolders.firstOrNull { it.id == batchId }
+            ?: return Result.failure(IllegalArgumentException("The batch folder no longer exists."))
+        val displayName = requestedName.trim()
+            .replace(Regex("[\\\\/:*?\"<>|]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .filterNot { it.isISOControl() }
+            .take(MAX_BATCH_DISPLAY_NAME_LENGTH)
+            .trim()
+        if (displayName.isBlank()) {
+            return Result.failure(IllegalArgumentException("Enter a valid batch name."))
+        }
+        if (_state.value.batchFolders.any { it.id != batchId && it.name.equals(displayName, ignoreCase = true) }) {
+            return Result.failure(IOException("Another batch already uses that name."))
+        }
+
+        return try {
+            val directory = resolveManagedBatchDirectory(folder)
+            withContext(Dispatchers.IO) {
+                writeBatchDisplayName(directory, displayName)
+            }
+            refreshBatchFolders()
+            Result.success(Unit)
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            Result.failure(error)
+        }
+    }
+
+    /** Copies a whole batch (page images, manifest, and any compiled PDFs) into a new safe sibling. */
+    suspend fun duplicateBatchFolder(batchId: String): Result<String> {
+        if (batchId == LEGACY_BATCH_ID) {
+            return Result.failure(IllegalArgumentException("The legacy scan collection cannot be duplicated as a batch folder."))
+        }
+        if (compileJob?.isActive == true) {
+            return Result.failure(IOException("Wait for the current batch PDF compilation to finish before duplicating a folder."))
+        }
+        val folder = _state.value.batchFolders.firstOrNull { it.id == batchId }
+            ?: return Result.failure(IllegalArgumentException("The batch folder no longer exists."))
+        val source = try {
+            resolveManagedBatchDirectory(folder)
+        } catch (error: Exception) {
+            return Result.failure(error)
+        }
+
+        var createdId: String? = null
+        try {
+            withContext(Dispatchers.IO) {
+                val root = scansDirectory.canonicalFile
+                val baseName = source.name + "_Copy"
+                var destination = File(root, baseName)
+                var suffix = 2
+                while (destination.exists()) {
+                    destination = File(root, baseName + "_" + suffix)
+                    suffix++
+                }
+                val staging = File(root, ".batch_copy_" + System.nanoTime())
+                try {
+                    source.copyRecursively(staging, overwrite = false)
+                    val sourceName = readBatchDisplayName(source)
+                        ?: source.name.removePrefix(BATCH_FOLDER_PREFIX).replace('_', ' ')
+                    writeBatchDisplayName(staging, sourceName + " (Copy)")
+                    if (!staging.renameTo(destination)) {
+                        throw IOException("Could not publish the duplicated batch folder.")
+                    }
+                    createdId = destination.name
+                } catch (error: Exception) {
+                    staging.deleteRecursively()
+                    throw error
+                }
+            }
+            refreshBatchFolders()
+            return Result.success(requireNotNull(createdId))
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            return Result.failure(error)
+        }
+    }
+
+    private fun resolveManagedBatchDirectory(folder: BatchScanFolder): File {
+        require(folder.id != LEGACY_BATCH_ID) { "The legacy batch is not a managed child folder." }
+        val directory = folder.directory.canonicalFile
+        val scansRoot = scansDirectory.canonicalFile
+        require(directory.isDirectory && directory.parentFile == scansRoot &&
+            directory.name.startsWith(BATCH_FOLDER_PREFIX)
+        ) { "The selected folder is outside the batch scan library." }
+        return directory
+    }
+
+    private fun readBatchDisplayName(directory: File): String? = runCatching {
+        File(directory, BATCH_DISPLAY_NAME_FILE)
+            .takeIf { it.isFile }
+            ?.readText()
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+    }.getOrNull()
+
+    private fun writeBatchDisplayName(directory: File, displayName: String) {
+        val target = File(directory, BATCH_DISPLAY_NAME_FILE)
+        val staging = File(directory, "$BATCH_DISPLAY_NAME_FILE.tmp")
+        val backup = File(directory, "$BATCH_DISPLAY_NAME_FILE.bak")
+        if (staging.exists() && !staging.delete()) throw IOException("Could not prepare the batch name update.")
+        if (backup.exists() && !backup.delete()) throw IOException("Could not prepare the batch name backup.")
+        staging.writeText(displayName)
+        if (target.exists() && !target.renameTo(backup)) {
+            staging.delete()
+            throw IOException("Could not stage the previous batch name.")
+        }
+        if (!staging.renameTo(target)) {
+            backup.takeIf { it.exists() }?.renameTo(target)
+            staging.delete()
+            throw IOException("Could not save the batch name.")
+        }
+        backup.delete()
+    }
+
     fun compileBatch(pageRangeInput: String = "All") {
         if (_state.value.isCompiling || _state.value.pages.isEmpty()) return
         val directory = activeBatchDirectory ?: return
@@ -533,6 +659,8 @@ class BatchScanViewModel(application: Application) : AndroidViewModel(applicatio
         const val LEGACY_BATCH_NAME = "BatchScan_Legacy"
         const val BATCH_FOLDER_PREFIX = "BatchScan_"
         private const val PAGE_MANIFEST = "batch_pages.json"
+        private const val BATCH_DISPLAY_NAME_FILE = ".batch_display_name"
+        private const val MAX_BATCH_DISPLAY_NAME_LENGTH = 64
         private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg")
     }
 }

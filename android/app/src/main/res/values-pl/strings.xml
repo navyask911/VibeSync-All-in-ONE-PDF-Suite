@@ -503,4 +503,8 @@
     <string name="about_us_website">Odwiedź naszą stronę</string>
     <string name="update_title">Dostępna aktualizacja</string>
     <string name="update_message">Dostępna jest nowa wersja VibeSync z nowymi funkcjami i poprawkami błędów. Zaktualizuj aplikację, aby kontynuować.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">Duplikuj partię</string>
+    <string name="batch_duplicate_success">Partia została zduplikowana.</string>
+    <string name="batch_rename_success">Zmieniono nazwę partii.</string>
 </resources>

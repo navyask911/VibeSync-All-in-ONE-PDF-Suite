@@ -509,4 +509,8 @@
     <string name="about_us_website">访问我们的网站</string>
     <string name="update_title">有可用更新</string>
     <string name="update_message">VibeSync 有新版本，包含新功能和错误修复。请更新后继续使用。</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">复制批次</string>
+    <string name="batch_duplicate_success">已复制批次。</string>
+    <string name="batch_rename_success">已重命名批次。</string>
 </resources>

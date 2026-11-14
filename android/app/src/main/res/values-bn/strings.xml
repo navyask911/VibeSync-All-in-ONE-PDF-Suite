@@ -509,4 +509,8 @@
     <string name="about_us_website">আমাদের ওয়েবসাইট দেখুন</string>
     <string name="update_title">আপডেট উপলভ্য</string>
     <string name="update_message">নতুন বৈশিষ্ট্য ও বাগ সংশোধনসহ VibeSync-এর একটি নতুন সংস্করণ উপলভ্য। চালিয়ে যেতে অনুগ্রহ করে আপডেট করুন।</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">ব্যাচ নকল করুন</string>
+    <string name="batch_duplicate_success">ব্যাচ নকল করা হয়েছে।</string>
+    <string name="batch_rename_success">ব্যাচের নাম পরিবর্তন করা হয়েছে।</string>
 </resources>

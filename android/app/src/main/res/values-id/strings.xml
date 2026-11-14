@@ -509,4 +509,8 @@
     <string name="about_us_website">Kunjungi Situs Web Kami</string>
     <string name="update_title">Pembaruan Tersedia</string>
     <string name="update_message">Versi baru VibeSync dengan fitur baru dan perbaikan bug tersedia. Perbarui aplikasi untuk melanjutkan.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">Duplikasi batch</string>
+    <string name="batch_duplicate_success">Batch berhasil diduplikasi.</string>
+    <string name="batch_rename_success">Nama batch berhasil diubah.</string>
 </resources>

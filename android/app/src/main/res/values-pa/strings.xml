@@ -503,4 +503,8 @@
     <string name="about_us_website">ਸਾਡੀ ਵੈੱਬਸਾਈਟ ਤੇ ਜਾਓ</string>
     <string name="update_title">ਅੱਪਡੇਟ ਉਪਲਬਧ ਹੈ</string>
     <string name="update_message">ਨਵੀਆਂ ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ ਅਤੇ ਬੱਗ ਠੀਕ ਕਰਨ ਵਾਲਾ VibeSync ਦਾ ਨਵਾਂ ਵਰਜਨ ਉਪਲਬਧ ਹੈ। ਜਾਰੀ ਰੱਖਣ ਲਈ ਕਿਰਪਾ ਕਰਕੇ ਅੱਪਡੇਟ ਕਰੋ।</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">ਬੈਚ ਦੀ ਨਕਲ ਬਣਾਓ</string>
+    <string name="batch_duplicate_success">ਬੈਚ ਦੀ ਨਕਲ ਬਣ ਗਈ।</string>
+    <string name="batch_rename_success">ਬੈਚ ਦਾ ਨਾਮ ਬਦਲਿਆ ਗਿਆ।</string>
 </resources>

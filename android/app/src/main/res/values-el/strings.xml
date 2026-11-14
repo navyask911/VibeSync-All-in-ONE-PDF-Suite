@@ -503,4 +503,8 @@
     <string name="about_us_website">Επισκεφθείτε τον ιστότοπό μας</string>
     <string name="update_title">Διαθέσιμη ενημέρωση</string>
     <string name="update_message">Είναι διαθέσιμη μια νέα έκδοση του VibeSync με νέες λειτουργίες και διορθώσεις σφαλμάτων. Ενημερώστε την εφαρμογή για να συνεχίσετε.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">Δημιουργία αντιγράφου παρτίδας</string>
+    <string name="batch_duplicate_success">Η παρτίδα αντιγράφηκε.</string>
+    <string name="batch_rename_success">Η παρτίδα μετονομάστηκε.</string>
 </resources>

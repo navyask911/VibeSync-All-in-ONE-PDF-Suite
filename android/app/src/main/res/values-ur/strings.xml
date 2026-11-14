@@ -509,4 +509,8 @@
     <string name="about_us_website">ہماری ویب سائٹ ملاحظہ کریں</string>
     <string name="update_title">اپ ڈیٹ دستیاب ہے</string>
     <string name="update_message">نئی خصوصیات اور بگ کی اصلاحات کے ساتھ VibeSync کا نیا ورژن دستیاب ہے۔ جاری رکھنے کے لیے براہِ کرم اپ ڈیٹ کریں۔</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">بیچ کی نقل بنائیں</string>
+    <string name="batch_duplicate_success">بیچ کی نقل بن گئی۔</string>
+    <string name="batch_rename_success">بیچ کا نام تبدیل کر دیا گیا۔</string>
 </resources>

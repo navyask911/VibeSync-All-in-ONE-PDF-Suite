@@ -509,4 +509,8 @@
     <string name="about_us_website">Web Sitemizi Ziyaret Edin</string>
     <string name="update_title">Güncelleme mevcut</string>
     <string name="update_message">Yeni özellikler ve hata düzeltmeleri içeren yeni bir VibeSync sürümü mevcut. Devam etmek için lütfen güncelleyin.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">Grubu çoğalt</string>
+    <string name="batch_duplicate_success">Grup çoğaltıldı.</string>
+    <string name="batch_rename_success">Grubun adı değiştirildi.</string>
 </resources>

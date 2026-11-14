@@ -503,4 +503,8 @@
     <string name="about_us_website">بازدید از وب‌سایت ما</string>
     <string name="update_title">به‌روزرسانی در دسترس است</string>
     <string name="update_message">نسخه جدیدی از VibeSync با قابلیت‌های تازه و رفع اشکال‌ها در دسترس است. برای ادامه، برنامه را به‌روزرسانی کنید.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">تکثیر دسته</string>
+    <string name="batch_duplicate_success">دسته تکثیر شد.</string>
+    <string name="batch_rename_success">نام دسته تغییر کرد.</string>
 </resources>

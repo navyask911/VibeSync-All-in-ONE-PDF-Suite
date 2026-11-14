@@ -114,6 +114,81 @@ class BatchScanViewModelTest {
         }
     }
 
+
+    @Test
+    fun batchFolderRenamePersistsDisplayNameWithoutMovingPageFiles() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val root = File(app.filesDir, "VibeSyncScans")
+        val prefs = app.getSharedPreferences(ResolutionProfilePrefs.PREFERENCES_FILE, 0)
+        val hadToggle = prefs.contains(BatchScanViewModel.KEY_BATCH_ENABLED)
+        val previousToggle = prefs.getBoolean(BatchScanViewModel.KEY_BATCH_ENABLED, false)
+        root.deleteRecursively()
+        try {
+            val viewModel = BatchScanViewModel(app)
+            viewModel.startNewBatchScan()
+            val batchId = requireNotNull(viewModel.state.value.activeBatchId)
+            val batchDirectory = File(root, batchId)
+            val marker = File(batchDirectory, "keep-page-data.jpg").apply { writeBytes(byteArrayOf(4, 5, 6)) }
+
+            val renamed = runBlocking { viewModel.renameBatchFolder(batchId, "  Client   Records  ") }
+
+            assertTrue("Rename failed: ${renamed.exceptionOrNull()}", renamed.isSuccess)
+            assertEquals("Client Records", viewModel.state.value.batchFolders.first { it.id == batchId }.name)
+            assertTrue(marker.isFile)
+            assertEquals(batchId, viewModel.state.value.activeBatchId)
+
+            val recreated = BatchScanViewModel(app)
+            assertEquals("Client Records", recreated.state.value.batchFolders.first { it.id == batchId }.name)
+            assertTrue(marker.isFile)
+        } finally {
+            root.deleteRecursively()
+            restorePref(prefs, hadToggle, previousToggle)
+        }
+    }
+
+    @Test
+    fun duplicateBatchFolderCopiesManifestPagesAndCompiledPdfIntoNewBatch() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val root = File(app.filesDir, "VibeSyncScans")
+        val prefs = app.getSharedPreferences(ResolutionProfilePrefs.PREFERENCES_FILE, 0)
+        val hadToggle = prefs.contains(BatchScanViewModel.KEY_BATCH_ENABLED)
+        val previousToggle = prefs.getBoolean(BatchScanViewModel.KEY_BATCH_ENABLED, false)
+        root.deleteRecursively()
+        val sources = sourcePages(app)
+        try {
+            val viewModel = BatchScanViewModel(app)
+            viewModel.startNewBatchScan()
+            val batchId = requireNotNull(viewModel.state.value.activeBatchId)
+            val originalDirectory = File(root, batchId)
+            val pageFile = sources.first().copyTo(File(originalDirectory, "page_1.jpg"))
+            File(originalDirectory, "batch_pages.json").writeText(
+                """[{"id":"page-1","file":"page_1.jpg","width":96,"height":144,"estimatedBytes":55296}]"""
+            )
+            val compiledPdf = File(originalDirectory, "compiled.pdf").apply { writeBytes(byteArrayOf(9, 8, 7, 6)) }
+            val renameResult = runBlocking { viewModel.renameBatchFolder(batchId, "Client Records") }
+            assertTrue(renameResult.isSuccess)
+
+            val duplicateResult = runBlocking { viewModel.duplicateBatchFolder(batchId) }
+
+            assertTrue("Duplicate failed: ${duplicateResult.exceptionOrNull()}", duplicateResult.isSuccess)
+            val duplicateId = requireNotNull(duplicateResult.getOrNull())
+            val duplicateDirectory = File(root, duplicateId)
+            assertTrue(duplicateId.startsWith(BatchScanViewModel.BATCH_FOLDER_PREFIX))
+            assertEquals(pageFile.readBytes().toList(), File(duplicateDirectory, "page_1.jpg").readBytes().toList())
+            assertEquals(compiledPdf.readBytes().toList(), File(duplicateDirectory, "compiled.pdf").readBytes().toList())
+            assertTrue(File(duplicateDirectory, "batch_pages.json").isFile)
+            assertEquals("Client Records (Copy)", viewModel.state.value.batchFolders.first { it.id == duplicateId }.name)
+
+            viewModel.openBatch(duplicateId)
+            assertEquals(1, viewModel.state.value.pages.size)
+            assertEquals(duplicateDirectory.canonicalFile, viewModel.state.value.pages.single().file.parentFile?.canonicalFile)
+        } finally {
+            sources.forEach { it.delete() }
+            root.deleteRecursively()
+            restorePref(prefs, hadToggle, previousToggle)
+        }
+    }
+
     @Test
     fun compileSuccessKeepsPersistentPagesInsideTheirBatchFolderUntilClearAll() {
         val app = ApplicationProvider.getApplicationContext<Application>()

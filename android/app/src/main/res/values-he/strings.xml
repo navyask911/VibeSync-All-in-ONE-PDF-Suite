@@ -503,4 +503,8 @@
     <string name="about_us_website">בקרו באתר שלנו</string>
     <string name="update_title">עדכון זמין</string>
     <string name="update_message">גרסה חדשה של VibeSync עם תכונות חדשות ותיקוני באגים זמינה. יש לעדכן כדי להמשיך.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">שכפול אצווה</string>
+    <string name="batch_duplicate_success">האצווה שוכפלה.</string>
+    <string name="batch_rename_success">שם האצווה שונה.</string>
 </resources>

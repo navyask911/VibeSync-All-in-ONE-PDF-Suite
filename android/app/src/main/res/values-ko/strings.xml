@@ -509,4 +509,8 @@
     <string name="about_us_website">웹사이트 방문</string>
     <string name="update_title">업데이트 가능</string>
     <string name="update_message">새로운 기능과 버그 수정이 포함된 VibeSync의 새 버전을 사용할 수 있습니다. 계속하려면 업데이트하세요.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">배치 복제</string>
+    <string name="batch_duplicate_success">배치를 복제했습니다.</string>
+    <string name="batch_rename_success">배치 이름을 변경했습니다.</string>
 </resources>

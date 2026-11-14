@@ -504,4 +504,8 @@
     <string name="about_us_website">เยี่ยมชมเว็บไซต์ของเรา</string>
     <string name="update_title">มีอัปเดตพร้อมใช้งาน</string>
     <string name="update_message">VibeSync เวอร์ชันใหม่ที่มาพร้อมฟีเจอร์ใหม่และการแก้ไขข้อบกพร่องพร้อมให้ใช้งานแล้ว โปรดอัปเดตเพื่อดำเนินการต่อ</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">ทำสำเนาชุด</string>
+    <string name="batch_duplicate_success">ทำสำเนาชุดแล้ว</string>
+    <string name="batch_rename_success">เปลี่ยนชื่อชุดแล้ว</string>
 </resources>

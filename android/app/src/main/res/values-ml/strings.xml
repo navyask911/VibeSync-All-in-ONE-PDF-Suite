@@ -503,4 +503,8 @@
     <string name="about_us_website">ഞങ്ങളുടെ വെബ്സൈറ്റ് സന്ദർശിക്കുക</string>
     <string name="update_title">അപ്‌ഡേറ്റ് ലഭ്യമാണ്</string>
     <string name="update_message">പുതിയ സവിശേഷതകളും പിശക് പരിഹാരങ്ങളും ഉൾപ്പെട്ട VibeSync-ന്റെ പുതിയ പതിപ്പ് ലഭ്യമാണ്. തുടരാൻ ദയവായി അപ്‌ഡേറ്റ് ചെയ്യുക.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">ബാച്ച് പകർത്തുക</string>
+    <string name="batch_duplicate_success">ബാച്ച് പകർത്തി.</string>
+    <string name="batch_rename_success">ബാച്ചിന്റെ പേര് മാറ്റി.</string>
 </resources>

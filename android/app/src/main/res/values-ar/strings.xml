@@ -509,4 +509,8 @@
     <string name="about_us_website">زيارة موقعنا</string>
     <string name="update_title">التحديث متاح</string>
     <string name="update_message">يتوفر إصدار جديد من VibeSync مع ميزات جديدة وإصلاحات للأخطاء. يُرجى التحديث للمتابعة.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">تكرار الدفعة</string>
+    <string name="batch_duplicate_success">تم تكرار الدفعة.</string>
+    <string name="batch_rename_success">تمت إعادة تسمية الدفعة.</string>
 </resources>

@@ -503,4 +503,8 @@
     <string name="about_us_website">ನಮ್ಮ ವೆಬ್‌ಸೈಟ್‌ಗೆ ಭೇಟಿ ನೀಡಿ</string>
     <string name="update_title">ಅಪ್‌ಡೇಟ್ ಲಭ್ಯವಿದೆ</string>
     <string name="update_message">ಹೊಸ ವೈಶಿಷ್ಟ್ಯಗಳು ಮತ್ತು ದೋಷ ಪರಿಹಾರಗಳೊಂದಿಗೆ VibeSync ನ ಹೊಸ ಆವೃತ್ತಿ ಲಭ್ಯವಿದೆ. ಮುಂದುವರಿಸಲು ದಯವಿಟ್ಟು ಅಪ್‌ಡೇಟ್ ಮಾಡಿ.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">ಬ್ಯಾಚ್ ನಕಲಿಸಿ</string>
+    <string name="batch_duplicate_success">ಬ್ಯಾಚ್ ನಕಲಿಸಲಾಗಿದೆ.</string>
+    <string name="batch_rename_success">ಬ್ಯಾಚ್ ಹೆಸರು ಬದಲಾಯಿಸಲಾಗಿದೆ.</string>
 </resources>

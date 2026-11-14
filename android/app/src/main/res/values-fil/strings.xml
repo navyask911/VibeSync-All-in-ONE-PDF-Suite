@@ -503,4 +503,8 @@
     <string name="about_us_website">Bisitahin ang Aming Website</string>
     <string name="update_title">May Available na Update</string>
     <string name="update_message">May bagong bersyon ng VibeSync na may mga bagong feature at pag-aayos ng bug. Mag-update para makapagpatuloy.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">I-duplicate ang batch</string>
+    <string name="batch_duplicate_success">Na-duplicate ang batch.</string>
+    <string name="batch_rename_success">Pinalitan ang pangalan ng batch.</string>
 </resources>

@@ -503,4 +503,8 @@
     <string name="about_us_website">Vizitează site-ul nostru</string>
     <string name="update_title">Actualizare disponibilă</string>
     <string name="update_message">Este disponibilă o nouă versiune VibeSync, cu funcții noi și remedieri de erori. Actualizați aplicația pentru a continua.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">Duplicați lotul</string>
+    <string name="batch_duplicate_success">Lot duplicat.</string>
+    <string name="batch_rename_success">Lot redenumit.</string>
 </resources>

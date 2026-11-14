@@ -5,6 +5,10 @@ import android.content.Intent
 import android.net.Uri
 import androidx.test.core.app.ApplicationProvider
 import com.vibesync.toolkit.pdf.presentation.common.PdfShareHelper
+import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
+import com.tom_roush.pdfbox.pdmodel.PDDocument
+import com.tom_roush.pdfbox.pdmodel.PDPage
+import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import org.junit.After
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
@@ -108,6 +112,42 @@ class PdfShareHelperTest {
         assertEquals("application/pdf", chooser.clipData?.description?.getMimeType(0))
         assertTrue(target.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
         assertTrue(chooser.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
+    }
+
+    
+    @Test
+    fun stagingPreservesARealPdfPagesSizesRotationAndBytes() {
+        PDFBoxResourceLoader.init(context)
+        val source = File(shareDirectory, "rotated_mixed_pages.pdf")
+        PDDocument().use { document ->
+            document.addPage(PDPage(PDRectangle(420f, 720f)))
+            document.addPage(PDPage(PDRectangle(720f, 420f)).apply { rotation = 90 })
+            document.save(source)
+        }
+        var staged: File? = null
+
+        PdfShareHelper.createChooserIntent(
+            context,
+            listOf(source),
+            "Share PDF",
+            uriProvider = { _, file ->
+                staged = file
+                Uri.parse("content://test.provider/${file.name}")
+            }
+        )
+
+        val sharedCopy = requireNotNull(staged)
+        assertArrayEquals(source.readBytes(), sharedCopy.readBytes())
+        PDDocument.load(source).use { original ->
+            PDDocument.load(sharedCopy).use { copied ->
+                assertEquals(original.numberOfPages, copied.numberOfPages)
+                for (index in 0 until original.numberOfPages) {
+                    assertEquals(original.getPage(index).mediaBox.width, copied.getPage(index).mediaBox.width, 0.01f)
+                    assertEquals(original.getPage(index).mediaBox.height, copied.getPage(index).mediaBox.height, 0.01f)
+                    assertEquals(original.getPage(index).rotation, copied.getPage(index).rotation)
+                }
+            }
+        }
     }
 
     @Test(expected = java.io.IOException::class)

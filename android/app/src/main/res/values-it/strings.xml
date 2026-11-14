@@ -509,4 +509,8 @@
     <string name="about_us_website">Visita il nostro sito web</string>
     <string name="update_title">Aggiornamento disponibile</string>
     <string name="update_message">È disponibile una nuova versione di VibeSync con nuove funzionalità e correzioni di bug. Aggiorna per continuare.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">Duplica batch</string>
+    <string name="batch_duplicate_success">Batch duplicato.</string>
+    <string name="batch_rename_success">Batch rinominato.</string>
 </resources>

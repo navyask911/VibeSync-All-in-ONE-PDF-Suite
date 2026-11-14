@@ -503,4 +503,8 @@
     <string name="about_us_website">Bezoek onze website</string>
     <string name="update_title">Update beschikbaar</string>
     <string name="update_message">Er is een nieuwe versie van VibeSync beschikbaar met nieuwe functies en bugfixes. Werk de app bij om door te gaan.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">Batch dupliceren</string>
+    <string name="batch_duplicate_success">Batch gedupliceerd.</string>
+    <string name="batch_rename_success">Batch hernoemd.</string>
 </resources>
