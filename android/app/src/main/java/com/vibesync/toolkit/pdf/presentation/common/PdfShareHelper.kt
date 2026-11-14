@@ -110,15 +110,20 @@ object PdfShareHelper {
         val stem = source.nameWithoutExtension.ifBlank { "document" }
         val extension = source.extension.takeIf { it.isNotBlank() }?.let { ".$it" } ?: ".pdf"
         var suffix = 0
-        val destination = while (true) {
+        var reservedDestination: File? = null
+        while (reservedDestination == null) {
             val candidateName = if (suffix == 0) source.name else "${stem}_${suffix}${extension}"
             val candidate = File(shareDirectory, candidateName)
-            if (candidate.createNewFile()) break candidate
-            suffix++
-            if (suffix > MAX_FILENAME_COLLISION_ATTEMPTS) {
-                throw IOException("Unable to reserve a unique file name for ${source.name}.")
+            if (candidate.createNewFile()) {
+                reservedDestination = candidate
+            } else {
+                suffix++
+                if (suffix > MAX_FILENAME_COLLISION_ATTEMPTS) {
+                    throw IOException("Unable to reserve a unique file name for ${source.name}.")
+                }
             }
         }
+        val destination = requireNotNull(reservedDestination)
 
         var copiedSuccessfully = false
         try {
