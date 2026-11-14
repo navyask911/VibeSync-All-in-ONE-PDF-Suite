@@ -2,6 +2,7 @@ package com.vibesync.toolkit.pdf.presentation.common
 
 import android.app.Activity
 import android.content.ClipData
+import android.content.ClipDescription
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -40,29 +41,26 @@ object PdfShareHelper {
     ): Intent {
         require(files.isNotEmpty()) { "At least one PDF is required for sharing." }
 
-        val uris = files.map { file ->
-            if (!file.isFile || file.length() <= 0L) {
-                throw IOException("The PDF is missing or empty: ${file.name}")
-            }
-            val lengthBeforeRead = file.length()
-            file.inputStream().use { input ->
-                if (input.read() == -1) {
-                    throw IOException("The PDF is not readable: ${file.name}")
-                }
-            }
-            if (file.length() != lengthBeforeRead) {
-                throw IOException("The PDF changed while it was being prepared: ${file.name}")
-            }
-            uriProvider(context, file)
-        }
+        // Stage every outgoing PDF in app-owned files storage. Some share targets,
+        // notably WhatsApp's document preview pipeline, do not reliably thumbnail cache-backed URIs.
+        val stagedFiles = files.map { file -> stagePdfForSharing(context, file) }
+        val uris = stagedFiles.map { file -> uriProvider(context, file) }
 
-        val clipData = ClipData.newUri(context.contentResolver, files.first().name, uris.first())
+        // newUri() lets the provider supply its MIME type. ClipDescription is immutable,
+        // so wrap its first item in an explicit PDF description to guarantee application/pdf.
+        val providerClip = ClipData.newUri(context.contentResolver, "PDF", uris.first())
+        val clipData = ClipData(
+            ClipDescription("PDF", arrayOf(PDF_MIME_TYPE)),
+            providerClip.getItemAt(0)
+        )
         uris.drop(1).forEach { uri -> clipData.addItem(ClipData.Item(uri)) }
 
         val sendIntent = if (uris.size == 1 && !forceMultiple) {
             Intent(Intent.ACTION_SEND).apply {
                 type = PDF_MIME_TYPE
                 putExtra(Intent.EXTRA_STREAM, uris.first())
+                putExtra(Intent.EXTRA_TITLE, files.first().name)
+                putExtra(Intent.EXTRA_SUBJECT, files.first().name)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 this.clipData = clipData
             }
@@ -70,6 +68,8 @@ object PdfShareHelper {
             Intent(Intent.ACTION_SEND_MULTIPLE).apply {
                 type = PDF_MIME_TYPE
                 putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+                putExtra(Intent.EXTRA_TITLE, files.first().name)
+                putExtra(Intent.EXTRA_SUBJECT, files.first().name)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 this.clipData = clipData
             }
@@ -83,5 +83,78 @@ object PdfShareHelper {
         }
     }
 
+    /**
+     * Copies a completed PDF into a FileProvider <files-path> before exposing it to another app.
+     * The original name is retained where available; collisions receive a numeric suffix.
+     */
+    private fun stagePdfForSharing(context: Context, source: File): File {
+        if (!source.isFile || source.length() <= 0L) {
+            throw IOException("The PDF is missing or empty: ${source.name}")
+        }
+
+        val shareDirectory = File(context.filesDir, SHARED_PDF_DIRECTORY)
+        if (!shareDirectory.exists() && !shareDirectory.mkdirs()) {
+            throw IOException("Unable to prepare the persistent PDF sharing directory.")
+        }
+        if (!shareDirectory.isDirectory) {
+            throw IOException("The persistent PDF sharing path is not a directory.")
+        }
+
+        val sourceFile = source.canonicalFile
+        val targetDirectory = shareDirectory.canonicalFile
+        if (sourceFile.parentFile?.canonicalFile == targetDirectory) {
+            verifyReadablePdf(sourceFile)
+            return sourceFile
+        }
+
+        val stem = source.nameWithoutExtension.ifBlank { "document" }
+        val extension = source.extension.takeIf { it.isNotBlank() }?.let { ".$it" } ?: ".pdf"
+        var suffix = 0
+        val destination = while (true) {
+            val candidateName = if (suffix == 0) source.name else "${stem}_${suffix}${extension}"
+            val candidate = File(shareDirectory, candidateName)
+            if (candidate.createNewFile()) break candidate
+            suffix++
+            if (suffix > MAX_FILENAME_COLLISION_ATTEMPTS) {
+                throw IOException("Unable to reserve a unique file name for ${source.name}.")
+            }
+        }
+
+        var copiedSuccessfully = false
+        try {
+            val lengthBeforeCopy = source.length()
+            source.inputStream().use { input ->
+                destination.outputStream().use { output ->
+                    val copiedBytes = input.copyTo(output)
+                    output.flush()
+                    if (copiedBytes <= 0L) {
+                        throw IOException("The PDF is not readable: ${source.name}")
+                    }
+                }
+            }
+            if (source.length() != lengthBeforeCopy || destination.length() != lengthBeforeCopy) {
+                throw IOException("The PDF changed while it was being prepared: ${source.name}")
+            }
+            verifyReadablePdf(destination)
+            copiedSuccessfully = true
+            return destination
+        } finally {
+            if (!copiedSuccessfully) destination.delete()
+        }
+    }
+
+    private fun verifyReadablePdf(file: File) {
+        if (!file.isFile || file.length() <= 0L) {
+            throw IOException("The PDF is missing or empty: ${file.name}")
+        }
+        file.inputStream().use { input ->
+            if (input.read() == -1) {
+                throw IOException("The PDF is not readable: ${file.name}")
+            }
+        }
+    }
+
+    private const val SHARED_PDF_DIRECTORY = "shared_pdfs"
+    private const val MAX_FILENAME_COLLISION_ATTEMPTS = 1000
     private const val PDF_MIME_TYPE = "application/pdf"
 }
