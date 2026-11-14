@@ -1,11 +1,13 @@
 package com.vibesync.toolkit.pdf
 
+import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.platform.ComposeView
 import android.view.View
 import android.view.ViewGroup
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -22,7 +24,11 @@ import androidx.compose.ui.test.swipeRight
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.presentation.scanner.BatchReviewSheet
 import com.vibesync.toolkit.pdf.presentation.scanner.BatchScanPage
+import com.vibesync.toolkit.pdf.presentation.scanner.BatchScanScreen
+import com.vibesync.toolkit.pdf.presentation.scanner.BatchScanViewModel
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
@@ -86,6 +92,48 @@ class BatchReviewSheetTest {
         composeRule.onNodeWithTag("batch_clear_all").performClick()
         composeRule.runOnIdle { assertEquals(emptyList<String>(), pages.map { it.id }) }
         listOf(a.file, b.file, c.file).forEach { it.delete() }
+    }
+
+    @Test
+    fun emptyBatchFolderHasDeleteControlAndIsRemovedFromTheDevice() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val scansRoot = File(app.filesDir, "VibeSyncScans")
+        assertTrue(scansRoot.exists() || scansRoot.mkdirs())
+        val folder = File(
+            scansRoot,
+            BatchScanViewModel.BATCH_FOLDER_PREFIX + "ui_delete_" + System.nanoTime()
+        )
+        assertTrue(folder.mkdirs())
+        val viewModel = BatchScanViewModel(app)
+        val deleteTag = "batch_delete_folder_${folder.name}"
+
+        try {
+            setTestContent {
+                BatchScanScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = {},
+                    onStartCapture = {},
+                    onOpenPdf = {}
+                )
+            }
+
+            composeRule.onNodeWithTag("batch_folder_list")
+                .performScrollToNode(hasTestTag(deleteTag))
+            composeRule.onNodeWithTag(deleteTag)
+                .assertIsDisplayed()
+                .performClick()
+            composeRule.onNodeWithTag("batch_delete_folder_confirm")
+                .assertIsDisplayed()
+                .performClick()
+
+            composeRule.waitUntil(10_000L) {
+                !folder.exists() && viewModel.state.value.batchFolders.none { it.id == folder.name }
+            }
+            composeRule.onNodeWithTag(deleteTag).assertDoesNotExist()
+            assertFalse(folder.exists())
+        } finally {
+            folder.deleteRecursively()
+        }
     }
 
     private fun page(id: String): BatchScanPage {
