@@ -376,6 +376,63 @@ class BatchScanViewModel(application: Application) : AndroidViewModel(applicatio
         refreshBatchFolders()
     }
 
+    /**
+     * Deletes a saved batch folder from the app-owned scan library and refreshes the folder list.
+     * Folder identity is resolved from current state and canonical-path checked so callers cannot
+     * delete the scans root, the legacy root batch, or a path outside VibeSyncScans.
+     */
+    suspend fun deleteBatchFolder(batchId: String): Result<Unit> {
+        val folder = _state.value.batchFolders.firstOrNull { it.id == batchId }
+            ?: return Result.failure(IllegalArgumentException("The batch folder no longer exists."))
+        if (batchId == LEGACY_BATCH_ID) {
+            return Result.failure(IllegalArgumentException("The legacy scan collection cannot be deleted as a batch folder."))
+        }
+        if (compileJob?.isActive == true) {
+            return Result.failure(IOException("Wait for the current batch PDF compilation to finish before deleting a folder."))
+        }
+
+        val directory: File
+        try {
+            directory = folder.directory.canonicalFile
+            val scansRoot = scansDirectory.canonicalFile
+            if (directory.parentFile != scansRoot ||
+                !directory.name.startsWith(BATCH_FOLDER_PREFIX)
+            ) {
+                return Result.failure(IllegalArgumentException("The selected folder is outside the batch scan library."))
+            }
+        } catch (error: Exception) {
+            return Result.failure(error)
+        }
+
+        val deleted = try {
+            withContext(Dispatchers.IO) {
+                !directory.exists() || directory.deleteRecursively()
+            }
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (error: Exception) {
+            return Result.failure(error)
+        }
+        if (!deleted || directory.exists()) {
+            return Result.failure(IOException("Could not delete the batch folder and its contents."))
+        }
+
+        if (activeBatchDirectory?.canonicalFile == directory) {
+            activeBatchDirectory = null
+            _state.value = _state.value.copy(
+                activeBatchId = null,
+                pages = emptyList(),
+                awaitingCapture = false,
+                isCompiling = false,
+                progress = 0f,
+                savedFile = null,
+                messageRes = null
+            )
+        }
+        refreshBatchFolders()
+        return Result.success(Unit)
+    }
+
     fun compileBatch(pageRangeInput: String = "All") {
         if (_state.value.isCompiling || _state.value.pages.isEmpty()) return
         val directory = activeBatchDirectory ?: return
