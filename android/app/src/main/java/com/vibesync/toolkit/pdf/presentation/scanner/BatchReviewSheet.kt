@@ -45,11 +45,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -67,6 +69,7 @@ import com.vibesync.toolkit.pdf.R
 import com.vibesync.toolkit.pdf.data.pdf.filters.FilterId
 import com.vibesync.toolkit.pdf.data.pdf.PageRangeParser
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -309,6 +312,8 @@ fun BatchScanScreen(
         runCatching { FilterId.valueOf(it) }.getOrNull()
     }
     val activeFolder = state.batchFolders.firstOrNull { it.id == state.activeBatchId }
+    var folderPendingDeletion by remember { mutableStateOf<BatchScanFolder?>(null) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(state.savedFile) {
         state.savedFile?.let { file ->
@@ -358,28 +363,43 @@ fun BatchScanScreen(
                     ) {
                         items(state.batchFolders, key = { it.id }) { folder ->
                             Card(
-                                modifier = Modifier.fillMaxWidth()
-                                    .clickable { viewModel.openBatch(folder.id) }
-                                    .testTag("batch_folder_${folder.id}"),
+                                modifier = Modifier.fillMaxWidth().testTag("batch_folder_${folder.id}"),
                                 colors = CardDefaults.cardColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                                 )
                             ) {
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                    Column(Modifier.weight(1f)) {
-                                        Text(folder.name, fontWeight = FontWeight.SemiBold)
-                                        Text(
-                                            "${folder.pageCount} pages",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    Row(
+                                        modifier = Modifier.weight(1f)
+                                            .clickable { viewModel.openBatch(folder.id) }
+                                            .padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Column(Modifier.weight(1f)) {
+                                            Text(folder.name, fontWeight = FontWeight.SemiBold)
+                                            Text(
+                                                "${folder.pageCount} pages",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    }
+                                    IconButton(
+                                        onClick = { folderPendingDeletion = folder },
+                                        modifier = Modifier.testTag("batch_delete_folder_${folder.id}")
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Delete,
+                                            contentDescription = stringResource(R.string.signature_manager_delete),
+                                            tint = MaterialTheme.colorScheme.error
                                         )
                                     }
-                                    Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
@@ -476,5 +496,38 @@ fun BatchScanScreen(
                 }
             }
         }
+    }
+
+    folderPendingDeletion?.let { folder ->
+        AlertDialog(
+            onDismissRequest = { folderPendingDeletion = null },
+            title = { Text(stringResource(R.string.delete_document_title)) },
+            text = { Text(stringResource(R.string.delete_document_message, folder.name)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        folderPendingDeletion = null
+                        scope.launch {
+                            val message = viewModel.deleteBatchFolder(folder.id).fold(
+                                onSuccess = { context.getString(R.string.document_delete_success) },
+                                onFailure = { context.getString(R.string.scan_operation_failed) }
+                            )
+                            snackbarHostState.showSnackbar(message)
+                        }
+                    },
+                    modifier = Modifier.testTag("batch_delete_folder_confirm")
+                ) {
+                    Text(stringResource(R.string.signature_manager_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { folderPendingDeletion = null },
+                    modifier = Modifier.testTag("batch_delete_folder_cancel")
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
     }
 }
