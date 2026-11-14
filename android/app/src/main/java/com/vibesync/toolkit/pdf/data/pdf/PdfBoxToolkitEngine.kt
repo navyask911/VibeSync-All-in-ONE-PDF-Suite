@@ -1077,7 +1077,7 @@ class PdfBoxToolkitEngine(
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.rgb(142, 0, 0)
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
-            textSize = 28f
+            textSize = 28f * WATERMARK_SIZE_SCALE
         }
         val measuredTextWidth = ceil(paint.measureText(text)).toInt().coerceAtLeast(1)
         val sidePaddingPx = 8
@@ -1120,7 +1120,7 @@ class PdfBoxToolkitEngine(
                 val mediaBox = page.mediaBox
                 val maxWidthPt = mediaBox.width * 0.85f
                 val aspectRatio = drawableBitmap.width.toFloat() / drawableBitmap.height.toFloat().coerceAtLeast(1f)
-                val targetHeightPt = minOf(9f, maxWidthPt / aspectRatio)
+                val targetHeightPt = minOf(9f * WATERMARK_SIZE_SCALE, maxWidthPt / aspectRatio)
                 val targetWidthPt = targetHeightPt * aspectRatio
                 val footer = FooterWatermarkLayout.topLeft(
                     pageWidth = mediaBox.width,
@@ -1169,7 +1169,7 @@ class PdfBoxToolkitEngine(
                 val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = Color.argb(150, 40, 40, 40)
                     typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-                    textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.012f).coerceIn(10f, 36f)
+                    textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.012f).coerceIn(10f, 36f) * WATERMARK_SIZE_SCALE
                 }
                 val watermarkText = DEFAULT_FOOTER_WATERMARK_TEXT
                 val margin = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.015f).coerceAtLeast(16f)
@@ -1193,7 +1193,7 @@ class PdfBoxToolkitEngine(
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = Color.argb((opacity * 255f).toInt(), 40, 40, 40)
                         typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-                        textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.012f).coerceIn(10f, 36f)
+                        textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.012f).coerceIn(10f, 36f) * WATERMARK_SIZE_SCALE
                     }
                     val margin = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.015f).coerceAtLeast(16f)
                     val x = (mutableBitmap.width - margin - paint.measureText(watermarkText))
@@ -1237,6 +1237,7 @@ class PdfBoxToolkitEngine(
         private const val WATERMARK_OPACITY_KEY = "watermark_opacity"
         private const val WATERMARK_ANGLE_KEY = "watermark_angle"
         private const val WATERMARK_ENABLED_KEY = "watermark_custom_enabled"
+        private const val WATERMARK_SIZE_SCALE = 1.5f
         private const val DEFAULT_WATERMARK_OPACITY = 0.45f
         private const val EDITOR_EXPORT_DPI = 300f
         private const val MAX_EDITOR_EXPORT_PIXELS = 8_000_000L
