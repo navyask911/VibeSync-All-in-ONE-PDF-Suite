@@ -170,8 +170,9 @@ class MainActivity : AppCompatActivity() {
     private val viewerViewModel: PdfViewerViewModel by viewModels()
     private val editorViewModel: EditorViewModel by viewModels()
     private val watermarkCustomizationViewModel: WatermarkCustomizationViewModel by viewModels {
+        val entitlementManager = billingManager
         WatermarkCustomizationViewModel.Factory(applicationContext) {
-            ::billingManager.isInitialized && billingManager.checkAdStatusForThisDevice()
+            entitlementManager.checkAdStatusForThisDevice()
         }
     }
     private val scannerHistoryViewModel: ScannerHistoryViewModel by viewModels()
