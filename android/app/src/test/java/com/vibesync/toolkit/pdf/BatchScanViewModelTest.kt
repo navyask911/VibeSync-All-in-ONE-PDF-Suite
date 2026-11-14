@@ -15,6 +15,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import kotlinx.coroutines.runBlocking
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows
 import org.robolectric.annotation.Config
@@ -64,6 +65,48 @@ class BatchScanViewModelTest {
             assertTrue(firstPages.none { it.file.exists() })
             assertFalse(File(firstFolder, "batch_pages.json").exists())
             assertTrue(recreated.state.value.batchFolders.any { it.id == secondBatchId })
+        } finally {
+            sources.forEach { it.delete() }
+            directory.deleteRecursively()
+            restorePref(prefs, hadToggle, previousToggle)
+        }
+    }
+
+    @Test
+    fun deleteEmptyBatchFolderRemovesDirectoryAndAllRemainingContents() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val directory = File(app.filesDir, "VibeSyncScans")
+        val prefs = app.getSharedPreferences(ResolutionProfilePrefs.PREFERENCES_FILE, 0)
+        val hadToggle = prefs.contains(BatchScanViewModel.KEY_BATCH_ENABLED)
+        val previousToggle = prefs.getBoolean(BatchScanViewModel.KEY_BATCH_ENABLED, false)
+        directory.deleteRecursively()
+        val sources = sourcePages(app)
+        try {
+            val viewModel = BatchScanViewModel(app)
+            viewModel.startNewBatchScan()
+            val batchId = requireNotNull(viewModel.state.value.activeBatchId)
+            val batchDirectory = File(directory, batchId)
+            captureTwo(viewModel, sources)
+
+            viewModel.clearPages()
+            assertTrue("Clearing pages leaves the empty batch directory behind.", batchDirectory.isDirectory)
+            assertEquals(0, batchDirectory.listFiles().orEmpty().size)
+
+            // A batch may also contain non-page artifacts (for example, a compiled PDF).
+            val nestedArtifact = File(batchDirectory, "exports/compiled.pdf").apply {
+                parentFile?.mkdirs()
+                writeBytes(byteArrayOf(1, 2, 3))
+            }
+            assertTrue(nestedArtifact.isFile)
+
+            val result = runBlocking { viewModel.deleteBatchFolder(batchId) }
+
+            assertTrue("Folder deletion failed: ${result.exceptionOrNull()}", result.isSuccess)
+            assertFalse(batchDirectory.exists())
+            assertFalse(nestedArtifact.exists())
+            assertFalse(viewModel.state.value.batchFolders.any { it.id == batchId })
+            assertEquals(null, viewModel.state.value.activeBatchId)
+            assertTrue(viewModel.state.value.pages.isEmpty())
         } finally {
             sources.forEach { it.delete() }
             directory.deleteRecursively()
