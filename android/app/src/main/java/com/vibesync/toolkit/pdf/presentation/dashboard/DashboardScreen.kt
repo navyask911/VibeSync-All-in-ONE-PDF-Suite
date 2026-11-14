@@ -74,6 +74,8 @@ fun DashboardScreen(
     onDeleteDocument: (Uri) -> Unit = {},
     onNavigateToPdfTool: (String, Uri) -> Unit = { route, _ -> onNavigateToTool(route) },
     onNavigateToPro: () -> Unit = {},
+    isProActive: Boolean = false,
+    onSaveWatermarkSettings: (String, Float, Float) -> Boolean = { _, _, _ -> false },
     onNavigateToSmartScan: () -> Unit = {},
     onNavigateToAbout: () -> Unit = {}
 ) {
@@ -601,6 +603,9 @@ fun DashboardScreen(
         selectedDocument?.let { target ->
             PdfDocumentActionsSheet(
                 documentName = target.name,
+                isProActive = isProActive,
+                onSaveWatermarkSettings = onSaveWatermarkSettings,
+                onNavigateToPro = onNavigateToPro,
                 onDismissRequest = { showDocumentActions = false },
                 onOpen = {
                     showDocumentActions = false

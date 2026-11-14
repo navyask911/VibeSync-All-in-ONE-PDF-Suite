@@ -79,6 +79,22 @@ class PdfBoxToolkitEngine(
     /**
      * Splits a PDF document by specified page ranges (e.g., "1-3", "4", "5-8").
      */
+    private fun importPagePreservingWatermark(
+        destinationDocument: PDDocument,
+        sourceDocument: PDDocument,
+        sourcePage: PDPage
+    ): PDPage {
+        val sourceDocumentWasWatermarked = sourceDocument.documentInformation
+            .getCustomMetadataValue(WATERMARK_METADATA_KEY) == WATERMARK_METADATA_VALUE
+        val sourcePageWasWatermarked = sourcePage.cosObject
+            .getString(WATERMARK_PAGE_METADATA_COS_KEY) == WATERMARK_METADATA_VALUE
+        val importedPage = destinationDocument.importPage(sourcePage)
+        if (sourceDocumentWasWatermarked || sourcePageWasWatermarked) {
+            importedPage.cosObject.setString(WATERMARK_PAGE_METADATA_COS_KEY, WATERMARK_METADATA_VALUE)
+        }
+        return importedPage
+    }
+
     suspend fun splitPdf(
         sourceUri: Uri,
         pageIntervals: List<IntRange>
@@ -103,7 +119,7 @@ class PdfBoxToolkitEngine(
                         outputFiles.add(splitFile)
                         try {
                             for (i in start..end) {
-                                subDoc.importPage(document.getPage(i))
+                                importPagePreservingWatermark(subDoc, document, document.getPage(i))
                             }
                             applyVibeSyncWatermark(subDoc)
                             subDoc.save(splitFile)
@@ -151,7 +167,7 @@ class PdfBoxToolkitEngine(
 
                 for (pageIndex in 0 until sourceDocument.numberOfPages) {
                     val sourcePage = sourceDocument.getPage(pageIndex)
-                    val importedPage = mergedDocument.importPage(sourcePage)
+                    val importedPage = importPagePreservingWatermark(mergedDocument, sourceDocument, sourcePage)
                     sourcePage.resources?.let { sourceResources ->
                         val clonedResources = resourceCloner.cloneForNewDocument(sourceResources.cosObject) as COSDictionary
                         importedPage.resources = PDResources(clonedResources)
@@ -1042,10 +1058,19 @@ class PdfBoxToolkitEngine(
         angleDegrees: Float
     ) {
         val documentInfo = document.documentInformation
+        // Legacy V2 documents carry a document-level marker. Treat their pages as stamped
+        // when importing them; new documents also carry a per-page marker.
         if (documentInfo.getCustomMetadataValue(WATERMARK_METADATA_KEY) == WATERMARK_METADATA_VALUE) {
             return
         }
         if (text.isBlank()) return
+        val pagesToWatermark = document.pages.filter { page ->
+            page.cosObject.getString(WATERMARK_PAGE_METADATA_COS_KEY) != WATERMARK_METADATA_VALUE
+        }
+        if (pagesToWatermark.isEmpty()) {
+            documentInfo.setCustomMetadataValue(WATERMARK_METADATA_KEY, WATERMARK_METADATA_VALUE)
+            return
+        }
 
         // Built-in Type1 fonts cannot encode Arabic, CJK, and many Indic glyphs. Shape the
         // localized footer with Android text layout and embed a transparent image in the PDF.
@@ -1091,7 +1116,7 @@ class PdfBoxToolkitEngine(
                 bitmap
             }
             val watermarkImage = LosslessFactory.createFromImage(document, drawableBitmap)
-            for (page in document.pages) {
+            for (page in pagesToWatermark) {
                 val mediaBox = page.mediaBox
                 val maxWidthPt = mediaBox.width * 0.85f
                 val aspectRatio = drawableBitmap.width.toFloat() / drawableBitmap.height.toFloat().coerceAtLeast(1f)
@@ -1122,6 +1147,7 @@ class PdfBoxToolkitEngine(
                     stream.setGraphicsStateParameters(graphicsState)
                     stream.drawImage(watermarkImage, x, y, targetWidthPt, targetHeightPt)
                 }
+                page.cosObject.setString(WATERMARK_PAGE_METADATA_COS_KEY, WATERMARK_METADATA_VALUE)
             }
         } finally {
             rotatedBitmap?.let { if (!it.isRecycled) it.recycle() }
@@ -1204,6 +1230,7 @@ class PdfBoxToolkitEngine(
         const val DEFAULT_FOOTER_WATERMARK_TEXT = "VibeSync All in ONE PDF Suite"
         private const val TAG = "PdfBoxToolkitEngine"
         private const val WATERMARK_METADATA_KEY = "VibeSync-Watermarked-V2"
+        private val WATERMARK_PAGE_METADATA_COS_KEY = COSName.getPDFName("VibeSync-Watermarked-V2-Page")
         private const val WATERMARK_METADATA_VALUE = "true"
         private const val WATERMARK_PREFERENCES = "pdf_watermark_options"
         private const val WATERMARK_TEXT_KEY = "watermark_text"

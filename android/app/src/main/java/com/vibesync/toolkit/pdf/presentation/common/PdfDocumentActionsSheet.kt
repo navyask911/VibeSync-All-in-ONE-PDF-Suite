@@ -1,6 +1,5 @@
 package com.vibesync.toolkit.pdf.presentation.common
 
-import android.content.Context
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -40,7 +39,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -48,12 +46,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.vibesync.toolkit.pdf.R
 import kotlin.math.roundToInt
-
-private const val WATERMARK_PREFERENCES = "pdf_watermark_options"
-private const val WATERMARK_TEXT_KEY = "watermark_text"
-private const val WATERMARK_OPACITY_KEY = "watermark_opacity"
-private const val WATERMARK_ANGLE_KEY = "watermark_angle"
-private const val WATERMARK_ENABLED_KEY = "watermark_custom_enabled"
 
 private data class PdfDocumentActionItem(
     val label: String,
@@ -81,9 +73,11 @@ fun PdfDocumentActionsSheet(
     onEncrypt: () -> Unit,
     onDelete: () -> Unit,
     onSaveToDownloads: (() -> Unit)? = null,
-    onPrint: (() -> Unit)? = null
+    onPrint: (() -> Unit)? = null,
+    isProActive: Boolean = false,
+    onNavigateToPro: () -> Unit = {},
+    onSaveWatermarkSettings: (String, Float, Float) -> Boolean = { _, _, _ -> false }
 ) {
-    val context = LocalContext.current
     val defaultWatermarkText = "VibeSync All in ONE PDF Suite"
     var showWatermarkSettings by remember(documentName) { mutableStateOf(false) }
     var watermarkText by remember(documentName) { mutableStateOf(defaultWatermarkText) }
@@ -126,7 +120,13 @@ fun PdfDocumentActionsSheet(
                         .clip(RoundedCornerShape(12.dp))
                         .clickable {
                             if (action.expandsWatermarkSettings) {
-                                showWatermarkSettings = !showWatermarkSettings
+                                if (isProActive) {
+                                    showWatermarkSettings = !showWatermarkSettings
+                                } else {
+                                    showWatermarkSettings = false
+                                    onDismissRequest()
+                                    onNavigateToPro()
+                                }
                             } else {
                                 onDismissRequest()
                                 action.onClick()
@@ -144,7 +144,7 @@ fun PdfDocumentActionsSheet(
                         color = if (action.destructive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurface
                     )
                 }
-                if (action.expandsWatermarkSettings && showWatermarkSettings) {
+                if (action.expandsWatermarkSettings && showWatermarkSettings && isProActive) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -176,13 +176,18 @@ fun PdfDocumentActionsSheet(
                         )
                         Button(
                             onClick = {
-                                context.getSharedPreferences(WATERMARK_PREFERENCES, Context.MODE_PRIVATE)
-                                    .edit()
-                                    .putString(WATERMARK_TEXT_KEY, watermarkText.trim())
-                                    .putFloat(WATERMARK_OPACITY_KEY, watermarkOpacity.coerceIn(0f, 1f))
-                                    .putFloat(WATERMARK_ANGLE_KEY, watermarkAngle.coerceIn(0f, 90f))
-                                    .putBoolean(WATERMARK_ENABLED_KEY, false)
-                                    .apply()
+                                // Re-check entitlement and persist only through the guarded ViewModel.
+                                if (!isProActive || !onSaveWatermarkSettings(
+                                        watermarkText,
+                                        watermarkOpacity.coerceIn(0f, 1f),
+                                        watermarkAngle.coerceIn(0f, 90f)
+                                    )
+                                ) {
+                                    showWatermarkSettings = false
+                                    onDismissRequest()
+                                    onNavigateToPro()
+                                    return@Button
+                                }
                                 onDismissRequest()
                                 onWatermark()
                             },

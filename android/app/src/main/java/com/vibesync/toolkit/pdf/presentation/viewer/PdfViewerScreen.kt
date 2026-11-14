@@ -993,20 +993,6 @@ fun PdfPageItem(
                         Text(stringResource(R.string.page_render_failed), fontSize = 12.sp)
                     }
                 }
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .padding(end = 12.dp, bottom = 8.dp),
-                    contentAlignment = Alignment.BottomEnd
-                ) {
-                    Text(
-                        text = "VibeSync All in ONE PDF Suite",
-                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 1.dp),
-                        color = Color(0xFF8E0000).copy(alpha = 0.55f),
-                        fontSize = 7.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
                 // The overlay is a sibling above the page bitmap; parent zoom, pan and scroll
                 // affect both in the same coordinate space, with no duplicated offsets.
                 if (highlightOverlays.isNotEmpty()) {
