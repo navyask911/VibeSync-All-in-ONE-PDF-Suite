@@ -20,7 +20,8 @@ class PdfFileProviderInstrumentationTest {
             File(context.cacheDir, "pdf_cache"),
             File(context.filesDir, "documents"),
             File(context.filesDir, "scans"),
-            File(context.filesDir, "VibeSyncScans")
+            File(context.filesDir, "VibeSyncScans"),
+            File(context.filesDir, "shared_pdfs")
         )
 
         configuredDirectories.forEachIndexed { index, directory ->
