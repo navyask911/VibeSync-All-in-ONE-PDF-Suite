@@ -112,7 +112,7 @@ class WatermarkControlTest {
     fun applyingWatermarkPersistsTextAndInvokesTheWatermarkAction() {
         watermarkPreferences().edit().clear().commit()
         var callbackInvoked = false
-        openWatermarkControls(isProActive = true) { callbackInvoked = true }
+        openWatermarkControls(isProActive = true, onWatermark = { callbackInvoked = true })
 
         composeTestRule.onNodeWithTag("watermark_text_field")
             .assertExists()
