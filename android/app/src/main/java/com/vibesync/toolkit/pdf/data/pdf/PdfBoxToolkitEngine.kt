@@ -758,7 +758,10 @@ class PdfBoxToolkitEngine(
             normalizeImageResourcesToRgb(document, page.resources, visitedResources)
             page.cosObject.removeItem(COSName.ANNOTS)
         }
-        document.version = ANDROID_SHARE_PDF_VERSION
+        // PDDocument.setVersion() intentionally refuses downgrades. Reset both PDF version
+        // declarations directly so the serialized header and catalog agree on PDF 1.4.
+        document.documentCatalog.cosObject.removeItem(COSName.getPDFName("Version"))
+        document.document.setVersion(ANDROID_SHARE_PDF_VERSION)
     }
 
     private fun normalizeImageResourcesToRgb(
