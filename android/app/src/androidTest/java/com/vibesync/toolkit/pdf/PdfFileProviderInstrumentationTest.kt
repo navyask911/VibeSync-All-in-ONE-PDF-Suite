@@ -15,6 +15,11 @@ import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.encryption.AccessPermission
 import com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy
+import com.tom_roush.pdfbox.pdmodel.graphics.color.PDDeviceCMYK
+import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
+import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationText
+import com.tom_roush.pdfbox.pdmodel.interactive.form.PDAcroForm
+import com.tom_roush.pdfbox.pdmodel.interactive.form.PDTextField
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import com.vibesync.toolkit.pdf.presentation.common.PdfShareHelper
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
@@ -28,6 +33,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
+import java.io.ByteArrayInputStream
 import java.security.Security
 
 @RunWith(AndroidJUnit4::class)
@@ -223,6 +229,108 @@ class PdfFileProviderInstrumentationTest {
             source.delete()
             prepared.delete()
             staged?.delete()
+        }
+    }
+
+    @Test
+    fun sharePreparationFlattensFormsAndAnnotationsConvertsCmykImagesAndUsesPdf14() = runBlocking {
+        val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
+        PDFBoxResourceLoader.init(context)
+        val source = File(context.cacheDir, "whatsapp_compat_source_${System.nanoTime()}.pdf")
+        val prepared = File(context.cacheDir, "whatsapp_compat_prepared_${System.nanoTime()}.pdf")
+
+        try {
+            PDDocument().use { document ->
+                document.version = 1.7f
+                val page = PDPage(PDRectangle.A4)
+                document.addPage(page)
+
+                val form = PDAcroForm(document)
+                document.documentCatalog.acroForm = form
+                val field = PDTextField(form).apply { partialName = "PreviewField" }
+                form.fields.add(field)
+                val fieldWidget = field.widgets.first().apply {
+                    rectangle = PDRectangle(36f, 700f, 180f, 28f)
+                    this.page = page
+                }
+                page.annotations.add(fieldWidget)
+                page.annotations.add(PDAnnotationText().apply {
+                    rectangle = PDRectangle(12f, 12f, 24f, 24f)
+                    contents = "Preview-only note"
+                })
+
+                val cmykImage = PDImageXObject(
+                    document,
+                    ByteArrayInputStream(byteArrayOf(0, 0xff.toByte(), 0xff.toByte(), 0)),
+                    null,
+                    1,
+                    1,
+                    8,
+                    PDDeviceCMYK.INSTANCE
+                )
+                PDPageContentStream(document, page).use { stream ->
+                    stream.drawImage(cmykImage, 36f, 36f, 120f, 80f)
+                }
+                document.save(source)
+            }
+
+            val engine = PdfBoxToolkitEngine(context, billingManager = null)
+            val result = engine.watermarkPdf(
+                sourceUri = android.net.Uri.fromFile(source),
+                watermarkText = PdfBoxToolkitEngine.DEFAULT_FOOTER_WATERMARK_TEXT,
+                outputFile = prepared,
+                removeSecurityForSharing = true
+            )
+            assertTrue("Share normalization failed: ${result.exceptionOrNull()}", result.isSuccess)
+
+            PDDocument.load(source).use { original ->
+                assertNotNull("The original AcroForm must remain untouched.", original.documentCatalog.acroForm)
+                assertTrue("The original annotations must remain untouched.", original.getPage(0).annotations.isNotEmpty())
+                val originalResources = original.getPage(0).resources
+                val originalImages = originalResources?.xObjectNames.orEmpty()
+                    .mapNotNull { name -> originalResources?.getXObject(name) as? PDImageXObject }
+                assertTrue(originalImages.any { it.colorSpace.name == "DeviceCMYK" })
+            }
+
+            PDDocument.load(prepared).use { output ->
+                assertEquals("Outgoing shares must use PDF 1.4.", 1.4f, output.version, 0f)
+                assertEquals("The outgoing copy must not keep interactive form fields.", null, output.documentCatalog.acroForm)
+                assertTrue("The outgoing copy must not keep page annotations.", output.getPage(0).annotations.isEmpty())
+                val outputResources = output.getPage(0).resources
+                val outputImages = outputResources?.xObjectNames.orEmpty()
+                    .mapNotNull { name -> outputResources?.getXObject(name) as? PDImageXObject }
+                assertTrue("The normalized PDF should still contain embedded images.", outputImages.isNotEmpty())
+                assertTrue(
+                    "All embedded images should use standard DeviceRGB color space.",
+                    outputImages.all { it.colorSpace.name == "DeviceRGB" }
+                )
+            }
+
+            ParcelFileDescriptor.open(prepared, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
+                PdfRenderer(descriptor).use { renderer ->
+                    assertEquals(1, renderer.pageCount)
+                    renderer.openPage(0).use { firstPage ->
+                        val bitmap = Bitmap.createBitmap(firstPage.width, firstPage.height, Bitmap.Config.ARGB_8888)
+                        try {
+                            bitmap.eraseColor(Color.WHITE)
+                            firstPage.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                            val sample = bitmap.getPixel(
+                                (firstPage.width * 0.16f).toInt(),
+                                (firstPage.height * 0.91f).toInt()
+                            )
+                            assertTrue(
+                                "Converted CMYK image must render as visible RGB content. pixel=$sample",
+                                Color.red(sample) > 180 && Color.green(sample) < 100 && Color.blue(sample) < 100
+                            )
+                        } finally {
+                            bitmap.recycle()
+                        }
+                    }
+                }
+            }
+        } finally {
+            source.delete()
+            prepared.delete()
         }
     }
 

@@ -45,6 +45,7 @@ import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
 import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
 import com.tom_roush.pdfbox.pdmodel.graphics.blend.BlendMode
 import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
+import com.tom_roush.pdfbox.pdmodel.graphics.form.PDFormXObject
 import com.tom_roush.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState
 import com.tom_roush.pdfbox.pdmodel.interactive.form.PDAcroForm
 import com.tom_roush.pdfbox.pdmodel.interactive.form.PDCheckBox
@@ -707,11 +708,12 @@ class PdfBoxToolkitEngine(
                         document.documentInformation.getCustomMetadataValue(WATERMARK_METADATA_KEY) == WATERMARK_METADATA_VALUE
 
                     if (removeSecurityForSharing) {
-                        // Normalize every outgoing share copy, not only the PDFs that needed a
-                        // new watermark. PDFBox writes a fresh xref/trailer and removes restrictions
-                        // from this copy; the original file is never modified. If a non-empty
-                        // open-password is required, loadPdfFromInputStream still rejects the file.
+                        // Normalize each outgoing copy for Android's native PdfRenderer.
+                        // Flatten interactive forms, remove other annotation appearances, convert
+                        // non-RGB image XObjects, and write a PDF 1.4-compatible document.
+                        // The loaded source and caller-owned PDF are never modified.
                         document.isAllSecurityToBeRemoved = true
+                        normalizeForAndroidPdfRenderer(document)
                         document.save(outputFile)
                     } else if (watermarkWasApplied && !alreadyWatermarked) {
                         document.save(outputFile)
@@ -732,6 +734,70 @@ class PdfBoxToolkitEngine(
             Result.failure(e)
         } finally {
             sourceFileToDelete?.delete()
+        }
+    }
+
+    /**
+     * Prepares only the outgoing share copy for Android's native PdfRenderer.
+     * Form appearances are flattened where available, residual annotations are removed,
+     * and nested non-RGB image XObjects are decoded/re-encoded as standard RGB.
+     * Text and vector content remain intact rather than rasterizing every page.
+     */
+    private fun normalizeForAndroidPdfRenderer(document: PDDocument) {
+        document.documentCatalog.acroForm?.let { acroForm ->
+            if (acroForm.fields.isNotEmpty()) {
+                acroForm.flatten()
+            }
+            document.documentCatalog.cosObject.removeItem(COSName.getPDFName("AcroForm"))
+        }
+
+        val visitedResources = java.util.Collections.newSetFromMap(
+            java.util.IdentityHashMap<PDResources, Boolean>()
+        )
+        document.pages.forEach { page ->
+            normalizeImageResourcesToRgb(document, page.resources, visitedResources)
+            page.cosObject.removeItem(COSName.ANNOTS)
+        }
+        document.version = ANDROID_SHARE_PDF_VERSION
+    }
+
+    private fun normalizeImageResourcesToRgb(
+        document: PDDocument,
+        resources: PDResources?,
+        visitedResources: MutableSet<PDResources>
+    ) {
+        if (resources == null || !visitedResources.add(resources)) return
+
+        resources.xObjectNames.toList().forEach { name ->
+            when (val xObject = resources.getXObject(name)) {
+                is PDImageXObject -> {
+                    if (!xObject.colorSpace.name.equals("DeviceRGB", ignoreCase = true)) {
+                        val decodedImage = xObject.image
+                        val rgbImage = Bitmap.createBitmap(
+                            decodedImage.width,
+                            decodedImage.height,
+                            Bitmap.Config.ARGB_8888
+                        )
+                        try {
+                            Canvas(rgbImage).drawBitmap(
+                                decodedImage,
+                                0f,
+                                0f,
+                                Paint(Paint.FILTER_BITMAP_FLAG)
+                            )
+                            resources.put(name, LosslessFactory.createFromImage(document, rgbImage))
+                        } finally {
+                            if (!rgbImage.isRecycled) rgbImage.recycle()
+                            if (!decodedImage.isRecycled) decodedImage.recycle()
+                        }
+                    }
+                }
+                is PDFormXObject -> normalizeImageResourcesToRgb(
+                    document,
+                    xObject.resources,
+                    visitedResources
+                )
+            }
         }
     }
 
@@ -1267,6 +1333,7 @@ class PdfBoxToolkitEngine(
         private const val DEFAULT_WATERMARK_OPACITY = 0.45f
         private const val EDITOR_EXPORT_DPI = 300f
         private const val MAX_EDITOR_EXPORT_PIXELS = 8_000_000L
+        private const val ANDROID_SHARE_PDF_VERSION = 1.4f
     }
 }
 

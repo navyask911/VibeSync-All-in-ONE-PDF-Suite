@@ -1028,10 +1028,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun shareDocumentPdf(
         uri: Uri,
-        defaultBaseName: String = "VibeSync_Shared_Document",
         recordOperation: Boolean = false
     ) {
         lifecycleScope.launch(Dispatchers.IO) {
+            val defaultBaseName = resolvePdfShareBaseName(uri)
             val staged = runCatching {
                 UriUtils.copyUriToCacheFile(this@MainActivity, uri, "share_pdf")
             }
@@ -1045,6 +1045,28 @@ class MainActivity : AppCompatActivity() {
                     }
             }
         }
+    }
+
+    /**
+     * Prefer the source document's display name. Providers without a useful DISPLAY_NAME
+     * (or those returning our generic placeholder) receive a collision-resistant scan name.
+     */
+    private fun resolvePdfShareBaseName(uri: Uri): String {
+        val displayName = runCatching { UriUtils.getFileName(this, uri) }
+            .getOrNull()
+            ?.substringAfterLast('/')
+            ?.substringAfterLast('\\')
+            ?.trim()
+            .orEmpty()
+        val candidate = sanitizeOutputBaseName(displayName, "")
+        val genericName = sanitizeOutputBaseName(getString(R.string.default_pdf_filename), "document")
+
+        return candidate.takeIf {
+            it.isNotBlank() &&
+                !it.equals(genericName, ignoreCase = true) &&
+                !it.equals("document", ignoreCase = true) &&
+                !it.equals("unknown", ignoreCase = true)
+        } ?: "VibeSync_Scan_${java.text.SimpleDateFormat("yyyyMMdd_HHmmss_SSS", java.util.Locale.US).format(java.util.Date())}"
     }
 
     /** Render regular PDFs to print-quality JPEGs; these temporary bitmaps are never exposed to Compose. */
@@ -1275,8 +1297,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun shareViewedDocument(sourceUri: Uri) {
-        // Route through the same staging/export path as every other PDF to avoid a second watermark pass.
-        shareDocumentPdf(sourceUri, "VibeSync_Viewed_Document", recordOperation = true)
+        // Keep the actual source filename through the common staging/export path.
+        shareDocumentPdf(sourceUri, recordOperation = true)
     }
     private fun shareFiles(
         files: List<File>,

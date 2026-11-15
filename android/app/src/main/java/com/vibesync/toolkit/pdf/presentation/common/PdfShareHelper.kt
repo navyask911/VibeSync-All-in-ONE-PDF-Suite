@@ -1,11 +1,10 @@
 package com.vibesync.toolkit.pdf.presentation.common
 
 import android.app.Activity
-import android.content.ClipData
-import android.content.ClipDescription
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.core.app.ShareCompat
 import com.vibesync.toolkit.pdf.core.util.UriUtils
 import java.io.File
 import java.io.IOException
@@ -46,43 +45,26 @@ object PdfShareHelper {
         val stagedFiles = files.map { file -> stagePdfForSharing(context, file) }
         val uris = stagedFiles.map { file -> uriProvider(context, file) }
 
-        // newUri() lets the provider supply its MIME type. ClipDescription is immutable,
-        // so wrap its first item in an explicit PDF description to guarantee application/pdf.
-        val providerClip = ClipData.newUri(context.contentResolver, "PDF", uris.first())
-        val clipData = ClipData(
-            ClipDescription("PDF", arrayOf(PDF_MIME_TYPE)),
-            providerClip.getItemAt(0)
-        )
-        uris.drop(1).forEach { uri -> clipData.addItem(ClipData.Item(uri)) }
+        // ShareCompat migrates stream extras into ClipData and adds the content URI
+        // read grant required by recipient apps' background thumbnail workers.
+        val builder = ShareCompat.IntentBuilder(context)
+            .setType(PDF_MIME_TYPE)
+            .setStream(uris.first())
+            .setSubject(files.first().name)
+        uris.drop(1).forEach(builder::addStream)
 
-        val sendIntent = if (uris.size == 1 && !forceMultiple) {
-            Intent(Intent.ACTION_SEND).apply {
-                type = PDF_MIME_TYPE
-                putExtra(Intent.EXTRA_STREAM, uris.first())
-                putExtra(Intent.EXTRA_TITLE, files.first().name)
-                putExtra(Intent.EXTRA_SUBJECT, files.first().name)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                this.clipData = clipData
-            }
-        } else {
-            Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-                type = PDF_MIME_TYPE
+        val sendIntent = builder.intent.apply {
+            putExtra(Intent.EXTRA_TITLE, files.first().name)
+            // Preserve the explicit multi-select contract for one-item callers.
+            if (forceMultiple && uris.size == 1) {
+                removeExtra(Intent.EXTRA_STREAM)
+                action = Intent.ACTION_SEND_MULTIPLE
                 putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
-                putExtra(Intent.EXTRA_TITLE, files.first().name)
-                putExtra(Intent.EXTRA_SUBJECT, files.first().name)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                this.clipData = clipData
             }
+            if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
-        // NEW_TASK is needed on the outgoing action as well as the chooser when a non-Activity
-        // Context invokes the helper. Activity callers keep the normal task/return behavior.
-        if (context !is Activity) sendIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-
         return Intent.createChooser(sendIntent, chooserTitle).apply {
-            // The wrapper also needs the read grant so the selected target can open the URI.
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            this.clipData = clipData
             if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
     }
