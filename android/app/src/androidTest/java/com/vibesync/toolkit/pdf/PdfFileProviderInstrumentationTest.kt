@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
+import android.os.ParcelFileDescriptor
 import androidx.core.content.FileProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -15,7 +16,7 @@ import com.tom_roush.pdfbox.pdmodel.PDPageContentStream
 import com.tom_roush.pdfbox.pdmodel.common.PDRectangle
 import com.tom_roush.pdfbox.pdmodel.encryption.AccessPermission
 import com.tom_roush.pdfbox.pdmodel.encryption.StandardProtectionPolicy
-import com.tom_roush.pdfbox.pdmodel.graphics.color.PDDeviceCMYK
+import com.tom_roush.pdfbox.pdmodel.graphics.color.PDDeviceGray
 import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
 import com.tom_roush.pdfbox.pdmodel.interactive.annotation.PDAnnotationText
 import com.tom_roush.pdfbox.pdmodel.interactive.form.PDAcroForm
@@ -34,6 +35,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import java.io.File
 import java.io.ByteArrayInputStream
+import kotlin.math.abs
 import java.security.Security
 
 @RunWith(AndroidJUnit4::class)
@@ -233,7 +235,7 @@ class PdfFileProviderInstrumentationTest {
     }
 
     @Test
-    fun sharePreparationFlattensFormsAndAnnotationsConvertsCmykImagesAndUsesPdf14() = runBlocking {
+    fun sharePreparationFlattensFormsAndAnnotationsConvertsGrayImagesAndUsesPdf14() = runBlocking<Unit> {
         val context: Context = InstrumentationRegistry.getInstrumentation().targetContext
         PDFBoxResourceLoader.init(context)
         val source = File(context.cacheDir, "whatsapp_compat_source_${System.nanoTime()}.pdf")
@@ -259,17 +261,17 @@ class PdfFileProviderInstrumentationTest {
                     contents = "Preview-only note"
                 })
 
-                val cmykImage = PDImageXObject(
+                val nonRgbImage = PDImageXObject(
                     document,
-                    ByteArrayInputStream(byteArrayOf(0, 0xff.toByte(), 0xff.toByte(), 0)),
+                    ByteArrayInputStream(byteArrayOf(0x40)),
                     null,
                     1,
                     1,
                     8,
-                    PDDeviceCMYK.INSTANCE
+                    PDDeviceGray.INSTANCE
                 )
                 PDPageContentStream(document, page).use { stream ->
-                    stream.drawImage(cmykImage, 36f, 36f, 120f, 80f)
+                    stream.drawImage(nonRgbImage, 36f, 36f, 120f, 80f)
                 }
                 document.save(source)
             }
@@ -286,19 +288,23 @@ class PdfFileProviderInstrumentationTest {
             PDDocument.load(source).use { original ->
                 assertNotNull("The original AcroForm must remain untouched.", original.documentCatalog.acroForm)
                 assertTrue("The original annotations must remain untouched.", original.getPage(0).annotations.isNotEmpty())
-                val originalResources = original.getPage(0).resources
-                val originalImages = originalResources?.xObjectNames.orEmpty()
-                    .mapNotNull { name -> originalResources?.getXObject(name) as? PDImageXObject }
-                assertTrue(originalImages.any { it.colorSpace.name == "DeviceCMYK" })
+                val originalResources = requireNotNull(original.getPage(0).resources)
+                val originalImages = mutableListOf<PDImageXObject>()
+                originalResources.xObjectNames.forEach { resourceName ->
+                    (originalResources.getXObject(resourceName) as? PDImageXObject)?.let(originalImages::add)
+                }
+                assertTrue(originalImages.any { it.colorSpace.name == "DeviceGray" })
             }
 
             PDDocument.load(prepared).use { output ->
                 assertEquals("Outgoing shares must use PDF 1.4.", 1.4f, output.version, 0f)
                 assertEquals("The outgoing copy must not keep interactive form fields.", null, output.documentCatalog.acroForm)
                 assertTrue("The outgoing copy must not keep page annotations.", output.getPage(0).annotations.isEmpty())
-                val outputResources = output.getPage(0).resources
-                val outputImages = outputResources?.xObjectNames.orEmpty()
-                    .mapNotNull { name -> outputResources?.getXObject(name) as? PDImageXObject }
+                val outputResources = requireNotNull(output.getPage(0).resources)
+                val outputImages = mutableListOf<PDImageXObject>()
+                outputResources.xObjectNames.forEach { resourceName ->
+                    (outputResources.getXObject(resourceName) as? PDImageXObject)?.let(outputImages::add)
+                }
                 assertTrue("The normalized PDF should still contain embedded images.", outputImages.isNotEmpty())
                 assertTrue(
                     "All embedded images should use standard DeviceRGB color space.",
@@ -319,8 +325,10 @@ class PdfFileProviderInstrumentationTest {
                                 (firstPage.height * 0.91f).toInt()
                             )
                             assertTrue(
-                                "Converted CMYK image must render as visible RGB content. pixel=$sample",
-                                Color.red(sample) > 180 && Color.green(sample) < 100 && Color.blue(sample) < 100
+                                "Converted DeviceGray image must render as neutral RGB content. pixel=$sample",
+                                abs(Color.red(sample) - Color.green(sample)) < 16 &&
+                                    abs(Color.green(sample) - Color.blue(sample)) < 16 &&
+                                    Color.red(sample) in 30..110
                             )
                         } finally {
                             bitmap.recycle()
