@@ -75,6 +75,10 @@ object PdfShareHelper {
             }
         }
 
+        // NEW_TASK is needed on the outgoing action as well as the chooser when a non-Activity
+        // Context invokes the helper. Activity callers keep the normal task/return behavior.
+        if (context !is Activity) sendIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
         return Intent.createChooser(sendIntent, chooserTitle).apply {
             // The wrapper also needs the read grant so the selected target can open the URI.
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)

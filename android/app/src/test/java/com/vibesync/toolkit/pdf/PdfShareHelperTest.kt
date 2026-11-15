@@ -76,6 +76,8 @@ class PdfShareHelperTest {
         assertEquals("content", requireNotNull(stream).scheme)
         assertTrue(sendIntent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
         assertTrue(chooser.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
+        assertTrue(sendIntent.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
+        assertTrue(chooser.flags and Intent.FLAG_ACTIVITY_NEW_TASK != 0)
         assertEquals(stream, sendIntent.clipData?.getItemAt(0)?.uri)
         assertEquals(stream, chooser.clipData?.getItemAt(0)?.uri)
         assertEquals("application/pdf", sendIntent.clipData?.description?.getMimeType(0))

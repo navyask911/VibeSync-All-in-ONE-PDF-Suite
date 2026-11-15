@@ -1300,7 +1300,8 @@ class MainActivity : AppCompatActivity() {
                                 toolkitEngine.watermarkPdf(
                                     sourceUri = Uri.fromFile(source),
                                     watermarkText = getString(R.string.pdf_watermark_text),
-                                    outputFile = output
+                                    outputFile = output,
+                                    removeSecurityForSharing = true
                                 ).getOrThrow()
                                 prepared.add(output)
                             }

@@ -684,7 +684,8 @@ class PdfBoxToolkitEngine(
         watermarkText: String,
         outputFile: File,
         opacity: Float = 150f / 255f,
-        angleDegrees: Float = 0f
+        angleDegrees: Float = 0f,
+        removeSecurityForSharing: Boolean = false
     ): Result<File> = withContext(Dispatchers.IO) {
         var sourceFileToDelete: File? = null
         try {
@@ -698,23 +699,39 @@ class PdfBoxToolkitEngine(
                             (document.numberOfPages > 0 && document.pages.all { page ->
                                 page.cosObject.getString(WATERMARK_PAGE_METADATA_COS_KEY) == WATERMARK_METADATA_VALUE
                             })
-                    if (alreadyWatermarked) {
-                        // A VibeSync-generated PDF already contains the entitlement-aware watermark.
-                        // Do not serialize it again during sharing: preserve original page geometry,
-                        // rotation, metadata, and all existing PDF objects byte-for-byte.
-                        copyOriginalBytes = true
-                    } else {
+                    val currentPermissions = document.currentAccessPermission
+                    val sourceHasSecurity = document.encryption != null ||
+                        document.isEncrypted ||
+                        !currentPermissions.canExtractContent() ||
+                        !currentPermissions.canModify()
+
+                    if (!alreadyWatermarked) {
                         applyVibeSyncWatermark(document, watermarkText, opacity, angleDegrees)
-                        val watermarkWasApplied =
-                            document.documentInformation.getCustomMetadataValue(WATERMARK_METADATA_KEY) == WATERMARK_METADATA_VALUE
-                        if (watermarkWasApplied) {
-                            document.save(outputFile)
-                        } else {
-                            // Active Pro users may share an unwatermarked document when no custom
-                            // watermark was requested. Preserve that source rather than needlessly
-                            // rewriting it.
-                            copyOriginalBytes = true
-                        }
+                    }
+
+                    val watermarkWasApplied =
+                        document.documentInformation.getCustomMetadataValue(WATERMARK_METADATA_KEY) == WATERMARK_METADATA_VALUE
+                    val securityMustBeRemoved = removeSecurityForSharing && sourceHasSecurity
+
+                    if (securityMustBeRemoved) {
+                        // This is a separate outgoing share copy. The user's original remains
+                        // encrypted and unchanged; a source that opened with the blank user
+                        // password is serialized without owner restrictions so thumbnailers can
+                        // extract/render page one. A non-empty user password still fails to load.
+                        document.isAllSecurityToBeRemoved = true
+                    }
+
+                    if (watermarkWasApplied && !alreadyWatermarked) {
+                        // PDFBox writes a fresh complete PDF (including a new xref/trailer) here.
+                        // PdfBox-Android 2.0.27 has no linearized/fast-web-view save option.
+                        document.save(outputFile)
+                    } else if (securityMustBeRemoved) {
+                        // Existing VibeSync watermark stays in place; only security is removed.
+                        document.save(outputFile)
+                    } else {
+                        // Preserve already-watermarked files and Pro files without a requested
+                        // custom mark byte-for-byte, avoiding unnecessary rewrites.
+                        copyOriginalBytes = true
                     }
                 }
             }
