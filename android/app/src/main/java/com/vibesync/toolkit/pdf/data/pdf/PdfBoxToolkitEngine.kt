@@ -699,38 +699,24 @@ class PdfBoxToolkitEngine(
                             (document.numberOfPages > 0 && document.pages.all { page ->
                                 page.cosObject.getString(WATERMARK_PAGE_METADATA_COS_KEY) == WATERMARK_METADATA_VALUE
                             })
-                    val currentPermissions = document.currentAccessPermission
-                    val sourceHasSecurity = document.encryption != null ||
-                        document.isEncrypted ||
-                        !currentPermissions.canExtractContent() ||
-                        !currentPermissions.canModify()
-
                     if (!alreadyWatermarked) {
                         applyVibeSyncWatermark(document, watermarkText, opacity, angleDegrees)
                     }
 
                     val watermarkWasApplied =
                         document.documentInformation.getCustomMetadataValue(WATERMARK_METADATA_KEY) == WATERMARK_METADATA_VALUE
-                    val securityMustBeRemoved = removeSecurityForSharing && sourceHasSecurity
 
-                    if (securityMustBeRemoved) {
-                        // This is a separate outgoing share copy. The user's original remains
-                        // encrypted and unchanged; a source that opened with the blank user
-                        // password is serialized without owner restrictions so thumbnailers can
-                        // extract/render page one. A non-empty user password still fails to load.
+                    if (removeSecurityForSharing) {
+                        // Normalize every outgoing share copy, not only the PDFs that needed a
+                        // new watermark. PDFBox writes a fresh xref/trailer and removes restrictions
+                        // from this copy; the original file is never modified. If a non-empty
+                        // open-password is required, loadPdfFromInputStream still rejects the file.
                         document.isAllSecurityToBeRemoved = true
-                    }
-
-                    if (watermarkWasApplied && !alreadyWatermarked) {
-                        // PDFBox writes a fresh complete PDF (including a new xref/trailer) here.
-                        // PdfBox-Android 2.0.27 has no linearized/fast-web-view save option.
                         document.save(outputFile)
-                    } else if (securityMustBeRemoved) {
-                        // Existing VibeSync watermark stays in place; only security is removed.
+                    } else if (watermarkWasApplied && !alreadyWatermarked) {
                         document.save(outputFile)
                     } else {
-                        // Preserve already-watermarked files and Pro files without a requested
-                        // custom mark byte-for-byte, avoiding unnecessary rewrites.
+                        // Non-share callers preserve already-watermarked or entitlement-free files.
                         copyOriginalBytes = true
                     }
                 }

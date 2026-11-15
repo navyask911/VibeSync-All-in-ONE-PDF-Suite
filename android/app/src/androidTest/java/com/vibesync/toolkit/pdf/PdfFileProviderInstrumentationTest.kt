@@ -106,15 +106,12 @@ class PdfFileProviderInstrumentationTest {
             Security.insertProviderAt(BouncyCastleProvider(), 1)
         }
 
+        val plain = File(context.cacheDir, "whatsapp_plain_source_${System.nanoTime()}.pdf")
+        val marked = File(context.cacheDir, "whatsapp_marked_source_${System.nanoTime()}.pdf")
         val source = File(context.cacheDir, "whatsapp_encrypted_source_${System.nanoTime()}.pdf")
         val prepared = File(context.cacheDir, "whatsapp_prepared_${System.nanoTime()}.pdf")
         var staged: File? = null
         try {
-            val permissions = AccessPermission().apply {
-                setCanExtractContent(false)
-                setCanModify(false)
-                setCanPrint(false)
-            }
             PDDocument().use { document ->
                 val page = PDPage(PDRectangle.A4)
                 document.addPage(page)
@@ -122,6 +119,25 @@ class PdfFileProviderInstrumentationTest {
                     stream.setNonStrokingColor(255, 0, 0)
                     stream.addRect(0f, 0f, PDRectangle.A4.width, PDRectangle.A4.height)
                     stream.fill()
+                }
+                document.save(plain)
+            }
+
+            val engine = PdfBoxToolkitEngine(context, billingManager = null)
+            // Mark once before locking the PDF. The share path must preserve this mark while
+            // rebuilding the outgoing PDF structure and removing its extraction restrictions.
+            val firstWatermark = engine.watermarkPdf(
+                sourceUri = android.net.Uri.fromFile(plain),
+                watermarkText = PdfBoxToolkitEngine.DEFAULT_FOOTER_WATERMARK_TEXT,
+                outputFile = marked
+            )
+            assertTrue("Initial watermark failed: ${firstWatermark.exceptionOrNull()}", firstWatermark.isSuccess)
+
+            PDDocument.load(marked).use { document ->
+                val permissions = AccessPermission().apply {
+                    setCanExtractContent(false)
+                    setCanModify(false)
+                    setCanPrint(false)
                 }
                 val policy = StandardProtectionPolicy("owner-password", "", permissions).apply {
                     encryptionKeyLength = 128
@@ -131,7 +147,6 @@ class PdfFileProviderInstrumentationTest {
                 document.save(source)
             }
 
-            val engine = PdfBoxToolkitEngine(context, billingManager = null)
             val preparedResult = engine.watermarkPdf(
                 sourceUri = android.net.Uri.fromFile(source),
                 watermarkText = PdfBoxToolkitEngine.DEFAULT_FOOTER_WATERMARK_TEXT,
@@ -146,6 +161,16 @@ class PdfFileProviderInstrumentationTest {
                 assertTrue("The outgoing copy must permit thumbnail content extraction.", output.currentAccessPermission.canExtractContent())
                 assertTrue("The outgoing copy must not retain a modify restriction.", output.currentAccessPermission.canModify())
                 assertEquals(1, output.numberOfPages)
+                assertEquals(
+                    "An existing watermark must not be duplicated during share normalization.",
+                    "true",
+                    output.documentInformation.getCustomMetadataValue("VibeSync-Watermarked-V2")
+                )
+                assertEquals(
+                    "The source watermark must remain represented by a single image.",
+                    1,
+                    output.getPage(0).resources?.xObjectNames?.count() ?: 0
+                )
                 assertEquals(PDRectangle.A4.width, output.getPage(0).mediaBox.width, 0.01f)
                 assertEquals(PDRectangle.A4.height, output.getPage(0).mediaBox.height, 0.01f)
             }
@@ -193,6 +218,8 @@ class PdfFileProviderInstrumentationTest {
                 }
             }
         } finally {
+            plain.delete()
+            marked.delete()
             source.delete()
             prepared.delete()
             staged?.delete()
