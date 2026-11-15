@@ -263,10 +263,10 @@ class PdfFileProviderInstrumentationTest {
 
                 val nonRgbImage = PDImageXObject(
                     document,
-                    ByteArrayInputStream(byteArrayOf(0x40)),
+                    ByteArrayInputStream(ByteArray(64) { 0x40 }),
                     null,
-                    1,
-                    1,
+                    8,
+                    8,
                     8,
                     PDDeviceGray.INSTANCE
                 )
@@ -294,6 +294,21 @@ class PdfFileProviderInstrumentationTest {
                     (originalResources.getXObject(resourceName) as? PDImageXObject)?.let(originalImages::add)
                 }
                 assertTrue(originalImages.any { it.colorSpace.name == "DeviceGray" })
+                val originalGrayBitmap = originalImages.first { it.colorSpace.name == "DeviceGray" }.image
+                try {
+                    val originalPixel = originalGrayBitmap.getPixel(
+                        originalGrayBitmap.width / 2,
+                        originalGrayBitmap.height / 2
+                    )
+                    assertTrue(
+                        "The DeviceGray fixture must decode to visible mid-gray before normalization. pixel=$originalPixel",
+                        Color.red(originalPixel) in 30..110 &&
+                            abs(Color.red(originalPixel) - Color.green(originalPixel)) < 16 &&
+                            abs(Color.green(originalPixel) - Color.blue(originalPixel)) < 16
+                    )
+                } finally {
+                    originalGrayBitmap.recycle()
+                }
             }
 
             PDDocument.load(prepared).use { output ->
@@ -310,6 +325,21 @@ class PdfFileProviderInstrumentationTest {
                     "All embedded images should use standard DeviceRGB color space.",
                     outputImages.all { it.colorSpace.name == "DeviceRGB" }
                 )
+                val normalizedImageBitmap = outputImages.first().image
+                try {
+                    val normalizedPixel = normalizedImageBitmap.getPixel(
+                        normalizedImageBitmap.width / 2,
+                        normalizedImageBitmap.height / 2
+                    )
+                    assertTrue(
+                        "The normalized DeviceRGB image must preserve its visible mid-gray pixels. pixel=$normalizedPixel",
+                        Color.red(normalizedPixel) in 30..110 &&
+                            abs(Color.red(normalizedPixel) - Color.green(normalizedPixel)) < 16 &&
+                            abs(Color.green(normalizedPixel) - Color.blue(normalizedPixel)) < 16
+                    )
+                } finally {
+                    normalizedImageBitmap.recycle()
+                }
             }
 
             ParcelFileDescriptor.open(prepared, ParcelFileDescriptor.MODE_READ_ONLY).use { descriptor ->
@@ -320,15 +350,35 @@ class PdfFileProviderInstrumentationTest {
                         try {
                             bitmap.eraseColor(Color.WHITE)
                             firstPage.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                            val sample = bitmap.getPixel(
-                                (firstPage.width * 0.16f).toInt(),
-                                (firstPage.height * 0.91f).toInt()
+                            // PdfRenderer implementations may differ in image-origin handling. Inspect
+                            // both valid vertical placements, but constrain the scan to the
+                            // image's horizontal bounds so watermark text cannot satisfy it.
+                            val xStart = (firstPage.width * 0.05f).toInt().coerceAtLeast(0)
+                            val xEnd = (firstPage.width * 0.30f).toInt().coerceAtMost(firstPage.width)
+                            val verticalBands = listOf(
+                                (firstPage.height * 0.02f).toInt() to (firstPage.height * 0.18f).toInt(),
+                                (firstPage.height * 0.82f).toInt() to (firstPage.height * 0.98f).toInt()
                             )
+                            val grayPixelCount = verticalBands.sumOf { (top, bottom) ->
+                                var count = 0
+                                for (y in top until bottom.coerceAtMost(firstPage.height)) {
+                                    for (x in xStart until xEnd) {
+                                        val pixel = bitmap.getPixel(x, y)
+                                        val red = Color.red(pixel)
+                                        if (
+                                            red in 30..110 &&
+                                            abs(red - Color.green(pixel)) < 16 &&
+                                            abs(Color.green(pixel) - Color.blue(pixel)) < 16
+                                        ) {
+                                            count++
+                                        }
+                                    }
+                                }
+                                count
+                            }
                             assertTrue(
-                                "Converted DeviceGray image must render as neutral RGB content. pixel=$sample",
-                                abs(Color.red(sample) - Color.green(sample)) < 16 &&
-                                    abs(Color.green(sample) - Color.blue(sample)) < 16 &&
-                                    Color.red(sample) in 30..110
+                                "Converted DeviceGray image must render as a visible neutral RGB region through PdfRenderer. grayPixels=$grayPixelCount",
+                                grayPixelCount > 100
                             )
                         } finally {
                             bitmap.recycle()
