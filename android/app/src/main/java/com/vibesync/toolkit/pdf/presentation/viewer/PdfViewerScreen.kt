@@ -347,7 +347,8 @@ fun PdfViewerScreen(
                                                 } else {
                                                     Icon(
                                                         Icons.Default.Print,
-                                                        contentDescription = stringResource(R.string.print_action)
+                                                        contentDescription = stringResource(R.string.print_action),
+                                                        modifier = Modifier.testTag("viewer_print")
                                                     )
                                                 }
                                             },
