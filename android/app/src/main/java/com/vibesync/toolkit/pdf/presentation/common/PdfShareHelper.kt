@@ -79,14 +79,14 @@ object PdfShareHelper {
             action = Intent.ACTION_SEND_MULTIPLE
             putExtra(Intent.EXTRA_TITLE, stagedPdfs.first().name)
             putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
-            clipData = clipData
+            this.clipData = clipData
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             removeFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
             if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
 
         return Intent.createChooser(sendIntent, chooserTitle).apply {
-            clipData = sendIntent.clipData
+            this.clipData = sendIntent.clipData
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             removeFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
             if (context !is Activity) addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
