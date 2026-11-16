@@ -49,6 +49,7 @@ class PdfFileProviderInstrumentationTest {
         PDFBoxResourceLoader.init(context)
         val source = File(context.cacheDir, "whatsapp_preview_${System.nanoTime()}.pdf")
         var staged: File? = null
+        var preview: File? = null
         try {
             PDDocument().use { document ->
                 val firstPage = PDPage(PDRectangle.A4)
@@ -67,7 +68,7 @@ class PdfFileProviderInstrumentationTest {
                 listOf(source),
                 "Share PDF",
                 uriProvider = { shareContext, file ->
-                    staged = file
+                    if (file.extension.equals("pdf", ignoreCase = true)) staged = file else preview = file
                     UriUtils.getShareableUri(shareContext, file)
                 }
             )
@@ -127,6 +128,7 @@ class PdfFileProviderInstrumentationTest {
         } finally {
             source.delete()
             staged?.delete()
+            preview?.delete()
         }
     }
 
@@ -143,6 +145,7 @@ class PdfFileProviderInstrumentationTest {
         val source = File(context.cacheDir, "whatsapp_encrypted_source_${System.nanoTime()}.pdf")
         val prepared = File(context.cacheDir, "whatsapp_prepared_${System.nanoTime()}.pdf")
         var staged: File? = null
+        var preview: File? = null
         try {
             PDDocument().use { document ->
                 val page = PDPage(PDRectangle.A4)
@@ -212,7 +215,7 @@ class PdfFileProviderInstrumentationTest {
                 listOf(prepared),
                 "Share PDF",
                 uriProvider = { shareContext, file ->
-                    staged = file
+                    if (file.extension.equals("pdf", ignoreCase = true)) staged = file else preview = file
                     UriUtils.getShareableUri(shareContext, file)
                 }
             )
@@ -278,6 +281,7 @@ class PdfFileProviderInstrumentationTest {
             source.delete()
             prepared.delete()
             staged?.delete()
+            preview?.delete()
         }
     }
 
