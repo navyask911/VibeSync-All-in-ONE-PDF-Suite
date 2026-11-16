@@ -81,11 +81,18 @@ fun ExportMenu(
     modifier: Modifier = Modifier,
     testTag: String = "export_menu",
     onExportSelected: (mimeType: String, displayName: String) -> Unit = { _, _ -> },
-    onSafLaunch: ((mimeType: String, displayName: String) -> Unit)? = null
+    onSafLaunch: ((mimeType: String, displayName: String) -> Unit)? = null,
+    externallyExpanded: Boolean? = null,
+    onExpandedChange: ((Boolean) -> Unit)? = null,
+    showTrigger: Boolean = true
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    var expanded by remember { mutableStateOf(false) }
+    var localExpanded by remember { mutableStateOf(false) }
+    val menuExpanded = externallyExpanded ?: localExpanded
+    fun setMenuExpanded(value: Boolean) {
+        if (onExpandedChange != null) onExpandedChange(value) else localExpanded = value
+    }
     var running by remember { mutableStateOf(false) }
     var progress by remember { mutableFloatStateOf(0f) }
     var completedPages by remember { mutableIntStateOf(0) }
@@ -133,7 +140,7 @@ fun ExportMenu(
     }
 
     fun requestSaveToDownloads() {
-        expanded = false
+        setMenuExpanded(false)
         if (
             Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
             context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
@@ -233,16 +240,18 @@ fun ExportMenu(
     }
 
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Box {
-            IconButton(onClick = { expanded = true }, enabled = enabled && !running, modifier = Modifier.testTag(testTag)) {
-                Icon(Icons.Default.FileDownload, contentDescription = stringResource(R.string.export_menu_title))
+        Box(modifier = if (showTrigger) Modifier else Modifier.size(1.dp)) {
+            if (showTrigger) {
+                IconButton(onClick = { setMenuExpanded(true) }, enabled = enabled && !running, modifier = Modifier.testTag(testTag)) {
+                    Icon(Icons.Default.FileDownload, contentDescription = stringResource(R.string.export_menu_title))
+                }
             }
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            DropdownMenu(expanded = menuExpanded, onDismissRequest = { setMenuExpanded(false) }) {
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.export_pdf)) },
                     modifier = Modifier.testTag("export_pdf"),
                     onClick = {
-                        expanded = false
+                        setMenuExpanded(false)
                         val name = generateSmartFileName("VibeSync_Export", "pdf")
                         requestSaf("application/pdf", name) { pdfLauncher.launch(name) }
                     }
@@ -256,7 +265,7 @@ fun ExportMenu(
                     text = { Text(stringResource(R.string.export_jpg_current)) },
                     modifier = Modifier.testTag("export_jpg_current"),
                     onClick = {
-                        expanded = false
+                        setMenuExpanded(false)
                         val page = currentPageIndex.coerceAtLeast(0)
                         queuedJpgPages = listOf(page)
                         val name = generateSmartFileName("VibeSync_Export_Page${page + 1}", "jpg")
@@ -267,7 +276,7 @@ fun ExportMenu(
                     text = { Text(stringResource(R.string.export_jpg_separate)) },
                     modifier = Modifier.testTag("export_jpg_separate"),
                     onClick = {
-                        expanded = false
+                        setMenuExpanded(false)
                         coroutineScope.launch {
                             try {
                                 val count = withContext(Dispatchers.IO) { pageCount(context, sourceUri, null) }
@@ -285,7 +294,7 @@ fun ExportMenu(
                     text = { Text(stringResource(R.string.export_jpg_zip)) },
                     modifier = Modifier.testTag("export_jpg_zip"),
                     onClick = {
-                        expanded = false
+                        setMenuExpanded(false)
                         val name = "${baseName}_pages.zip"
                         requestSaf("application/zip", name) { zipLauncher.launch(name) }
                     }
@@ -294,7 +303,7 @@ fun ExportMenu(
                     text = { Text(stringResource(R.string.export_txt)) },
                     modifier = Modifier.testTag("export_txt"),
                     onClick = {
-                        expanded = false
+                        setMenuExpanded(false)
                         val name = "$baseName.txt"
                         requestSaf("text/plain", name) { txtLauncher.launch(name) }
                     }

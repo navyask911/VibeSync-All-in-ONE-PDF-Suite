@@ -97,6 +97,7 @@ fun PdfViewerScreen(
     var offsetX by remember { mutableFloatStateOf(0f) }
     var offsetY by remember { mutableFloatStateOf(0f) }
     var scanMenuExpanded by remember(documentUri) { mutableStateOf(false) }
+    var compactExportMenuExpanded by remember(documentUri) { mutableStateOf(false) }
     var showRenameScanDialog by remember(documentUri) { mutableStateOf(false) }
     var showDeleteScanDialog by remember(documentUri) { mutableStateOf(false) }
     var isSearchActive by remember(documentUri) { mutableStateOf(false) }
@@ -148,6 +149,79 @@ fun PdfViewerScreen(
             ?.pageIndex
         if (!uiState.isLoading && targetPage != null && targetPage in 0 until uiState.pageCount) {
             listState.animateScrollToItem(targetPage)
+        }
+    }
+
+    fun launchPrint() {
+        if (isPreparingPrint) return
+        isPreparingPrint = true
+        val activity = generateSequence(context) { (it as? ContextWrapper)?.baseContext }
+            .filterIsInstance<Activity>()
+            .firstOrNull()
+        if (activity == null) {
+            println("PdfViewerScreen: Print click could not resolve Activity from LocalContext")
+            isPreparingPrint = false
+            return
+        }
+
+        println("PdfViewerScreen: Print click resolved Activity; preparing print dispatch")
+        val jobName = context.getString(R.string.print_job_name, uiState.fileName)
+        val attributes = PrintAttributes.Builder()
+            .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
+            .setResolution(PrintAttributes.Resolution("pdf_print", "PDF print", 300, 300))
+            .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
+            .build()
+        val sourceFile = if (documentUri.scheme == "file") documentUri.path?.let(::File) else null
+        if (sourceFile != null && sourceFile.isFile && sourceFile.canRead() && sourceFile.length() > 0L) {
+            var preparedFile: File? = null
+            try {
+                preparedFile = UriUtils.copyUriToCacheFile(context, documentUri, "print_ready").also { file ->
+                    if (!file.isFile || !file.canRead() || file.length() <= 0L) {
+                        file.delete()
+                        throw IOException("The selected PDF is not ready for printing.")
+                    }
+                }
+                viewModel.setPreparedPrintFile(preparedFile)
+                println("PdfViewerScreen: dispatching Print through PdfViewerViewModel")
+                viewModel.printDocument(activity, jobName, attributes)
+                preparedFile = null
+            } catch (error: Exception) {
+                preparedFile?.delete()
+                android.widget.Toast.makeText(
+                    context,
+                    error.localizedMessage ?: context.getString(R.string.print_failed),
+                    android.widget.Toast.LENGTH_LONG
+                ).show()
+            } finally {
+                isPreparingPrint = false
+            }
+        } else {
+            coroutineScope.launch {
+                var preparedFile: File? = null
+                try {
+                    preparedFile = withContext(Dispatchers.IO) {
+                        UriUtils.copyUriToCacheFile(context, documentUri, "print_ready").also { file ->
+                            if (!file.isFile || !file.canRead() || file.length() <= 0L) {
+                                file.delete()
+                                throw IOException("The selected PDF is not ready for printing.")
+                            }
+                        }
+                    }
+                    viewModel.setPreparedPrintFile(requireNotNull(preparedFile))
+                    println("PdfViewerScreen: dispatching Print through PdfViewerViewModel")
+                    viewModel.printDocument(activity, jobName, attributes)
+                    preparedFile = null
+                } catch (error: Exception) {
+                    preparedFile?.delete()
+                    android.widget.Toast.makeText(
+                        context,
+                        error.localizedMessage ?: context.getString(R.string.print_failed),
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                } finally {
+                    isPreparingPrint = false
+                }
+            }
         }
     }
 
@@ -262,94 +336,44 @@ fun PdfViewerScreen(
                                 }
                                 DropdownMenu(expanded = scanMenuExpanded, onDismissRequest = { scanMenuExpanded = false }) {
                                     if (compactActions) {
-                                        DropdownMenuItem(text = { Text(stringResource(R.string.print_action)) }, trailingIcon = {
-                        IconButton(
-                            onClick = {
-                                if (isPreparingPrint) return@IconButton
-                                isPreparingPrint = true
-                                val activity = generateSequence(context) { (it as? ContextWrapper)?.baseContext }
-                                    .filterIsInstance<Activity>()
-                                    .firstOrNull()
-                                if (activity == null) {
-                                    println("PdfViewerScreen: Print click could not resolve Activity from LocalContext")
-                                    isPreparingPrint = false
-                                    return@IconButton
-                                }
-                                println("PdfViewerScreen: Print click resolved Activity; preparing print dispatch")
-                                val jobName = context.getString(R.string.print_job_name, uiState.fileName)
-                                val attributes = PrintAttributes.Builder()
-                                    .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
-                                    .setResolution(PrintAttributes.Resolution("pdf_print", "PDF print", 300, 300))
-                                    .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
-                                    .build()
-                                val sourceFile = if (documentUri.scheme == "file") documentUri.path?.let(::File) else null
-                                if (sourceFile != null && sourceFile.isFile && sourceFile.canRead() && sourceFile.length() > 0L) {
-                                    var preparedFile: File? = null
-                                    try {
-                                        preparedFile = UriUtils.copyUriToCacheFile(context, documentUri, "print_ready").also { file ->
-                                            if (!file.isFile || !file.canRead() || file.length() <= 0L) {
-                                                file.delete()
-                                                throw IOException("The selected PDF is not ready for printing.")
-                                            }
-                                        }
-                                        viewModel.setPreparedPrintFile(preparedFile)
-                                        println("PdfViewerScreen: dispatching Print through PdfViewerViewModel")
-                                        viewModel.printDocument(activity, jobName, attributes)
-                                        preparedFile = null
-                                    } catch (error: Exception) {
-                                        preparedFile?.delete()
-                                        android.widget.Toast.makeText(
-                                            context,
-                                            error.localizedMessage ?: context.getString(R.string.print_failed),
-                                            android.widget.Toast.LENGTH_LONG
-                                        ).show()
-                                    } finally {
-                                        isPreparingPrint = false
-                                    }
-                                } else {
-                                    coroutineScope.launch {
-                                        var preparedFile: File? = null
-                                        try {
-                                            preparedFile = withContext(Dispatchers.IO) {
-                                                UriUtils.copyUriToCacheFile(context, documentUri, "print_ready").also { file ->
-                                                    if (!file.isFile || !file.canRead() || file.length() <= 0L) {
-                                                        file.delete()
-                                                        throw IOException("The selected PDF is not ready for printing.")
-                                                    }
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.print_action)) },
+                                            trailingIcon = {
+                                                if (isPreparingPrint) {
+                                                    CircularProgressIndicator(
+                                                        modifier = Modifier.size(18.dp),
+                                                        strokeWidth = 2.dp
+                                                    )
+                                                } else {
+                                                    Icon(
+                                                        Icons.Default.Print,
+                                                        contentDescription = stringResource(R.string.print_action)
+                                                    )
                                                 }
+                                            },
+                                            modifier = Modifier.testTag("viewer_print_menu_item"),
+                                            enabled = !uiState.isLoading && uiState.pageCount > 0 && !isPreparingPrint,
+                                            onClick = {
+                                                scanMenuExpanded = false
+                                                launchPrint()
                                             }
-                                            viewModel.setPreparedPrintFile(requireNotNull(preparedFile))
-                                            println("PdfViewerScreen: dispatching Print through PdfViewerViewModel")
-                                            viewModel.printDocument(activity, jobName, attributes)
-                                            preparedFile = null
-                                        } catch (error: Exception) {
-                                            preparedFile?.delete()
-                                            android.widget.Toast.makeText(
-                                                context,
-                                                error.localizedMessage ?: context.getString(R.string.print_failed),
-                                                android.widget.Toast.LENGTH_LONG
-                                            ).show()
-                                        } finally {
-                                            isPreparingPrint = false
-                                        }
-                                    }
-                                }
-                            },
-                            enabled = !uiState.isLoading && uiState.pageCount > 0 && !isPreparingPrint,
-                            modifier = Modifier.testTag("viewer_print")
-                        ) {
-                            if (isPreparingPrint) CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                            else Icon(Icons.Default.Print, contentDescription = stringResource(R.string.print_action))
-                        }
-                                        }, onClick = { scanMenuExpanded = false })
-                                        DropdownMenuItem(text = { Text(stringResource(R.string.viewer_download_save)) }, leadingIcon = {
-                                            ExportMenu(
-                                                sourceUri = viewModel.getDocumentUriForActions() ?: documentUri,
-                                                currentPageIndex = uiState.currentPageIndex,
-                                                enabled = !uiState.isLoading && uiState.pageCount > 0,
-                                                testTag = "viewer_export_menu"
-                                            )
-                                        }, onClick = { scanMenuExpanded = false })
+                                        )
+                                        DropdownMenuItem(
+                                            text = { Text(stringResource(R.string.viewer_download_save)) },
+                                            leadingIcon = {
+                                                Icon(
+                                                    Icons.Default.FileDownload,
+                                                    contentDescription = stringResource(R.string.viewer_download_save),
+                                                    modifier = Modifier.testTag("viewer_export_menu")
+                                                )
+                                            },
+                                            modifier = Modifier.testTag("viewer_export_menu_item"),
+                                            enabled = !uiState.isLoading && uiState.pageCount > 0,
+                                            onClick = {
+                                                scanMenuExpanded = false
+                                                compactExportMenuExpanded = true
+                                            }
+                                        )
                                     }
                                     if (scale > 1.05f) {
                                         DropdownMenuItem(text = { Text(stringResource(R.string.reset_zoom)) },
@@ -377,6 +401,17 @@ fun PdfViewerScreen(
                                             leadingIcon = { Icon(Icons.Default.DeleteOutline, contentDescription = null) },
                                             onClick = { scanMenuExpanded = false; showDeleteScanDialog = true })
                                     }
+                                }
+                                if (compactActions) {
+                                    ExportMenu(
+                                        sourceUri = viewModel.getDocumentUriForActions() ?: documentUri,
+                                        currentPageIndex = uiState.currentPageIndex,
+                                        enabled = !uiState.isLoading && uiState.pageCount > 0,
+                                        testTag = "viewer_export_menu_compact",
+                                        externallyExpanded = compactExportMenuExpanded,
+                                        onExpandedChange = { compactExportMenuExpanded = it },
+                                        showTrigger = false
+                                    )
                                 }
                             }
                         }
@@ -446,82 +481,15 @@ fun PdfViewerScreen(
                         }
                         if (!compactActions) {
                     IconButton(
-                        onClick = {
-                            if (isPreparingPrint) return@IconButton
-                            isPreparingPrint = true
-                            val activity = generateSequence(context) { (it as? ContextWrapper)?.baseContext }
-                                .filterIsInstance<Activity>()
-                                .firstOrNull()
-                            if (activity == null) {
-                                println("PdfViewerScreen: Print click could not resolve Activity from LocalContext")
-                                isPreparingPrint = false
-                                return@IconButton
-                            }
-                            println("PdfViewerScreen: Print click resolved Activity; preparing print dispatch")
-                            val jobName = context.getString(R.string.print_job_name, uiState.fileName)
-                            val attributes = PrintAttributes.Builder()
-                                .setMediaSize(PrintAttributes.MediaSize.ISO_A4)
-                                .setResolution(PrintAttributes.Resolution("pdf_print", "PDF print", 300, 300))
-                                .setColorMode(PrintAttributes.COLOR_MODE_COLOR)
-                                .build()
-                            val sourceFile = if (documentUri.scheme == "file") documentUri.path?.let(::File) else null
-                            if (sourceFile != null && sourceFile.isFile && sourceFile.canRead() && sourceFile.length() > 0L) {
-                                var preparedFile: File? = null
-                                try {
-                                    preparedFile = UriUtils.copyUriToCacheFile(context, documentUri, "print_ready").also { file ->
-                                        if (!file.isFile || !file.canRead() || file.length() <= 0L) {
-                                            file.delete()
-                                            throw IOException("The selected PDF is not ready for printing.")
-                                        }
-                                    }
-                                    viewModel.setPreparedPrintFile(preparedFile)
-                                    println("PdfViewerScreen: dispatching Print through PdfViewerViewModel")
-                                    viewModel.printDocument(activity, jobName, attributes)
-                                    preparedFile = null
-                                } catch (error: Exception) {
-                                    preparedFile?.delete()
-                                    android.widget.Toast.makeText(
-                                        context,
-                                        error.localizedMessage ?: context.getString(R.string.print_failed),
-                                        android.widget.Toast.LENGTH_LONG
-                                    ).show()
-                                } finally {
-                                    isPreparingPrint = false
-                                }
-                            } else {
-                                coroutineScope.launch {
-                                    var preparedFile: File? = null
-                                    try {
-                                        preparedFile = withContext(Dispatchers.IO) {
-                                            UriUtils.copyUriToCacheFile(context, documentUri, "print_ready").also { file ->
-                                                if (!file.isFile || !file.canRead() || file.length() <= 0L) {
-                                                    file.delete()
-                                                    throw IOException("The selected PDF is not ready for printing.")
-                                                }
-                                            }
-                                        }
-                                        viewModel.setPreparedPrintFile(requireNotNull(preparedFile))
-                                        println("PdfViewerScreen: dispatching Print through PdfViewerViewModel")
-                                        viewModel.printDocument(activity, jobName, attributes)
-                                        preparedFile = null
-                                    } catch (error: Exception) {
-                                        preparedFile?.delete()
-                                        android.widget.Toast.makeText(
-                                            context,
-                                            error.localizedMessage ?: context.getString(R.string.print_failed),
-                                            android.widget.Toast.LENGTH_LONG
-                                        ).show()
-                                    } finally {
-                                        isPreparingPrint = false
-                                    }
-                                }
-                            }
-                        },
+                        onClick = { launchPrint() },
                         enabled = !uiState.isLoading && uiState.pageCount > 0 && !isPreparingPrint,
                         modifier = Modifier.testTag("viewer_print")
                     ) {
-                        if (isPreparingPrint) CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
-                        else Icon(Icons.Default.Print, contentDescription = stringResource(R.string.print_action))
+                        if (isPreparingPrint) {
+                            CircularProgressIndicator(modifier = Modifier.size(22.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Print, contentDescription = stringResource(R.string.print_action))
+                        }
                     }
                             ExportMenu(
                                 sourceUri = viewModel.getDocumentUriForActions() ?: documentUri,
