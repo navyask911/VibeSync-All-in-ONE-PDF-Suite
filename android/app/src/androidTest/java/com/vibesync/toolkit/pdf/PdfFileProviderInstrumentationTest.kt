@@ -300,11 +300,19 @@ class PdfFileProviderInstrumentationTest {
                         originalGrayBitmap.width / 2,
                         originalGrayBitmap.height / 2
                     )
-                    assertTrue(
-                        "The DeviceGray fixture must decode to visible mid-gray before normalization. pixel=$originalPixel",
-                        Color.red(originalPixel) in 30..110 &&
-                            abs(Color.red(originalPixel) - Color.green(originalPixel)) < 16 &&
-                            abs(Color.green(originalPixel) - Color.blue(originalPixel)) < 16
+                    // PDFBox-Android represents DeviceGray samples through the alpha
+                    // channel of its ALPHA_8 decoded bitmap (0x40 -> 0x40FFFFFF).
+                    // Confirm that the source fixture is gray before the production path
+                    // promotes that sample into opaque DeviceRGB channels.
+                    val originalGraySample = if (Color.alpha(originalPixel) < 255) {
+                        Color.alpha(originalPixel)
+                    } else {
+                        Color.red(originalPixel)
+                    }
+                    assertEquals(
+                        "The DeviceGray fixture must retain its mid-gray source sample. pixel=$originalPixel",
+                        0x40,
+                        originalGraySample
                     )
                 } finally {
                     originalGrayBitmap.recycle()
