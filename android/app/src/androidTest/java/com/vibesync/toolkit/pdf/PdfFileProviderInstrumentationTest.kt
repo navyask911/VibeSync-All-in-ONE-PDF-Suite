@@ -3,6 +3,7 @@ package com.vibesync.toolkit.pdf
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
@@ -73,12 +74,35 @@ class PdfFileProviderInstrumentationTest {
             @Suppress("DEPRECATION")
             val sendIntent = requireNotNull(chooser.getParcelableExtra(Intent.EXTRA_INTENT) as? Intent)
             @Suppress("DEPRECATION")
-            val sharedUri = requireNotNull(sendIntent.getParcelableExtra(Intent.EXTRA_STREAM) as? android.net.Uri)
-            assertEquals(Intent.ACTION_SEND, sendIntent.action)
+            val sharedUris = requireNotNull(sendIntent.getParcelableArrayListExtra<android.net.Uri>(Intent.EXTRA_STREAM))
+            assertEquals(Intent.ACTION_SEND_MULTIPLE, sendIntent.action)
             assertEquals("application/pdf", sendIntent.type)
+            assertEquals(2, sharedUris.size)
+            val sharedUri = sharedUris[0]
+            val thumbnailUri = sharedUris[1]
             assertEquals("application/pdf", sendIntent.clipData?.description?.getMimeType(0))
+            assertEquals("image/jpeg", sendIntent.clipData?.description?.getMimeType(1))
+            assertEquals(sharedUri, sendIntent.clipData?.getItemAt(0)?.uri)
+            assertEquals(thumbnailUri, sendIntent.clipData?.getItemAt(1)?.uri)
+            assertEquals(2, chooser.clipData?.itemCount)
             assertTrue(sendIntent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
+            assertTrue(chooser.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
+            assertEquals(0, sendIntent.flags and Intent.FLAG_ACTIVITY_NO_HISTORY)
+            assertEquals(0, chooser.flags and Intent.FLAG_ACTIVITY_NO_HISTORY)
             assertArrayEquals(source.readBytes(), requireNotNull(staged).readBytes())
+
+            val thumbnail = context.contentResolver.openInputStream(thumbnailUri).use { input ->
+                requireNotNull(input) { "FileProvider could not open the preview JPEG URI." }.let(BitmapFactory::decodeStream)
+            }
+            assertNotNull("The sidecar must be a decodable JPEG.", thumbnail)
+            requireNotNull(thumbnail).let { bitmap ->
+                try {
+                    assertTrue("Preview width must be at most 300 px.", bitmap.width <= 300)
+                    assertTrue("Preview height must be at most 300 px.", bitmap.height <= 300)
+                } finally {
+                    bitmap.recycle()
+                }
+            }
 
             context.contentResolver.openFileDescriptor(sharedUri, "r").use { descriptor ->
                 assertNotNull(descriptor)
@@ -195,14 +219,37 @@ class PdfFileProviderInstrumentationTest {
             @Suppress("DEPRECATION")
             val sendIntent = requireNotNull(chooser.getParcelableExtra(Intent.EXTRA_INTENT) as? Intent)
             @Suppress("DEPRECATION")
-            val sharedUri = requireNotNull(sendIntent.getParcelableExtra(Intent.EXTRA_STREAM) as? android.net.Uri)
-            assertEquals(Intent.ACTION_SEND, sendIntent.action)
+            val sharedUris = requireNotNull(sendIntent.getParcelableArrayListExtra<android.net.Uri>(Intent.EXTRA_STREAM))
+            assertEquals(Intent.ACTION_SEND_MULTIPLE, sendIntent.action)
             assertEquals("application/pdf", sendIntent.type)
+            assertEquals(2, sharedUris.size)
+            val sharedUri = sharedUris[0]
+            val thumbnailUri = sharedUris[1]
             assertEquals("content", sharedUri.scheme)
+            assertEquals("content", thumbnailUri.scheme)
             assertEquals(sharedUri, sendIntent.clipData?.getItemAt(0)?.uri)
+            assertEquals(thumbnailUri, sendIntent.clipData?.getItemAt(1)?.uri)
             assertEquals(sharedUri, chooser.clipData?.getItemAt(0)?.uri)
+            assertEquals(thumbnailUri, chooser.clipData?.getItemAt(1)?.uri)
+            assertEquals("application/pdf", sendIntent.clipData?.description?.getMimeType(0))
+            assertEquals("image/jpeg", sendIntent.clipData?.description?.getMimeType(1))
             assertTrue(sendIntent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
             assertTrue(chooser.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
+            assertEquals(0, sendIntent.flags and Intent.FLAG_ACTIVITY_NO_HISTORY)
+            assertEquals(0, chooser.flags and Intent.FLAG_ACTIVITY_NO_HISTORY)
+
+            val thumbnail = context.contentResolver.openInputStream(thumbnailUri).use { input ->
+                requireNotNull(input) { "FileProvider could not open the preview JPEG URI." }.let(BitmapFactory::decodeStream)
+            }
+            assertNotNull("The sidecar must be a decodable JPEG.", thumbnail)
+            requireNotNull(thumbnail).let { bitmap ->
+                try {
+                    assertTrue("Preview width must be at most 300 px.", bitmap.width <= 300)
+                    assertTrue("Preview height must be at most 300 px.", bitmap.height <= 300)
+                } finally {
+                    bitmap.recycle()
+                }
+            }
 
             context.contentResolver.openFileDescriptor(sharedUri, "r").use { descriptor ->
                 assertNotNull(descriptor)
