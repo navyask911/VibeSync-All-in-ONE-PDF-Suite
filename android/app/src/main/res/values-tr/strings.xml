@@ -514,5 +514,5 @@
     <string name="batch_duplicate_success">Grup çoğaltıldı.</string>
     <string name="batch_rename_success">Grubun adı değiştirildi.</string>
     <string name="save_to_downloads">İndirilenlere kaydet</string>
-    <string name="saved_to_downloads_whatsapp_tip">İndirilenlere kaydedildi. İpucu: Geniş önizleme için WhatsApp 📎 → Belge'yi kullanın.</string>
+    <string name="saved_to_downloads_whatsapp_tip">İndirilenlere kaydedildi. İpucu: Geniş önizleme için WhatsApp 📎 → Belge seçeneğini kullanın.</string>
 </resources>
