@@ -782,12 +782,47 @@ class PdfBoxToolkitEngine(
                             Bitmap.Config.ARGB_8888
                         )
                         try {
-                            Canvas(rgbImage).drawBitmap(
-                                decodedImage,
-                                0f,
-                                0f,
-                                Paint(Paint.FILTER_BITMAP_FLAG)
-                            )
+                            if (xObject.colorSpace.name.equals("DeviceGray", ignoreCase = true)) {
+                                // PDFBox-Android may decode DeviceGray samples as ALPHA_8
+                                // (for example 0x40 becomes 0x40FFFFFF). Drawing that bitmap
+                                // directly would turn the gray sample into translucent white.
+                                // Promote the sample to opaque, equal RGB channels instead.
+                                val pixels = IntArray(decodedImage.width * decodedImage.height)
+                                decodedImage.getPixels(
+                                    pixels,
+                                    0,
+                                    decodedImage.width,
+                                    0,
+                                    0,
+                                    decodedImage.width,
+                                    decodedImage.height
+                                )
+                                for (index in pixels.indices) {
+                                    val pixel = pixels[index]
+                                    val gray = if (Color.alpha(pixel) < 255) {
+                                        Color.alpha(pixel)
+                                    } else {
+                                        Color.red(pixel)
+                                    }
+                                    pixels[index] = Color.rgb(gray, gray, gray)
+                                }
+                                rgbImage.setPixels(
+                                    pixels,
+                                    0,
+                                    rgbImage.width,
+                                    0,
+                                    0,
+                                    rgbImage.width,
+                                    rgbImage.height
+                                )
+                            } else {
+                                Canvas(rgbImage).drawBitmap(
+                                    decodedImage,
+                                    0f,
+                                    0f,
+                                    Paint(Paint.FILTER_BITMAP_FLAG)
+                                )
+                            }
                             resources.put(name, LosslessFactory.createFromImage(document, rgbImage))
                         } finally {
                             if (!rgbImage.isRecycled) rgbImage.recycle()
