@@ -24,9 +24,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DriveFileRenameOutline
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -45,11 +51,13 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
@@ -64,9 +72,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.graphics.ImageBitmap
 import com.vibesync.toolkit.pdf.R
+import com.vibesync.toolkit.pdf.presentation.common.PdfShareHelper
 import com.vibesync.toolkit.pdf.data.pdf.filters.FilterId
 import com.vibesync.toolkit.pdf.data.pdf.PageRangeParser
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -309,6 +319,11 @@ fun BatchScanScreen(
         runCatching { FilterId.valueOf(it) }.getOrNull()
     }
     val activeFolder = state.batchFolders.firstOrNull { it.id == state.activeBatchId }
+    var folderPendingDeletion by remember { mutableStateOf<BatchScanFolder?>(null) }
+    var folderPendingRename by remember { mutableStateOf<BatchScanFolder?>(null) }
+    var renameFolderName by remember { mutableStateOf("") }
+    var expandedFolderMenu by remember { mutableStateOf<String?>(null) }
+    val scope = rememberCoroutineScope()
 
     LaunchedEffect(state.savedFile) {
         state.savedFile?.let { file ->
@@ -358,28 +373,107 @@ fun BatchScanScreen(
                     ) {
                         items(state.batchFolders, key = { it.id }) { folder ->
                             Card(
-                                modifier = Modifier.fillMaxWidth()
-                                    .clickable { viewModel.openBatch(folder.id) }
-                                    .testTag("batch_folder_${folder.id}"),
+                                modifier = Modifier.fillMaxWidth().testTag("batch_folder_${folder.id}"),
                                 colors = CardDefaults.cardColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
                                 )
                             ) {
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                    Column(Modifier.weight(1f)) {
-                                        Text(folder.name, fontWeight = FontWeight.SemiBold)
-                                        Text(
-                                            "${folder.pageCount} pages",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        )
+                                    Row(
+                                        modifier = Modifier.weight(1f)
+                                            .clickable { viewModel.openBatch(folder.id) }
+                                            .padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        Icon(Icons.Default.Folder, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                                        Column(Modifier.weight(1f)) {
+                                            Text(folder.name, fontWeight = FontWeight.SemiBold)
+                                            Text(
+                                                "${folder.pageCount} pages",
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                        Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                     }
-                                    Icon(Icons.Default.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    val compiledPdf = folder.directory.listFiles().orEmpty()
+                                        .filter { it.isFile && it.extension.equals("pdf", ignoreCase = true) }
+                                        .maxByOrNull { it.lastModified() }
+                                    Box {
+                                        IconButton(
+                                            onClick = { expandedFolderMenu = folder.id },
+                                            modifier = Modifier.testTag("batch_folder_menu_${folder.id}")
+                                        ) {
+                                            Icon(
+                                                Icons.Default.MoreVert,
+                                                contentDescription = stringResource(R.string.document_actions_title)
+                                            )
+                                        }
+                                        DropdownMenu(
+                                            expanded = expandedFolderMenu == folder.id,
+                                            onDismissRequest = { expandedFolderMenu = null }
+                                        ) {
+                                            if (folder.id != BatchScanViewModel.LEGACY_BATCH_ID) {
+                                                DropdownMenuItem(
+                                                    text = { Text(stringResource(R.string.scan_rename)) },
+                                                    leadingIcon = { Icon(Icons.Default.DriveFileRenameOutline, contentDescription = null) },
+                                                    onClick = {
+                                                        expandedFolderMenu = null
+                                                        renameFolderName = folder.name
+                                                        folderPendingRename = folder
+                                                    },
+                                                    modifier = Modifier.testTag("batch_rename_folder_${folder.id}")
+                                                )
+                                                DropdownMenuItem(
+                                                    text = { Text(stringResource(R.string.batch_duplicate)) },
+                                                    leadingIcon = { Icon(Icons.Default.ContentCopy, contentDescription = null) },
+                                                    onClick = {
+                                                        expandedFolderMenu = null
+                                                        scope.launch {
+                                                            val message = viewModel.duplicateBatchFolder(folder.id).fold(
+                                                                onSuccess = { context.getString(R.string.batch_duplicate_success) },
+                                                                onFailure = { context.getString(R.string.scan_operation_failed) }
+                                                            )
+                                                            snackbarHostState.showSnackbar(message)
+                                                        }
+                                                    },
+                                                    modifier = Modifier.testTag("batch_duplicate_folder_${folder.id}")
+                                                )
+                                            }
+                                            if (compiledPdf != null) {
+                                                DropdownMenuItem(
+                                                    text = { Text(stringResource(R.string.share_pdf)) },
+                                                    leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                                                    onClick = {
+                                                        expandedFolderMenu = null
+                                                        runCatching {
+                                                            PdfShareHelper.sharePdf(context, compiledPdf, context.getString(R.string.share_pdf))
+                                                        }.onFailure {
+                                                            scope.launch {
+                                                                snackbarHostState.showSnackbar(context.getString(R.string.scan_operation_failed))
+                                                            }
+                                                        }
+                                                    },
+                                                    modifier = Modifier.testTag("batch_share_folder_${folder.id}")
+                                                )
+                                            }
+                                            if (folder.id != BatchScanViewModel.LEGACY_BATCH_ID) {
+                                                DropdownMenuItem(
+                                                    text = { Text(stringResource(R.string.signature_manager_delete)) },
+                                                    leadingIcon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
+                                                    onClick = {
+                                                        expandedFolderMenu = null
+                                                        folderPendingDeletion = folder
+                                                    },
+                                                    modifier = Modifier.testTag("batch_delete_folder_${folder.id}")
+                                                )
+                                            }
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -476,5 +570,79 @@ fun BatchScanScreen(
                 }
             }
         }
+    }
+
+
+    folderPendingRename?.let { folder ->
+        AlertDialog(
+            onDismissRequest = { folderPendingRename = null },
+            title = { Text(stringResource(R.string.rename_document_title)) },
+            text = {
+                OutlinedTextField(
+                    value = renameFolderName,
+                    onValueChange = { renameFolderName = it },
+                    label = { Text(stringResource(R.string.rename_document_hint)) },
+                    singleLine = true,
+                    modifier = Modifier.testTag("batch_folder_rename_field")
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val requestedName = renameFolderName
+                        folderPendingRename = null
+                        scope.launch {
+                            val message = viewModel.renameBatchFolder(folder.id, requestedName).fold(
+                                onSuccess = { context.getString(R.string.batch_rename_success) },
+                                onFailure = { context.getString(R.string.scan_operation_failed) }
+                            )
+                            snackbarHostState.showSnackbar(message)
+                        }
+                    },
+                    enabled = renameFolderName.isNotBlank(),
+                    modifier = Modifier.testTag("batch_folder_rename_confirm")
+                ) {
+                    Text(stringResource(R.string.scan_rename))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { folderPendingRename = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
+    }
+
+    folderPendingDeletion?.let { folder ->
+        AlertDialog(
+            onDismissRequest = { folderPendingDeletion = null },
+            title = { Text(stringResource(R.string.delete_document_title)) },
+            text = { Text(stringResource(R.string.delete_document_message, folder.name)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        folderPendingDeletion = null
+                        scope.launch {
+                            val message = viewModel.deleteBatchFolder(folder.id).fold(
+                                onSuccess = { context.getString(R.string.document_delete_success) },
+                                onFailure = { context.getString(R.string.scan_operation_failed) }
+                            )
+                            snackbarHostState.showSnackbar(message)
+                        }
+                    },
+                    modifier = Modifier.testTag("batch_delete_folder_confirm")
+                ) {
+                    Text(stringResource(R.string.signature_manager_delete))
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { folderPendingDeletion = null },
+                    modifier = Modifier.testTag("batch_delete_folder_cancel")
+                ) {
+                    Text(stringResource(R.string.cancel))
+                }
+            }
+        )
     }
 }

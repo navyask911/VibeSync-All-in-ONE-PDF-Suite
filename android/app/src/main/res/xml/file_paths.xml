@@ -4,5 +4,6 @@
     <files-path name="internal_pdfs" path="documents/" />
     <files-path name="scanned_documents" path="scans/" />
     <files-path name="batch_scanned_pdfs" path="VibeSyncScans/" />
+    <files-path name="shared_pdfs" path="shared_pdfs/" />
     <external-cache-path name="ext_cached_pdfs" path="pdf_cache/" />
 </paths>

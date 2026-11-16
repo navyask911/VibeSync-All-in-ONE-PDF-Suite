@@ -37,6 +37,18 @@ class ExportMenuTest {
         }
     }
 
+    @Test
+    fun saveToDownloadsIsOfferedInTheExportMenu() {
+        setTestContent {
+            ExportMenu(
+                sourceUri = Uri.parse("file:///tmp/unused-export.pdf"),
+                testTag = "export_menu"
+            )
+        }
+        composeRule.onNodeWithTag("export_menu").assertIsDisplayed().performClick()
+        composeRule.onNodeWithTag("save_to_downloads").assertIsDisplayed()
+    }
+
     private fun setTestContent(content: @Composable () -> Unit) {
         composeRule.activity.runOnUiThread {
             val composeView = findComposeView(composeRule.activity.window.decorView)

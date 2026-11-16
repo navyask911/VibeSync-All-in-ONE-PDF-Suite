@@ -1,13 +1,16 @@
 package com.vibesync.toolkit.pdf
 
 import android.app.Application
+import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.net.Uri
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.*
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -17,6 +20,7 @@ import com.vibesync.toolkit.pdf.data.pdf.PdfSearchHighlight
 import com.vibesync.toolkit.pdf.data.pdf.PdfSearchMatch
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfPageItem
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerScreen
+import java.io.File
 import com.vibesync.toolkit.pdf.presentation.viewer.PdfViewerViewModel
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.data.model.ToolMode
@@ -249,6 +253,55 @@ class PdfViewerScreenTest {
         listOf("viewer_zoom_out","viewer_zoom_in","viewer_previous_page","viewer_next_page",
             "viewer_share","viewer_edit","viewer_print","viewer_export_menu").forEach { tag ->
             composeTestRule.onNodeWithTag(tag, useUnmergedTree = true).assertExists()
+        }
+    }
+
+    @Test
+    fun compactOverflowLabelsOpenDownloadsAndTriggerPrint() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val sourcePdf = File.createTempFile("viewer_action_labels_", ".pdf", app.cacheDir).apply {
+            writeBytes("%PDF-1.4\n% label click test\n%%EOF\n".toByteArray())
+        }
+        val stateFlow = MutableStateFlow(
+            com.vibesync.toolkit.pdf.presentation.viewer.ViewerUiState(
+                fileName = "viewer_action_labels.pdf",
+                pageCount = 1,
+                currentPageIndex = 0,
+                isLoading = false,
+                pagesMetadata = listOf(PageMetadata(pageIndex = 0, widthPt = 595f, heightPt = 842f))
+            )
+        )
+        every { mockViewModel.uiState } returns stateFlow
+        coEvery { mockViewModel.acquirePageBitmap(any(), any()) } returns null
+        val compactConfiguration = Configuration(app.resources.configuration).apply {
+            screenWidthDp = 390
+        }
+
+        try {
+            composeTestRule.setContent {
+                CompositionLocalProvider(LocalConfiguration provides compactConfiguration) {
+                    VibeSyncPdfTheme {
+                        PdfViewerScreen(
+                            documentUri = Uri.fromFile(sourcePdf),
+                            viewModel = mockViewModel,
+                            onNavigateBack = {},
+                            onNavigateToEditor = {},
+                            onShareDocument = {}
+                        )
+                    }
+                }
+            }
+
+            composeTestRule.onNodeWithTag("viewer_more_actions").assertIsDisplayed().performClick()
+            composeTestRule.onNodeWithTag("viewer_print_menu_item").assertIsDisplayed().performClick()
+            composeTestRule.waitForIdle()
+            verify(exactly = 1) { mockViewModel.printDocument(any(), any(), any()) }
+
+            composeTestRule.onNodeWithTag("viewer_more_actions").assertIsDisplayed().performClick()
+            composeTestRule.onNodeWithTag("viewer_export_menu_item").assertIsDisplayed().performClick()
+            composeTestRule.onNodeWithTag("save_to_downloads").assertIsDisplayed().assertHasClickAction()
+        } finally {
+            sourcePdf.delete()
         }
     }
 

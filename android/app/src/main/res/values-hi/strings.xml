@@ -509,4 +509,10 @@
     <string name="about_us_website">हमारी वेबसाइट पर जाएँ</string>
     <string name="update_title">अपडेट उपलब्ध है</string>
     <string name="update_message">नई सुविधाओं और बग सुधारों के साथ VibeSync का नया संस्करण उपलब्ध है। जारी रखने के लिए कृपया अपडेट करें।</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">बैच की प्रतिलिपि बनाएँ</string>
+    <string name="batch_duplicate_success">बैच की प्रतिलिपि बनाई गई।</string>
+    <string name="batch_rename_success">बैच का नाम बदल दिया गया।</string>
+    <string name="save_to_downloads">डाउनलोड में सेव करें</string>
+    <string name="saved_to_downloads_whatsapp_tip">डाउनलोड में सेव हो गया। सुझाव: चौड़ा प्रीव्यू देखने के लिए WhatsApp 📎 → Document का उपयोग करें।</string>
 </resources>

@@ -503,4 +503,10 @@
     <string name="about_us_website">Vizitează site-ul nostru</string>
     <string name="update_title">Actualizare disponibilă</string>
     <string name="update_message">Este disponibilă o nouă versiune VibeSync, cu funcții noi și remedieri de erori. Actualizați aplicația pentru a continua.</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">Duplicați lotul</string>
+    <string name="batch_duplicate_success">Lot duplicat.</string>
+    <string name="batch_rename_success">Lot redenumit.</string>
+    <string name="save_to_downloads">Salvează în Descărcări</string>
+    <string name="saved_to_downloads_whatsapp_tip">Salvat în Descărcări. Sfat: folosește WhatsApp 📎 → Document pentru a vedea o previzualizare lată.</string>
 </resources>

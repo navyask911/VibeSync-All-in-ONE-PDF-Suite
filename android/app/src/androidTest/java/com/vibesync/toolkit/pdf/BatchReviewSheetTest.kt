@@ -1,11 +1,13 @@
 package com.vibesync.toolkit.pdf
 
+import android.app.Application
 import android.graphics.Bitmap
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.ui.platform.ComposeView
 import android.view.View
 import android.view.ViewGroup
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.rules.ActivityScenarioRule
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsEnabled
@@ -16,13 +18,19 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeRight
 import com.vibesync.toolkit.pdf.core.designsystem.VibeSyncPdfTheme
 import com.vibesync.toolkit.pdf.presentation.scanner.BatchReviewSheet
 import com.vibesync.toolkit.pdf.presentation.scanner.BatchScanPage
+import com.vibesync.toolkit.pdf.presentation.scanner.BatchScanScreen
+import com.vibesync.toolkit.pdf.presentation.scanner.BatchScanViewModel
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import java.io.File
@@ -86,6 +94,109 @@ class BatchReviewSheetTest {
         composeRule.onNodeWithTag("batch_clear_all").performClick()
         composeRule.runOnIdle { assertEquals(emptyList<String>(), pages.map { it.id }) }
         listOf(a.file, b.file, c.file).forEach { it.delete() }
+    }
+
+    @Test
+    fun emptyBatchFolderHasDeleteControlAndIsRemovedFromTheDevice() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val scansRoot = File(app.filesDir, "VibeSyncScans")
+        assertTrue(scansRoot.exists() || scansRoot.mkdirs())
+        val folder = File(
+            scansRoot,
+            BatchScanViewModel.BATCH_FOLDER_PREFIX + "ui_delete_" + System.nanoTime()
+        )
+        assertTrue(folder.mkdirs())
+        val viewModel = BatchScanViewModel(app)
+        val deleteTag = "batch_delete_folder_${folder.name}"
+
+        try {
+            setTestContent {
+                BatchScanScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = {},
+                    onStartCapture = {},
+                    onOpenPdf = {}
+                )
+            }
+
+            composeRule.onNodeWithTag("batch_folder_list")
+                .performScrollToNode(hasTestTag("batch_folder_menu_${folder.name}"))
+            composeRule.onNodeWithTag("batch_folder_menu_${folder.name}")
+                .assertIsDisplayed()
+                .performClick()
+            composeRule.onNodeWithTag(deleteTag)
+                .assertIsDisplayed()
+                .performClick()
+            composeRule.onNodeWithTag("batch_delete_folder_confirm")
+                .assertIsDisplayed()
+                .performClick()
+
+            composeRule.waitUntil(10_000L) {
+                !folder.exists() && viewModel.state.value.batchFolders.none { it.id == folder.name }
+            }
+            composeRule.onNodeWithTag(deleteTag).assertDoesNotExist()
+            assertFalse(folder.exists())
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
+
+
+    @Test
+    fun batchFolderMenuSupportsRenameDuplicateAndShareOfCompiledPdf() {
+        val app = ApplicationProvider.getApplicationContext<Application>()
+        val scansRoot = File(app.filesDir, "VibeSyncScans")
+        assertTrue(scansRoot.exists() || scansRoot.mkdirs())
+        val viewModel = BatchScanViewModel(app)
+        viewModel.startNewBatchScan()
+        val batchId = requireNotNull(viewModel.state.value.activeBatchId)
+        val folder = File(scansRoot, batchId)
+        File(folder, "compiled.pdf").writeBytes(byteArrayOf(1, 2, 3, 4))
+        viewModel.closeBatch()
+
+        try {
+            setTestContent {
+                BatchScanScreen(
+                    viewModel = viewModel,
+                    onNavigateBack = {},
+                    onStartCapture = {},
+                    onOpenPdf = {}
+                )
+            }
+
+            fun openFolderMenu() {
+                composeRule.onNodeWithTag("batch_folder_list")
+                    .performScrollToNode(hasTestTag("batch_folder_menu_$batchId"))
+                composeRule.onNodeWithTag("batch_folder_menu_$batchId").performClick()
+            }
+
+            openFolderMenu()
+            composeRule.onNodeWithTag("batch_rename_folder_$batchId").performClick()
+            val renameField = composeRule.onNodeWithTag("batch_folder_rename_field")
+            renameField.performTextClearance()
+            renameField.performTextInput("Client Records")
+            composeRule.onNodeWithTag("batch_folder_rename_confirm").performClick()
+            composeRule.waitUntil(5_000L) {
+                viewModel.state.value.batchFolders.firstOrNull { it.id == batchId }?.name == "Client Records"
+            }
+
+            openFolderMenu()
+            composeRule.onNodeWithTag("batch_duplicate_folder_$batchId")
+                .assertIsDisplayed()
+                .performClick()
+            composeRule.waitUntil(10_000L) {
+                viewModel.state.value.batchFolders.size == 2 &&
+                    viewModel.state.value.batchFolders.any { it.name == "Client Records (Copy)" }
+            }
+
+            openFolderMenu()
+            composeRule.onNodeWithTag("batch_share_folder_$batchId").assertIsDisplayed()
+        } finally {
+            viewModel.state.value.batchFolders
+                .filter { it.id == batchId || it.name == "Client Records (Copy)" }
+                .forEach { it.directory.deleteRecursively() }
+            File(scansRoot, batchId).deleteRecursively()
+        }
     }
 
     private fun page(id: String): BatchScanPage {

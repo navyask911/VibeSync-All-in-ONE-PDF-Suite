@@ -1028,10 +1028,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun shareDocumentPdf(
         uri: Uri,
-        defaultBaseName: String = "VibeSync_Shared_Document",
         recordOperation: Boolean = false
     ) {
         lifecycleScope.launch(Dispatchers.IO) {
+            val defaultBaseName = resolvePdfShareBaseName(uri)
             val staged = runCatching {
                 UriUtils.copyUriToCacheFile(this@MainActivity, uri, "share_pdf")
             }
@@ -1045,6 +1045,28 @@ class MainActivity : AppCompatActivity() {
                     }
             }
         }
+    }
+
+    /**
+     * Prefer the source document's display name. Providers without a useful DISPLAY_NAME
+     * (or those returning our generic placeholder) receive a collision-resistant scan name.
+     */
+    private fun resolvePdfShareBaseName(uri: Uri): String {
+        val displayName = runCatching { UriUtils.getFileName(this, uri) }
+            .getOrNull()
+            ?.substringAfterLast('/')
+            ?.substringAfterLast('\\')
+            ?.trim()
+            .orEmpty()
+        val candidate = sanitizeOutputBaseName(displayName, "")
+        val genericName = sanitizeOutputBaseName(getString(R.string.default_pdf_filename), "document")
+
+        return candidate.takeIf {
+            it.isNotBlank() &&
+                !it.equals(genericName, ignoreCase = true) &&
+                !it.equals("document", ignoreCase = true) &&
+                !it.equals("unknown", ignoreCase = true)
+        } ?: "VibeSync_Scan_${java.text.SimpleDateFormat("yyyyMMdd_HHmmss_SSS", java.util.Locale.US).format(java.util.Date())}"
     }
 
     /** Render regular PDFs to print-quality JPEGs; these temporary bitmaps are never exposed to Compose. */
@@ -1230,11 +1252,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun shareScanPdf(scanFile: File) {
-        runCatching {
-            PdfShareHelper.sharePdf(this, scanFile, getString(R.string.share_pdf))
-        }.onFailure { error ->
-            Toast.makeText(this, error.localizedMessage ?: getString(R.string.scan_operation_failed), Toast.LENGTH_LONG).show()
-        }
+        shareRenamedFiles(
+            files = listOf(scanFile),
+            mimeType = "application/pdf"
+        )
     }
 
     private fun shareScanImages(scanFile: File) {
@@ -1275,8 +1296,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun shareViewedDocument(sourceUri: Uri) {
-        // Route through the same staging/export path as every other PDF to avoid a second watermark pass.
-        shareDocumentPdf(sourceUri, "VibeSync_Viewed_Document", recordOperation = true)
+        // Keep the actual source filename through the common staging/export path.
+        shareDocumentPdf(sourceUri, recordOperation = true)
     }
     private fun shareFiles(
         files: List<File>,
@@ -1300,7 +1321,8 @@ class MainActivity : AppCompatActivity() {
                                 toolkitEngine.watermarkPdf(
                                     sourceUri = Uri.fromFile(source),
                                     watermarkText = getString(R.string.pdf_watermark_text),
-                                    outputFile = output
+                                    outputFile = output,
+                                    removeSecurityForSharing = true
                                 ).getOrThrow()
                                 prepared.add(output)
                             }
@@ -1355,15 +1377,60 @@ class MainActivity : AppCompatActivity() {
     ) {
         if (isFinishing || isDestroyed || !lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
         if (mimeType == "application/pdf") {
-            runCatching {
-                PdfShareHelper.sharePdfs(
-                    context = this,
-                    files = files,
-                    chooserTitle = getString(R.string.share_vibesync_output),
-                    forceMultiple = forceMultiple
-                )
-            }.onFailure { error ->
-                Toast.makeText(this, error.localizedMessage ?: getString(R.string.error_prepare_pdf_sharing), Toast.LENGTH_LONG).show()
+            // External PDF shares are always one ACTION_SEND PDF. For a selected batch,
+            // compile the chosen PDFs into one ordered document before preparing that stream.
+            val requestedDisplayName = if (files.size == 1) {
+                files.single().name
+            } else {
+                "${pendingShareDefaultBaseName.ifBlank { "VibeSync_Export" }}_Combined.pdf"
+            }
+            lifecycleScope.launch {
+                var mergedSource: File? = null
+                var preparedShare: File? = null
+                try {
+                    withContext(Dispatchers.IO) {
+                        val shareWorkDirectory = File(cacheDir, "pdf_cache/share_prepared")
+                        if (!shareWorkDirectory.exists() && !shareWorkDirectory.mkdirs()) {
+                            throw java.io.IOException("Unable to prepare the PDF share workspace.")
+                        }
+                        if (!shareWorkDirectory.isDirectory) {
+                            throw java.io.IOException("The PDF share workspace is not a directory.")
+                        }
+
+                        val sourceToPrepare = if (files.size == 1) {
+                            files.single()
+                        } else {
+                            File.createTempFile("vibesync_batch_", ".pdf", shareWorkDirectory).also { merged ->
+                                mergedSource = merged
+                                toolkitEngine.mergePdfs(files.map(Uri::fromFile), merged).getOrThrow()
+                            }
+                        }
+
+                        preparedShare = reserveShareOutputFile(shareWorkDirectory, requestedDisplayName)
+                        toolkitEngine.watermarkPdf(
+                            sourceUri = Uri.fromFile(sourceToPrepare),
+                            watermarkText = PdfBoxToolkitEngine.DEFAULT_FOOTER_WATERMARK_TEXT,
+                            outputFile = requireNotNull(preparedShare),
+                            removeSecurityForSharing = true
+                        ).getOrThrow()
+                    }
+                    PdfShareHelper.sharePdf(
+                        context = this@MainActivity,
+                        file = requireNotNull(preparedShare),
+                        chooserTitle = getString(R.string.share_vibesync_output)
+                    )
+                } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    Toast.makeText(
+                        this@MainActivity,
+                        error.localizedMessage ?: getString(R.string.error_prepare_pdf_sharing),
+                        Toast.LENGTH_LONG
+                    ).show()
+                } finally {
+                    preparedShare?.delete()
+                    mergedSource?.delete()
+                }
             }
             return
         }
@@ -1386,6 +1453,22 @@ class MainActivity : AppCompatActivity() {
             }
         }
         startActivity(Intent.createChooser(shareIntent, getString(R.string.share_vibesync_output)))
+    }
+
+    private fun reserveShareOutputFile(directory: File, requestedName: String): File {
+        val safeName = File(requestedName).name.ifBlank { "document.pdf" }
+        val extension = safeName.substringAfterLast('.', "")
+        val stem = if (extension.isBlank()) safeName else safeName.substringBeforeLast('.')
+        for (suffix in 0..1000) {
+            val candidateName = when {
+                suffix == 0 -> safeName
+                extension.isBlank() -> "${stem}_$suffix"
+                else -> "${stem}_$suffix.$extension"
+            }
+            val candidate = File(directory, candidateName)
+            if (candidate.createNewFile()) return candidate
+        }
+        throw java.io.IOException("Unable to reserve a filename for the outgoing PDF.")
     }
 
     private fun renameOutputFiles(files: List<File>, baseName: String, extension: String): List<File> {

@@ -45,6 +45,7 @@ import com.tom_roush.pdfbox.pdmodel.font.PDType1Font
 import com.tom_roush.pdfbox.pdmodel.graphics.image.LosslessFactory
 import com.tom_roush.pdfbox.pdmodel.graphics.blend.BlendMode
 import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
+import com.tom_roush.pdfbox.pdmodel.graphics.form.PDFormXObject
 import com.tom_roush.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState
 import com.tom_roush.pdfbox.pdmodel.interactive.form.PDAcroForm
 import com.tom_roush.pdfbox.pdmodel.interactive.form.PDCheckBox
@@ -684,18 +685,45 @@ class PdfBoxToolkitEngine(
         watermarkText: String,
         outputFile: File,
         opacity: Float = 150f / 255f,
-        angleDegrees: Float = 0f
+        angleDegrees: Float = 0f,
+        removeSecurityForSharing: Boolean = false
     ): Result<File> = withContext(Dispatchers.IO) {
         var sourceFileToDelete: File? = null
         try {
             val sourceFile = UriUtils.copyUriToCacheFile(context, sourceUri, "watermark_src_")
             sourceFileToDelete = sourceFile
+            var copyOriginalBytes = false
             sourceFile.inputStream().use { inputStream ->
                 loadPdfFromInputStream(inputStream, oldPassword = null).use { document ->
-                    applyVibeSyncWatermark(document, watermarkText, opacity, angleDegrees)
-                    document.save(outputFile)
+                    val alreadyWatermarked =
+                        document.documentInformation.getCustomMetadataValue(WATERMARK_METADATA_KEY) == WATERMARK_METADATA_VALUE ||
+                            (document.numberOfPages > 0 && document.pages.all { page ->
+                                page.cosObject.getString(WATERMARK_PAGE_METADATA_COS_KEY) == WATERMARK_METADATA_VALUE
+                            })
+                    if (!alreadyWatermarked) {
+                        applyVibeSyncWatermark(document, watermarkText, opacity, angleDegrees)
+                    }
+
+                    val watermarkWasApplied =
+                        document.documentInformation.getCustomMetadataValue(WATERMARK_METADATA_KEY) == WATERMARK_METADATA_VALUE
+
+                    if (removeSecurityForSharing) {
+                        // Normalize each outgoing copy for Android's native PdfRenderer.
+                        // Flatten interactive forms, remove other annotation appearances, convert
+                        // non-RGB image XObjects, and write a PDF 1.4-compatible document.
+                        // The loaded source and caller-owned PDF are never modified.
+                        document.isAllSecurityToBeRemoved = true
+                        normalizeForAndroidPdfRenderer(document)
+                        document.save(outputFile)
+                    } else if (watermarkWasApplied && !alreadyWatermarked) {
+                        document.save(outputFile)
+                    } else {
+                        // Non-share callers preserve already-watermarked or entitlement-free files.
+                        copyOriginalBytes = true
+                    }
                 }
             }
+            if (copyOriginalBytes) sourceFile.copyTo(outputFile, overwrite = true)
             Result.success(outputFile)
         } catch (cancelled: CancellationException) {
             outputFile.delete()
@@ -706,6 +734,108 @@ class PdfBoxToolkitEngine(
             Result.failure(e)
         } finally {
             sourceFileToDelete?.delete()
+        }
+    }
+
+    /**
+     * Prepares only the outgoing share copy for Android's native PdfRenderer.
+     * Form appearances are flattened where available, residual annotations are removed,
+     * and nested non-RGB image XObjects are decoded/re-encoded as standard RGB.
+     * Text and vector content remain intact rather than rasterizing every page.
+     */
+    private fun normalizeForAndroidPdfRenderer(document: PDDocument) {
+        document.documentCatalog.acroForm?.let { acroForm ->
+            if (acroForm.fields.isNotEmpty()) {
+                acroForm.flatten()
+            }
+            document.documentCatalog.cosObject.removeItem(COSName.getPDFName("AcroForm"))
+        }
+
+        val visitedResources = java.util.Collections.newSetFromMap(
+            java.util.IdentityHashMap<PDResources, Boolean>()
+        )
+        document.pages.forEach { page ->
+            normalizeImageResourcesToRgb(document, page.resources, visitedResources)
+            page.cosObject.removeItem(COSName.ANNOTS)
+        }
+        // PDDocument.setVersion() intentionally refuses downgrades. Reset both PDF version
+        // declarations directly so the serialized header and catalog agree on PDF 1.4.
+        document.documentCatalog.cosObject.removeItem(COSName.getPDFName("Version"))
+        document.document.setVersion(ANDROID_SHARE_PDF_VERSION)
+    }
+
+    private fun normalizeImageResourcesToRgb(
+        document: PDDocument,
+        resources: PDResources?,
+        visitedResources: MutableSet<PDResources>
+    ) {
+        if (resources == null || !visitedResources.add(resources)) return
+
+        resources.xObjectNames.toList().forEach { name ->
+            when (val xObject = resources.getXObject(name)) {
+                is PDImageXObject -> {
+                    if (!xObject.colorSpace.name.equals("DeviceRGB", ignoreCase = true)) {
+                        val decodedImage = xObject.image
+                        val rgbImage = Bitmap.createBitmap(
+                            decodedImage.width,
+                            decodedImage.height,
+                            Bitmap.Config.ARGB_8888
+                        )
+                        try {
+                            if (xObject.colorSpace.name.equals("DeviceGray", ignoreCase = true)) {
+                                // PDFBox-Android may decode DeviceGray samples as ALPHA_8
+                                // (for example 0x40 becomes 0x40FFFFFF). Drawing that bitmap
+                                // directly would turn the gray sample into translucent white.
+                                // Promote the sample to opaque, equal RGB channels instead.
+                                val pixels = IntArray(decodedImage.width * decodedImage.height)
+                                decodedImage.getPixels(
+                                    pixels,
+                                    0,
+                                    decodedImage.width,
+                                    0,
+                                    0,
+                                    decodedImage.width,
+                                    decodedImage.height
+                                )
+                                for (index in pixels.indices) {
+                                    val pixel = pixels[index]
+                                    val gray = if (Color.alpha(pixel) < 255) {
+                                        Color.alpha(pixel)
+                                    } else {
+                                        Color.red(pixel)
+                                    }
+                                    pixels[index] = Color.rgb(gray, gray, gray)
+                                }
+                                rgbImage.setPixels(
+                                    pixels,
+                                    0,
+                                    rgbImage.width,
+                                    0,
+                                    0,
+                                    rgbImage.width,
+                                    rgbImage.height
+                                )
+                            } else {
+                                Canvas(rgbImage).drawBitmap(
+                                    decodedImage,
+                                    0f,
+                                    0f,
+                                    Paint(Paint.FILTER_BITMAP_FLAG)
+                                )
+                            }
+                            resources.put(name, LosslessFactory.createFromImage(document, rgbImage))
+                        } finally {
+                            if (!rgbImage.isRecycled) rgbImage.recycle()
+                            if (!decodedImage.isRecycled) decodedImage.recycle()
+                        }
+                    }
+                }
+                is PDFormXObject -> normalizeImageResourcesToRgb(
+                    document,
+                    xObject.resources,
+                    visitedResources
+                )
+            }
         }
     }
 
@@ -1077,7 +1207,7 @@ class PdfBoxToolkitEngine(
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.rgb(142, 0, 0)
             typeface = Typeface.create("sans-serif", Typeface.BOLD)
-            textSize = 28f
+            textSize = 28f * WATERMARK_SIZE_SCALE
         }
         val measuredTextWidth = ceil(paint.measureText(text)).toInt().coerceAtLeast(1)
         val sidePaddingPx = 8
@@ -1120,7 +1250,7 @@ class PdfBoxToolkitEngine(
                 val mediaBox = page.mediaBox
                 val maxWidthPt = mediaBox.width * 0.85f
                 val aspectRatio = drawableBitmap.width.toFloat() / drawableBitmap.height.toFloat().coerceAtLeast(1f)
-                val targetHeightPt = minOf(9f, maxWidthPt / aspectRatio)
+                val targetHeightPt = minOf(9f * WATERMARK_SIZE_SCALE, maxWidthPt / aspectRatio)
                 val targetWidthPt = targetHeightPt * aspectRatio
                 val footer = FooterWatermarkLayout.topLeft(
                     pageWidth = mediaBox.width,
@@ -1169,7 +1299,7 @@ class PdfBoxToolkitEngine(
                 val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                     color = Color.argb(150, 40, 40, 40)
                     typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-                    textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.012f).coerceIn(10f, 36f)
+                    textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.012f).coerceIn(10f, 36f) * WATERMARK_SIZE_SCALE
                 }
                 val watermarkText = DEFAULT_FOOTER_WATERMARK_TEXT
                 val margin = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.015f).coerceAtLeast(16f)
@@ -1193,7 +1323,7 @@ class PdfBoxToolkitEngine(
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
                         color = Color.argb((opacity * 255f).toInt(), 40, 40, 40)
                         typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-                        textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.012f).coerceIn(10f, 36f)
+                        textSize = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.012f).coerceIn(10f, 36f) * WATERMARK_SIZE_SCALE
                     }
                     val margin = (minOf(mutableBitmap.width, mutableBitmap.height) * 0.015f).coerceAtLeast(16f)
                     val x = (mutableBitmap.width - margin - paint.measureText(watermarkText))
@@ -1237,9 +1367,11 @@ class PdfBoxToolkitEngine(
         private const val WATERMARK_OPACITY_KEY = "watermark_opacity"
         private const val WATERMARK_ANGLE_KEY = "watermark_angle"
         private const val WATERMARK_ENABLED_KEY = "watermark_custom_enabled"
+        private const val WATERMARK_SIZE_SCALE = 1.5f
         private const val DEFAULT_WATERMARK_OPACITY = 0.45f
         private const val EDITOR_EXPORT_DPI = 300f
         private const val MAX_EDITOR_EXPORT_PIXELS = 8_000_000L
+        private const val ANDROID_SHARE_PDF_VERSION = 1.4f
     }
 }
 

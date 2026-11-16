@@ -504,4 +504,10 @@
     <string name="about_us_website">เยี่ยมชมเว็บไซต์ของเรา</string>
     <string name="update_title">มีอัปเดตพร้อมใช้งาน</string>
     <string name="update_message">VibeSync เวอร์ชันใหม่ที่มาพร้อมฟีเจอร์ใหม่และการแก้ไขข้อบกพร่องพร้อมให้ใช้งานแล้ว โปรดอัปเดตเพื่อดำเนินการต่อ</string>
+    <!-- Batch folder management -->
+    <string name="batch_duplicate">ทำสำเนาชุด</string>
+    <string name="batch_duplicate_success">ทำสำเนาชุดแล้ว</string>
+    <string name="batch_rename_success">เปลี่ยนชื่อชุดแล้ว</string>
+    <string name="save_to_downloads">บันทึกไปยังดาวน์โหลด</string>
+    <string name="saved_to_downloads_whatsapp_tip">บันทึกไปยังดาวน์โหลดแล้ว เคล็ดลับ: ใช้ WhatsApp 📎 → เอกสาร เพื่อดูตัวอย่างแบบกว้าง</string>
 </resources>
