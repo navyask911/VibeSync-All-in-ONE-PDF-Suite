@@ -513,4 +513,6 @@
     <string name="batch_duplicate">배치 복제</string>
     <string name="batch_duplicate_success">배치를 복제했습니다.</string>
     <string name="batch_rename_success">배치 이름을 변경했습니다.</string>
+    <string name="save_to_downloads">다운로드에 저장</string>
+    <string name="saved_to_downloads_whatsapp_tip">다운로드에 저장되었습니다. 팁: 넓은 미리보기를 보려면 WhatsApp 📎 → 문서를 사용하세요.</string>
 </resources>

@@ -531,4 +531,6 @@
     <string name="batch_duplicate">Duplicate batch</string>
     <string name="batch_duplicate_success">Batch duplicated.</string>
     <string name="batch_rename_success">Batch renamed.</string>
+    <string name="save_to_downloads">Save to Downloads</string>
+    <string name="saved_to_downloads_whatsapp_tip">Saved to Downloads. Tip: Use WhatsApp 📎 → Document to see a wide preview.</string>
 </resources>

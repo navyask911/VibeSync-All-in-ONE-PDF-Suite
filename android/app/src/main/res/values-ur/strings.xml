@@ -513,4 +513,6 @@
     <string name="batch_duplicate">بیچ کی نقل بنائیں</string>
     <string name="batch_duplicate_success">بیچ کی نقل بن گئی۔</string>
     <string name="batch_rename_success">بیچ کا نام تبدیل کر دیا گیا۔</string>
+    <string name="save_to_downloads">ڈاؤن لوڈز میں محفوظ کریں</string>
+    <string name="saved_to_downloads_whatsapp_tip">ڈاؤن لوڈز میں محفوظ ہو گیا۔ مشورہ: چوڑا پیش منظر دیکھنے کے لیے WhatsApp 📎 → Document استعمال کریں۔</string>
 </resources>

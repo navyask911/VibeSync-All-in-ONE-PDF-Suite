@@ -507,4 +507,6 @@
     <string name="batch_duplicate">කණ්ඩායම පිටපත් කරන්න</string>
     <string name="batch_duplicate_success">කණ්ඩායම පිටපත් කරන ලදී.</string>
     <string name="batch_rename_success">කණ්ඩායමේ නම වෙනස් කරන ලදී.</string>
+    <string name="save_to_downloads">බාගැනීම් වෙත සුරකින්න</string>
+    <string name="saved_to_downloads_whatsapp_tip">බාගැනීම් වෙත සුරකින ලදී. ඉඟිය: පුළුල් පෙරදසුනක් සඳහා WhatsApp 📎 → Document භාවිත කරන්න.</string>
 </resources>

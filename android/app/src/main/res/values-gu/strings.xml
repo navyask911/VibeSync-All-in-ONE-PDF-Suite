@@ -507,4 +507,6 @@
     <string name="batch_duplicate">બેચની નકલ બનાવો</string>
     <string name="batch_duplicate_success">બેચની નકલ બનાવાઈ.</string>
     <string name="batch_rename_success">બેચનું નામ બદલાયું.</string>
+    <string name="save_to_downloads">ડાઉનલોડ્સમાં સાચવો</string>
+    <string name="saved_to_downloads_whatsapp_tip">ડાઉનલોડ્સમાં સાચવ્યું. સૂચન: પહોળું પ્રીવ્યૂ જોવા WhatsApp 📎 → Document વાપરો.</string>
 </resources>

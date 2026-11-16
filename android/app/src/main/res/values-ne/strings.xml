@@ -507,4 +507,6 @@
     <string name="batch_duplicate">ब्याच प्रतिलिपि गर्नुहोस्</string>
     <string name="batch_duplicate_success">ब्याच प्रतिलिपि गरियो।</string>
     <string name="batch_rename_success">ब्याचको नाम परिवर्तन गरियो।</string>
+    <string name="save_to_downloads">डाउनलोडमा सुरक्षित गर्नुहोस्</string>
+    <string name="saved_to_downloads_whatsapp_tip">डाउनलोडमा सुरक्षित गरियो। सुझाव: फराकिलो पूर्वावलोकन हेर्न WhatsApp 📎 → Document प्रयोग गर्नुहोस्।</string>
 </resources>

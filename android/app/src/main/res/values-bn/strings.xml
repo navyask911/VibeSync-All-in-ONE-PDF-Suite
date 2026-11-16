@@ -513,4 +513,6 @@
     <string name="batch_duplicate">ব্যাচ নকল করুন</string>
     <string name="batch_duplicate_success">ব্যাচ নকল করা হয়েছে।</string>
     <string name="batch_rename_success">ব্যাচের নাম পরিবর্তন করা হয়েছে।</string>
+    <string name="save_to_downloads">ডাউনলোডসে সংরক্ষণ করুন</string>
+    <string name="saved_to_downloads_whatsapp_tip">ডাউনলোডসে সংরক্ষিত হয়েছে। পরামর্শ: বড় প্রিভিউ দেখতে WhatsApp 📎 → Document ব্যবহার করুন।</string>
 </resources>

@@ -507,4 +507,6 @@
     <string name="batch_duplicate">Duplicera batch</string>
     <string name="batch_duplicate_success">Batchen duplicerades.</string>
     <string name="batch_rename_success">Batchen har bytt namn.</string>
+    <string name="save_to_downloads">Spara i Hämtade filer</string>
+    <string name="saved_to_downloads_whatsapp_tip">Sparat i Hämtade filer. Tips: Använd WhatsApp 📎 → Dokument för att se en bred förhandsvisning.</string>
 </resources>

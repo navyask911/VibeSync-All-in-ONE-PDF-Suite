@@ -523,4 +523,6 @@
     <string name="batch_duplicate">Дублировать пакет</string>
     <string name="batch_duplicate_success">Пакет дублирован.</string>
     <string name="batch_rename_success">Пакет переименован.</string>
+    <string name="save_to_downloads">Сохранить в Загрузки</string>
+    <string name="saved_to_downloads_whatsapp_tip">Сохранено в Загрузки. Совет: выберите в WhatsApp 📎 → Документ, чтобы увидеть широкое превью.</string>
 </resources>

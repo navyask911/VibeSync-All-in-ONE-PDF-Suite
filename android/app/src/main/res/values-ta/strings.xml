@@ -507,4 +507,6 @@
     <string name="batch_duplicate">தொகுதியை நகலெடு</string>
     <string name="batch_duplicate_success">தொகுதி நகலெடுக்கப்பட்டது.</string>
     <string name="batch_rename_success">தொகுதியின் பெயர் மாற்றப்பட்டது.</string>
+    <string name="save_to_downloads">பதிவிறக்கங்களில் சேமிக்கவும்</string>
+    <string name="saved_to_downloads_whatsapp_tip">பதிவிறக்கங்களில் சேமிக்கப்பட்டது. குறிப்பு: அகலமான முன்னோட்டத்தைப் பார்க்க WhatsApp 📎 → Document பயன்படுத்தவும்.</string>
 </resources>

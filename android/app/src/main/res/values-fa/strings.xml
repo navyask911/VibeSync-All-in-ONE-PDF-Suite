@@ -507,4 +507,6 @@
     <string name="batch_duplicate">تکثیر دسته</string>
     <string name="batch_duplicate_success">دسته تکثیر شد.</string>
     <string name="batch_rename_success">نام دسته تغییر کرد.</string>
+    <string name="save_to_downloads">ذخیره در بارگیری‌ها</string>
+    <string name="saved_to_downloads_whatsapp_tip">در بارگیری‌ها ذخیره شد. نکته: برای دیدن پیش‌نمایش عریض، در WhatsApp از 📎 → سند استفاده کنید.</string>
 </resources>

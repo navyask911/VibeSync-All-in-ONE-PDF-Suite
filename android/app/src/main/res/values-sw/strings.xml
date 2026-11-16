@@ -507,4 +507,6 @@
     <string name="batch_duplicate">Nakili kundi</string>
     <string name="batch_duplicate_success">Kundi limenakiliwa.</string>
     <string name="batch_rename_success">Jina la kundi limebadilishwa.</string>
+    <string name="save_to_downloads">Hifadhi kwenye Vipakuliwa</string>
+    <string name="saved_to_downloads_whatsapp_tip">Imehifadhiwa kwenye Vipakuliwa. Kidokezo: Tumia WhatsApp 📎 → Hati kuona onyesho pana.</string>
 </resources>

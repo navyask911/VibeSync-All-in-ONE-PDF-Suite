@@ -507,4 +507,6 @@
     <string name="batch_duplicate">ബാച്ച് പകർത്തുക</string>
     <string name="batch_duplicate_success">ബാച്ച് പകർത്തി.</string>
     <string name="batch_rename_success">ബാച്ചിന്റെ പേര് മാറ്റി.</string>
+    <string name="save_to_downloads">ഡൗൺലോഡുകളിലേക്ക് സേവ് ചെയ്യുക</string>
+    <string name="saved_to_downloads_whatsapp_tip">ഡൗൺലോഡുകളിലേക്ക് സേവ് ചെയ്തു. ടിപ്പ്: വീതിയേറിയ പ്രിവ്യൂ കാണാൻ WhatsApp 📎 → Document ഉപയോഗിക്കുക.</string>
 </resources>

@@ -1,5 +1,13 @@
 package com.vibesync.toolkit.pdf.presentation.viewer
 
+import android.Manifest
+import android.content.ContentValues
+import android.content.pm.PackageManager
+import android.os.Build
+import android.os.Environment
+import android.media.MediaScannerConnection
+import android.provider.MediaStore
+
 import com.vibesync.toolkit.pdf.data.pdf.PdfBitmapUtils
 import com.vibesync.toolkit.pdf.data.pdf.PdfBoxToolkitEngine
 import android.content.Context
@@ -94,6 +102,48 @@ fun ExportMenu(
             .substringBeforeLast('.')
             .ifBlank { "document" }
     }
+    val saveToDownloadsTask: () -> Unit = {
+        coroutineScope.launch {
+            runExport(
+                context,
+                { savePdfToDownloads(context, sourceUri, "$baseName.pdf") },
+                onDone = {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.saved_to_downloads_whatsapp_tip),
+                        Toast.LENGTH_LONG
+                    ).show()
+                },
+                onError = { showExportError(context, it) }
+            )
+        }
+    }
+    val legacyStoragePermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            saveToDownloadsTask()
+        } else {
+            Toast.makeText(
+                context,
+                context.getString(R.string.storage_permissions_denied),
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    fun requestSaveToDownloads() {
+        expanded = false
+        if (
+            Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+        ) {
+            legacyStoragePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            saveToDownloadsTask()
+        }
+    }
+
 
     fun requestSaf(mimeType: String, displayName: String, launch: () -> Unit) {
         onExportSelected(mimeType, displayName)
@@ -196,6 +246,11 @@ fun ExportMenu(
                         val name = generateSmartFileName("VibeSync_Export", "pdf")
                         requestSaf("application/pdf", name) { pdfLauncher.launch(name) }
                     }
+                )
+                DropdownMenuItem(
+                    text = { Text(stringResource(R.string.save_to_downloads)) },
+                    modifier = Modifier.testTag("save_to_downloads"),
+                    onClick = { requestSaveToDownloads() }
                 )
                 DropdownMenuItem(
                     text = { Text(stringResource(R.string.export_jpg_current)) },
@@ -391,6 +446,80 @@ private suspend fun runExport(
 
 private fun showExportError(context: Context, error: Throwable) {
     Toast.makeText(context, error.localizedMessage ?: context.getString(R.string.export_failed), Toast.LENGTH_LONG).show()
+}
+
+private const val PDF_MIME_TYPE = "application/pdf"
+
+private suspend fun savePdfToDownloads(
+    context: Context,
+    sourceUri: Uri,
+    requestedDisplayName: String
+) = withContext(Dispatchers.IO) {
+    val displayName = File(requestedDisplayName).name.ifBlank { "document.pdf" }
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+        val resolver = context.contentResolver
+        val relativePath = "${Environment.DIRECTORY_DOWNLOADS}/VibeSync"
+        val values = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
+            put(MediaStore.MediaColumns.MIME_TYPE, PDF_MIME_TYPE)
+            put(MediaStore.MediaColumns.RELATIVE_PATH, relativePath)
+            put(MediaStore.MediaColumns.IS_PENDING, 1)
+        }
+        val savedUri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: throw IOException("Could not create the Downloads/VibeSync PDF entry.")
+        try {
+            val output = resolver.openOutputStream(savedUri, "w")
+                ?: throw IOException("Could not open the Downloads/VibeSync PDF entry.")
+            output.use { writeWatermarkedPdfToOutput(context, sourceUri, it) }
+            val published = ContentValues().apply {
+                put(MediaStore.MediaColumns.IS_PENDING, 0)
+            }
+            if (resolver.update(savedUri, published, null, null) <= 0) {
+                throw IOException("Could not publish the saved PDF in Downloads.")
+            }
+        } catch (error: Throwable) {
+            resolver.delete(savedUri, null, null)
+            throw error
+        }
+    } else {
+        @Suppress("DEPRECATION")
+        val publicDownloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        val targetDirectory = File(publicDownloads, "VibeSync")
+        if (!targetDirectory.exists() && !targetDirectory.mkdirs()) {
+            throw IOException("Could not create the Downloads/VibeSync folder.")
+        }
+        if (!targetDirectory.isDirectory) {
+            throw IOException("The Downloads/VibeSync path is not a directory.")
+        }
+        val outputFile = createUniqueDownloadFile(targetDirectory, displayName)
+        try {
+            FileOutputStream(outputFile).use { writeWatermarkedPdfToOutput(context, sourceUri, it) }
+            MediaScannerConnection.scanFile(
+                context,
+                arrayOf(outputFile.absolutePath),
+                arrayOf(PDF_MIME_TYPE),
+                null
+            )
+        } catch (error: Throwable) {
+            outputFile.delete()
+            throw error
+        }
+    }
+}
+
+private fun createUniqueDownloadFile(directory: File, requestedName: String): File {
+    val extension = requestedName.substringAfterLast('.', "")
+    val stem = if (extension.isBlank()) requestedName else requestedName.substringBeforeLast('.')
+    for (suffix in 0..1000) {
+        val candidateName = when {
+            suffix == 0 -> requestedName
+            extension.isBlank() -> "${stem}_$suffix"
+            else -> "${stem}_$suffix.$extension"
+        }
+        val candidate = File(directory, candidateName)
+        if (candidate.createNewFile()) return candidate
+    }
+    throw IOException("Could not reserve a unique file name in Downloads/VibeSync.")
 }
 
 private suspend fun copyPdfToSaf(context: Context, sourceUri: Uri, targetUri: Uri) {

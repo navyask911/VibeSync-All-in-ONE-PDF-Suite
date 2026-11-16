@@ -507,4 +507,6 @@
     <string name="batch_duplicate">బ్యాచ్‌ను నకలు చేయండి</string>
     <string name="batch_duplicate_success">బ్యాచ్ నకలు చేయబడింది.</string>
     <string name="batch_rename_success">బ్యాచ్ పేరు మార్చబడింది.</string>
+    <string name="save_to_downloads">డౌన్‌లోడ్‌లలో సేవ్ చేయండి</string>
+    <string name="saved_to_downloads_whatsapp_tip">డౌన్‌లోడ్‌లలో సేవ్ అయింది. సూచన: వెడల్పైన ప్రివ్యూ కోసం WhatsApp 📎 → Document ఉపయోగించండి.</string>
 </resources>

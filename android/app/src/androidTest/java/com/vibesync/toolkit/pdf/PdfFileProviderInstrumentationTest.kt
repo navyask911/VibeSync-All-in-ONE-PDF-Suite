@@ -3,7 +3,6 @@ package com.vibesync.toolkit.pdf
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
@@ -49,7 +48,6 @@ class PdfFileProviderInstrumentationTest {
         PDFBoxResourceLoader.init(context)
         val source = File(context.cacheDir, "whatsapp_preview_${System.nanoTime()}.pdf")
         var staged: File? = null
-        var preview: File? = null
         try {
             PDDocument().use { document ->
                 val firstPage = PDPage(PDRectangle.A4)
@@ -65,45 +63,30 @@ class PdfFileProviderInstrumentationTest {
 
             val chooser = PdfShareHelper.createChooserIntent(
                 context,
-                listOf(source),
+                source,
                 "Share PDF",
                 uriProvider = { shareContext, file ->
-                    if (file.extension.equals("pdf", ignoreCase = true)) staged = file else preview = file
+                    staged = file
                     UriUtils.getShareableUri(shareContext, file)
                 }
             )
             @Suppress("DEPRECATION")
             val sendIntent = requireNotNull(chooser.getParcelableExtra(Intent.EXTRA_INTENT) as? Intent)
-            @Suppress("DEPRECATION")
-            val sharedUris = requireNotNull(sendIntent.getParcelableArrayListExtra<android.net.Uri>(Intent.EXTRA_STREAM))
-            assertEquals(Intent.ACTION_SEND_MULTIPLE, sendIntent.action)
+            assertEquals(Intent.ACTION_SEND, sendIntent.action)
             assertEquals("application/pdf", sendIntent.type)
-            assertEquals(2, sharedUris.size)
-            val sharedUri = sharedUris[0]
-            val thumbnailUri = sharedUris[1]
+            @Suppress("DEPRECATION")
+            val sharedUri = requireNotNull(sendIntent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM))
+            assertEquals("content", sharedUri.scheme)
             assertEquals("application/pdf", sendIntent.clipData?.description?.getMimeType(0))
-            assertEquals("image/jpeg", sendIntent.clipData?.description?.getMimeType(1))
+            assertEquals(1, sendIntent.clipData?.itemCount)
             assertEquals(sharedUri, sendIntent.clipData?.getItemAt(0)?.uri)
-            assertEquals(thumbnailUri, sendIntent.clipData?.getItemAt(1)?.uri)
-            assertEquals(2, chooser.clipData?.itemCount)
+            assertEquals(1, chooser.clipData?.itemCount)
+            assertEquals(sharedUri, chooser.clipData?.getItemAt(0)?.uri)
             assertTrue(sendIntent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
             assertTrue(chooser.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
             assertEquals(0, sendIntent.flags and Intent.FLAG_ACTIVITY_NO_HISTORY)
             assertEquals(0, chooser.flags and Intent.FLAG_ACTIVITY_NO_HISTORY)
             assertArrayEquals(source.readBytes(), requireNotNull(staged).readBytes())
-
-            val thumbnail = context.contentResolver.openInputStream(thumbnailUri).use { input ->
-                requireNotNull(input) { "FileProvider could not open the preview JPEG URI." }.let(BitmapFactory::decodeStream)
-            }
-            assertNotNull("The sidecar must be a decodable JPEG.", thumbnail)
-            requireNotNull(thumbnail).let { bitmap ->
-                try {
-                    assertTrue("Preview width must be at most 300 px.", bitmap.width <= 300)
-                    assertTrue("Preview height must be at most 300 px.", bitmap.height <= 300)
-                } finally {
-                    bitmap.recycle()
-                }
-            }
 
             context.contentResolver.openFileDescriptor(sharedUri, "r").use { descriptor ->
                 assertNotNull(descriptor)
@@ -128,7 +111,6 @@ class PdfFileProviderInstrumentationTest {
         } finally {
             source.delete()
             staged?.delete()
-            preview?.delete()
         }
     }
 
@@ -145,7 +127,6 @@ class PdfFileProviderInstrumentationTest {
         val source = File(context.cacheDir, "whatsapp_encrypted_source_${System.nanoTime()}.pdf")
         val prepared = File(context.cacheDir, "whatsapp_prepared_${System.nanoTime()}.pdf")
         var staged: File? = null
-        var preview: File? = null
         try {
             PDDocument().use { document ->
                 val page = PDPage(PDRectangle.A4)
@@ -212,47 +193,30 @@ class PdfFileProviderInstrumentationTest {
 
             val chooser = PdfShareHelper.createChooserIntent(
                 context,
-                listOf(prepared),
+                prepared,
                 "Share PDF",
                 uriProvider = { shareContext, file ->
-                    if (file.extension.equals("pdf", ignoreCase = true)) staged = file else preview = file
+                    staged = file
                     UriUtils.getShareableUri(shareContext, file)
                 }
             )
             @Suppress("DEPRECATION")
             val sendIntent = requireNotNull(chooser.getParcelableExtra(Intent.EXTRA_INTENT) as? Intent)
-            @Suppress("DEPRECATION")
-            val sharedUris = requireNotNull(sendIntent.getParcelableArrayListExtra<android.net.Uri>(Intent.EXTRA_STREAM))
-            assertEquals(Intent.ACTION_SEND_MULTIPLE, sendIntent.action)
+            assertEquals(Intent.ACTION_SEND, sendIntent.action)
             assertEquals("application/pdf", sendIntent.type)
-            assertEquals(2, sharedUris.size)
-            val sharedUri = sharedUris[0]
-            val thumbnailUri = sharedUris[1]
+            @Suppress("DEPRECATION")
+            val sharedUri = requireNotNull(sendIntent.getParcelableExtra<android.net.Uri>(Intent.EXTRA_STREAM))
             assertEquals("content", sharedUri.scheme)
-            assertEquals("content", thumbnailUri.scheme)
-            assertEquals(sharedUri, sendIntent.clipData?.getItemAt(0)?.uri)
-            assertEquals(thumbnailUri, sendIntent.clipData?.getItemAt(1)?.uri)
-            assertEquals(sharedUri, chooser.clipData?.getItemAt(0)?.uri)
-            assertEquals(thumbnailUri, chooser.clipData?.getItemAt(1)?.uri)
             assertEquals("application/pdf", sendIntent.clipData?.description?.getMimeType(0))
-            assertEquals("image/jpeg", sendIntent.clipData?.description?.getMimeType(1))
+            assertEquals(1, sendIntent.clipData?.itemCount)
+            assertEquals(sharedUri, sendIntent.clipData?.getItemAt(0)?.uri)
+            assertEquals(1, chooser.clipData?.itemCount)
+            assertEquals(sharedUri, chooser.clipData?.getItemAt(0)?.uri)
             assertTrue(sendIntent.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
             assertTrue(chooser.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION != 0)
             assertEquals(0, sendIntent.flags and Intent.FLAG_ACTIVITY_NO_HISTORY)
             assertEquals(0, chooser.flags and Intent.FLAG_ACTIVITY_NO_HISTORY)
-
-            val thumbnail = context.contentResolver.openInputStream(thumbnailUri).use { input ->
-                requireNotNull(input) { "FileProvider could not open the preview JPEG URI." }.let(BitmapFactory::decodeStream)
-            }
-            assertNotNull("The sidecar must be a decodable JPEG.", thumbnail)
-            requireNotNull(thumbnail).let { bitmap ->
-                try {
-                    assertTrue("Preview width must be at most 300 px.", bitmap.width <= 300)
-                    assertTrue("Preview height must be at most 300 px.", bitmap.height <= 300)
-                } finally {
-                    bitmap.recycle()
-                }
-            }
+            assertArrayEquals(prepared.readBytes(), requireNotNull(staged).readBytes())
 
             context.contentResolver.openFileDescriptor(sharedUri, "r").use { descriptor ->
                 assertNotNull(descriptor)
@@ -281,7 +245,6 @@ class PdfFileProviderInstrumentationTest {
             source.delete()
             prepared.delete()
             staged?.delete()
-            preview?.delete()
         }
     }
 

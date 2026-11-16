@@ -508,4 +508,6 @@
     <string name="batch_duplicate">Дублювати пакет</string>
     <string name="batch_duplicate_success">Пакет продубльовано.</string>
     <string name="batch_rename_success">Пакет перейменовано.</string>
+    <string name="save_to_downloads">Зберегти в Завантаження</string>
+    <string name="saved_to_downloads_whatsapp_tip">Збережено в Завантаження. Порада: скористайтеся у WhatsApp 📎 → Документ, щоб побачити широкий попередній перегляд.</string>
 </resources>

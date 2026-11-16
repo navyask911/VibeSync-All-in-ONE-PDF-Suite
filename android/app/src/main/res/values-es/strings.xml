@@ -523,4 +523,6 @@
     <string name="batch_duplicate">Duplicar lote</string>
     <string name="batch_duplicate_success">Lote duplicado.</string>
     <string name="batch_rename_success">Lote renombrado.</string>
+    <string name="save_to_downloads">Guardar en Descargas</string>
+    <string name="saved_to_downloads_whatsapp_tip">Guardado en Descargas. Consejo: Usa WhatsApp 📎 → Documento para ver una vista previa amplia.</string>
 </resources>

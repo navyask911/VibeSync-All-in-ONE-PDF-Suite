@@ -513,4 +513,6 @@
     <string name="batch_duplicate">Duplikasi batch</string>
     <string name="batch_duplicate_success">Batch berhasil diduplikasi.</string>
     <string name="batch_rename_success">Nama batch berhasil diubah.</string>
+    <string name="save_to_downloads">Simpan ke Download</string>
+    <string name="saved_to_downloads_whatsapp_tip">Disimpan ke Download. Tips: Gunakan WhatsApp 📎 → Dokumen untuk melihat pratinjau lebar.</string>
 </resources>

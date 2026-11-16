@@ -513,4 +513,6 @@
     <string name="batch_duplicate">تكرار الدفعة</string>
     <string name="batch_duplicate_success">تم تكرار الدفعة.</string>
     <string name="batch_rename_success">تمت إعادة تسمية الدفعة.</string>
+    <string name="save_to_downloads">حفظ في التنزيلات</string>
+    <string name="saved_to_downloads_whatsapp_tip">تم الحفظ في التنزيلات. نصيحة: استخدم WhatsApp 📎 → المستند لرؤية معاينة عريضة.</string>
 </resources>

@@ -507,4 +507,6 @@
     <string name="batch_duplicate">ਬੈਚ ਦੀ ਨਕਲ ਬਣਾਓ</string>
     <string name="batch_duplicate_success">ਬੈਚ ਦੀ ਨਕਲ ਬਣ ਗਈ।</string>
     <string name="batch_rename_success">ਬੈਚ ਦਾ ਨਾਮ ਬਦਲਿਆ ਗਿਆ।</string>
+    <string name="save_to_downloads">ਡਾਊਨਲੋਡਾਂ ਵਿੱਚ ਸੁਰੱਖਿਅਤ ਕਰੋ</string>
+    <string name="saved_to_downloads_whatsapp_tip">ਡਾਊਨਲੋਡਾਂ ਵਿੱਚ ਸੁਰੱਖਿਅਤ ਕੀਤਾ ਗਿਆ। ਸੁਝਾਅ: ਚੌੜਾ ਪ੍ਰੀਵਿਊ ਦੇਖਣ ਲਈ WhatsApp 📎 → Document ਵਰਤੋ.</string>
 </resources>

@@ -513,4 +513,6 @@
     <string name="batch_duplicate">复制批次</string>
     <string name="batch_duplicate_success">已复制批次。</string>
     <string name="batch_rename_success">已重命名批次。</string>
+    <string name="save_to_downloads">保存到下载</string>
+    <string name="saved_to_downloads_whatsapp_tip">已保存到下载。提示：在 WhatsApp 中使用 📎 → 文档即可查看宽幅预览。</string>
 </resources>

@@ -507,4 +507,6 @@
     <string name="batch_duplicate">Duplikuj partię</string>
     <string name="batch_duplicate_success">Partia została zduplikowana.</string>
     <string name="batch_rename_success">Zmieniono nazwę partii.</string>
+    <string name="save_to_downloads">Zapisz w Pobranych</string>
+    <string name="saved_to_downloads_whatsapp_tip">Zapisano w Pobranych. Wskazówka: użyj w WhatsApp 📎 → Dokument, aby zobaczyć szeroki podgląd.</string>
 </resources>

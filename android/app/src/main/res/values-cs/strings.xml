@@ -507,4 +507,6 @@
     <string name="batch_duplicate">Duplikovat dávku</string>
     <string name="batch_duplicate_success">Dávka byla duplikována.</string>
     <string name="batch_rename_success">Dávka byla přejmenována.</string>
+    <string name="save_to_downloads">Uložit do Stažených souborů</string>
+    <string name="saved_to_downloads_whatsapp_tip">Uloženo do Stažených souborů. Tip: Pro široký náhled použijte ve WhatsApp 📎 → Dokument.</string>
 </resources>

@@ -507,4 +507,6 @@
     <string name="batch_duplicate">I-duplicate ang batch</string>
     <string name="batch_duplicate_success">Na-duplicate ang batch.</string>
     <string name="batch_rename_success">Pinalitan ang pangalan ng batch.</string>
+    <string name="save_to_downloads">I-save sa Downloads</string>
+    <string name="saved_to_downloads_whatsapp_tip">Na-save sa Downloads. Tip: Gamitin ang WhatsApp 📎 → Document para makakita ng malapad na preview.</string>
 </resources>

@@ -507,4 +507,6 @@
     <string name="batch_duplicate">ಬ್ಯಾಚ್ ನಕಲಿಸಿ</string>
     <string name="batch_duplicate_success">ಬ್ಯಾಚ್ ನಕಲಿಸಲಾಗಿದೆ.</string>
     <string name="batch_rename_success">ಬ್ಯಾಚ್ ಹೆಸರು ಬದಲಾಯಿಸಲಾಗಿದೆ.</string>
+    <string name="save_to_downloads">ಡೌನ್‌ಲೋಡ್‌ಗಳಿಗೆ ಉಳಿಸಿ</string>
+    <string name="saved_to_downloads_whatsapp_tip">ಡೌನ್‌ಲೋಡ್‌ಗಳಿಗೆ ಉಳಿಸಲಾಗಿದೆ. ಸಲಹೆ: ವಿಶಾಲ ಪೂರ್ವವೀಕ್ಷಣೆಗಾಗಿ WhatsApp 📎 → Document ಬಳಸಿ.</string>
 </resources>

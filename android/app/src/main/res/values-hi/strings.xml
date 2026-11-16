@@ -513,4 +513,6 @@
     <string name="batch_duplicate">बैच की प्रतिलिपि बनाएँ</string>
     <string name="batch_duplicate_success">बैच की प्रतिलिपि बनाई गई।</string>
     <string name="batch_rename_success">बैच का नाम बदल दिया गया।</string>
+    <string name="save_to_downloads">डाउनलोड में सेव करें</string>
+    <string name="saved_to_downloads_whatsapp_tip">डाउनलोड में सेव हो गया। सुझाव: चौड़ा प्रीव्यू देखने के लिए WhatsApp 📎 → Document का उपयोग करें।</string>
 </resources>

@@ -507,4 +507,6 @@
     <string name="batch_duplicate">Köteg másolása</string>
     <string name="batch_duplicate_success">A köteg másolata elkészült.</string>
     <string name="batch_rename_success">A köteg átnevezve.</string>
+    <string name="save_to_downloads">Mentés a Letöltések mappába</string>
+    <string name="saved_to_downloads_whatsapp_tip">Mentve a Letöltések mappába. Tipp: A széles előnézethez használd a WhatsApp 📎 → Dokumentum lehetőséget.</string>
 </resources>

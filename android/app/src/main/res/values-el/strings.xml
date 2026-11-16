@@ -507,4 +507,6 @@
     <string name="batch_duplicate">Δημιουργία αντιγράφου παρτίδας</string>
     <string name="batch_duplicate_success">Η παρτίδα αντιγράφηκε.</string>
     <string name="batch_rename_success">Η παρτίδα μετονομάστηκε.</string>
+    <string name="save_to_downloads">Αποθήκευση στις Λήψεις</string>
+    <string name="saved_to_downloads_whatsapp_tip">Αποθηκεύτηκε στις Λήψεις. Συμβουλή: Χρησιμοποιήστε στο WhatsApp 📎 → Έγγραφο για ευρεία προεπισκόπηση.</string>
 </resources>

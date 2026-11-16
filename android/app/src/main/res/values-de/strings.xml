@@ -523,4 +523,6 @@
     <string name="batch_duplicate">Stapel duplizieren</string>
     <string name="batch_duplicate_success">Stapel wurde dupliziert.</string>
     <string name="batch_rename_success">Stapel wurde umbenannt.</string>
+    <string name="save_to_downloads">In Downloads speichern</string>
+    <string name="saved_to_downloads_whatsapp_tip">In Downloads gespeichert. Tipp: Verwende in WhatsApp 📎 → Dokument, um eine breite Vorschau zu sehen.</string>
 </resources>
